@@ -45,7 +45,7 @@ job "counter-api" {
       driver = "raw_exec"
 
       artifact {
-        source      = "git::https://github.com/thangchung/go-coffeeshop"
+        source      = "git::https://github.com/HannahMarsh/pi_t-experiment"
         destination = "local/repo"
       }
 
@@ -53,7 +53,7 @@ job "counter-api" {
         command = "bash"
         args = [
           "-c",
-          "cd local/repo/cmd/counter && go mod tidy && go mod download && CGO_ENABLED=0 go run -tags migrate github.com/thangchung/go-coffeeshop/cmd/counter"
+          "cd local/repo/cmd/counter && go mod tidy && go mod download && CGO_ENABLED=0 go run -tags migrate github.com/HannahMarsh/pi_t-experiment/cmd/counter"
         ]
       }
 

@@ -1,4 +1,4 @@
-module github.com/thangchung/go-coffeeshop
+module github.com/HannahMarsh/pi_t-experiment
 
 go 1.19
 

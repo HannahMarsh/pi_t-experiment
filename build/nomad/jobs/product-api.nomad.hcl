@@ -30,7 +30,7 @@ job "product-api" {
       driver = "raw_exec"
 
       artifact {
-        source      = "git::https://github.com/thangchung/go-coffeeshop"
+        source      = "git::https://github.com/HannahMarsh/pi_t-experiment"
         destination = "local/repo"
       }
 
@@ -38,7 +38,7 @@ job "product-api" {
         command = "bash"
         args = [
           "-c",
-          "cd local/repo/cmd/product && go mod tidy && go mod download && CGO_ENABLED=0 go run github.com/thangchung/go-coffeeshop/cmd/product"
+          "cd local/repo/cmd/product && go mod tidy && go mod download && CGO_ENABLED=0 go run github.com/HannahMarsh/pi_t-experiment/cmd/product"
         ]
       }
 

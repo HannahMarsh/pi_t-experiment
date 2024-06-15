@@ -45,7 +45,7 @@ job "web" {
       driver = "raw_exec"
 
       artifact {
-        source      = "git::https://github.com/thangchung/go-coffeeshop"
+        source      = "git::https://github.com/HannahMarsh/pi_t-experiment"
         destination = "local/repo"
       }
 
@@ -53,7 +53,7 @@ job "web" {
         command = "bash"
         args = [
           "-c",
-          "cd local/repo/cmd/web && go mod tidy && go mod download && CGO_ENABLED=0 go run github.com/thangchung/go-coffeeshop/cmd/web"
+          "cd local/repo/cmd/web && go mod tidy && go mod download && CGO_ENABLED=0 go run github.com/HannahMarsh/pi_t-experiment/cmd/web"
         ]
       }
 

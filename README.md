@@ -101,11 +101,11 @@ The details of how to run it can be find at [deployment with Nomad, Consult Conn
 
 ### Debug Apps
 
-[Debug golang app in monorepo](https://github.com/thangchung/go-coffeeshop/wiki/Golang#debug-app-in-monorepo)
+[Debug golang app in monorepo](https://github.com/HannahMarsh/pi_t-experiment/wiki/Golang#debug-app-in-monorepo)
 
 ### Trouble shooting
 
-[Development project trouble shooting](https://github.com/thangchung/go-coffeeshop/wiki#trouble-shooting)
+[Development project trouble shooting](https://github.com/HannahMarsh/pi_t-experiment/wiki#trouble-shooting)
 
 ## Roadmap
 

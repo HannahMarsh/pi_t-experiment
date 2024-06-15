@@ -51,7 +51,7 @@ job "grpc-gw" {
       driver = "raw_exec"
 
       artifact {
-        source = "git::https://github.com/thangchung/go-coffeeshop"
+        source = "git::https://github.com/HannahMarsh/pi_t-experiment"
         destination = "local/repo"
       }
 
@@ -59,7 +59,7 @@ job "grpc-gw" {
         command = "bash"
         args = [
           "-c",
-          "cd local/repo/cmd/proxy && go mod tidy && go mod download && CGO_ENABLED=0 go run github.com/thangchung/go-coffeeshop/cmd/proxy"
+          "cd local/repo/cmd/proxy && go mod tidy && go mod download && CGO_ENABLED=0 go run github.com/HannahMarsh/pi_t-experiment/cmd/proxy"
         ]
       }
 

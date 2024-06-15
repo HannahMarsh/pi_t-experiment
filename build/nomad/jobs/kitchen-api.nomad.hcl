@@ -26,7 +26,7 @@ job "kitchen-api" {
       driver = "raw_exec"
 
       artifact {
-        source      = "git::https://github.com/thangchung/go-coffeeshop"
+        source      = "git::https://github.com/HannahMarsh/pi_t-experiment"
         destination = "local/repo"
       }
 
@@ -34,7 +34,7 @@ job "kitchen-api" {
         command = "bash"
         args = [
           "-c",
-          "cd local/repo/cmd/kitchen && go mod tidy && go mod download && CGO_ENABLED=0 go run -tags migrate github.com/thangchung/go-coffeeshop/cmd/kitchen"
+          "cd local/repo/cmd/kitchen && go mod tidy && go mod download && CGO_ENABLED=0 go run -tags migrate github.com/HannahMarsh/pi_t-experiment/cmd/kitchen"
         ]
       }
 

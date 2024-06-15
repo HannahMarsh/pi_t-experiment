@@ -6,7 +6,7 @@ import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 import "common.proto";
 
-option go_package = "github.com/thangchung/go-coffeeshop/proto/gen";
+option go_package = "github.com/HannahMarsh/pi_t-experiment/proto/gen";
 
 service ProductService {
   rpc GetItemTypes(GetItemTypesRequest) returns (GetItemTypesResponse) {

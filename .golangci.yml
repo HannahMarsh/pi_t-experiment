@@ -1,6 +1,6 @@
 linters-settings:
   gci:
-    local-prefixes: github.com/thangchung/go-coffeeshop
+    local-prefixes: github.com/HannahMarsh/pi_t-experiment
   dupl:
     threshold: 100
   errorlint:
