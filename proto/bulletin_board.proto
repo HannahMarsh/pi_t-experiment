@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package proto;
+
+service BulletinBoardService {
+  rpc RegisterNode(Node) returns (RegisterNodeResponse);
+  rpc GetActiveNodes(Empty) returns (ActiveNodesResponse);
+  rpc BroadcastStartSignal(Empty) returns (StartSignalResponse);
+}
+
+message Node {
+  string id = 1;
+  string host = 2;
+  int32 port = 3;
+  string last_heartbeat = 4;
+}
+
+message RegisterNodeResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ActiveNodesResponse {
+  repeated Node active_nodes = 1;
+}
+
+message StartSignalResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message Empty {}
