@@ -3,8 +3,9 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"pi_t-experiment/internal/domain/models"
-	"pi_t-experiment/internal/usecases"
+
+	"github.com/HannahMarsh/pi_t-experiment/internal/domain/models"
+	"github.com/HannahMarsh/pi_t-experiment/internal/usecases"
 )
 
 type BulletinBoardHandler struct {

@@ -1,9 +1,10 @@
 package usecases
 
 import (
-	"pi_t-experiment/internal/domain/interfaces"
-	"pi_t-experiment/internal/domain/models"
 	"time"
+
+	"github.com/HannahMarsh/pi_t-experiment/internal/domain/interfaces"
+	"github.com/HannahMarsh/pi_t-experiment/internal/domain/models"
 )
 
 type NodeService struct {
