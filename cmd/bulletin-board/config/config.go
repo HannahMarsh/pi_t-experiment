@@ -6,16 +6,16 @@ import (
 	"os"
 
 	"github.com/ilyakaznacheev/cleanenv"
-	configs "github.com/thangchung/go-coffeeshop/pkg/config"
+	configs "github.com/HannahMarsh/pi_t-experiment/pkg/config"
 )
 
 type (
 	Config struct {
 		configs.App  `yaml:"app"`
 		configs.HTTP `yaml:"http"`
-		configs.Log  `yaml:"logger"`
-		PG           `yaml:"postgres"`
-		RabbitMQ     `yaml:"rabbitmq"`
+		configs.Log `yaml:"logger"`
+		PG          `yaml:"postgres"`
+		RabbitMQ    `yaml:"rabbitmq"`
 	}
 
 	PG struct {
