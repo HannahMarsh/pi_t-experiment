@@ -10,6 +10,7 @@
     "go.mod",
     "go.sum",
     ".git/*",
-    "*/dev/null"
+    "*/dev/null",
+    "git add . ; npm link ai-commit ; ai-commit"
   ]
 }

@@ -67,6 +67,7 @@ func main() {
 	select {
 	case v := <-quit:
 		cleanup()
+		cancel()
 		slog.Info("signal.Notify", v)
 	case done := <-ctx.Done():
 		cleanup()
