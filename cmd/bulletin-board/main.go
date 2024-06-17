@@ -6,15 +6,12 @@ import (
 	"flag"
 	"fmt"
 	"github.com/HannahMarsh/pi_t-experiment/cmd/config"
-	"github.com/HannahMarsh/pi_t-experiment/internal/repositories"
-	"github.com/HannahMarsh/pi_t-experiment/internal/usecases"
-	"github.com/HannahMarsh/pi_t-experiment/pkg/api/handlers"
+	"github.com/HannahMarsh/pi_t-experiment/internal/bulletin_board"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/infrastructure/logger"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"go.uber.org/automaxprocs/maxprocs"
@@ -62,23 +59,16 @@ func main() {
 	// integrate Logrus with the slog logger
 	slog.New(logger.NewLogrusHandler(logrus.StandardLogger()))
 
-	bulletinBoardRepo := &repositories.BulletinBoardRepositoryImpl{}
-	bulletinBoardService := &usecases.BulletinBoardService{
-		Repo:     bulletinBoardRepo,
-		Interval: time.Duration(cfg.HeartbeatInterval) * time.Second, // Interval for each run
-	}
-	bulletinBoardHandler := &handlers.BulletinBoardHandler{
-		Service: bulletinBoardService,
-	}
+	bulletinBoard := bulletin_board.NewBulletinBoard()
 
-	go bulletinBoardHandler.StartRuns()
+	go bulletinBoard.StartRuns()
 
-	http.HandleFunc("/register", bulletinBoardHandler.RegisterNode)
+	http.HandleFunc("/register", bulletinBoard.RegisterNode)
 
 	go func() {
 		address := fmt.Sprintf(":%d", port)
-		if err := http.ListenAndServe(address, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("failed to start HTTP server", err)
+		if err2 := http.ListenAndServe(address, nil); err2 != nil && !errors.Is(err2, http.ErrServerClosed) {
+			slog.Error("failed to start HTTP server", err2)
 		}
 	}()
 

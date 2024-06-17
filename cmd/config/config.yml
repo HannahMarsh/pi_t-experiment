@@ -7,7 +7,9 @@ nodes:
     host: 'http://localhost'
     port: 1122
     pkey: '123456'
+    prkey: 'ss'
   - id: 2
     host: 'http://localhost'
     port: 1123
     pkey: '7891011'
+    prkey: 'ss'

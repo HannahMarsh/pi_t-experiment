@@ -14,10 +14,11 @@ type BulletinBoard struct {
 }
 
 type Node struct {
-	ID        int    `yaml:"id"`
-	Host      string `yaml:"host"`
-	Port      int    `yaml:"port"`
-	PublicKey string `yaml:"public_key"`
+	ID         int    `yaml:"id"`
+	Host       string `yaml:"host"`
+	Port       int    `yaml:"port"`
+	PublicKey  string `yaml:"public_key"`
+	PrivateKey string `yaml:"private_key"`
 }
 
 type GlobalConfig struct {

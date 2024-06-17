@@ -1,31 +1,48 @@
 package node
 
-import "time"
+import (
+	"github.com/HannahMarsh/pi_t-experiment/internal/api"
+	"github.com/orcaman/concurrent-map/v2"
+)
 
 // Node represents a node in the onion routing network
 type Node struct {
-	ID            int
-	Host          string
-	Port          int
-	LastHeartbeat time.Time
-	PublicKey     []byte
-	PrivateKey    []byte
+	ID         int
+	Host       string
+	Port       int
+	PublicKey  []byte
+	PrivateKey []byte
+	OtherNodes cmap.ConcurrentMap[string, api.Node]
 }
 
 // NewNode creates a new node
-func NewNode(id int, host string, port int, publicKey []byte) *Node {
+func NewNode(id int, host string, port int, publicKey []byte, privateKey []byte) *Node {
 	return &Node{
-		ID:            id,
-		Host:          host,
-		Port:          port,
-		LastHeartbeat: time.Now(),
-		PublicKey:     publicKey,
+		ID:         id,
+		Host:       host,
+		Port:       port,
+		PublicKey:  publicKey,
+		PrivateKey: privateKey,
+		OtherNodes: cmap.New[api.Node](),
 	}
 }
 
-// UpdateHeartbeat updates the last heartbeat time of the node
-func (n *Node) UpdateHeartbeat() {
-	n.LastHeartbeat = time.Now()
+func (n *Node) updateNode(node api.Node) {
+	n.OtherNodes.Set(node.Address, node)
+}
+
+func (n *Node) startRun(activeNodes []api.Node) {
+	n.OtherNodes.Clear()
+	var participate bool = false
+	for _, node := range activeNodes {
+		n.updateNode(node)
+		if node.ID == n.ID {
+			participate = true
+		}
+	}
+	if participate {
+
+	}
 }
 
 func (n *Node) Receive(o *Onion) error {

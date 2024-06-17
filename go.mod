@@ -9,10 +9,10 @@ require (
 	github.com/ilyakaznacheev/cleanenv v1.3.0
 	github.com/kyleconroy/sqlc v1.16.0
 	github.com/lib/pq v1.10.7
+	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/pkg/errors v0.9.1
 	github.com/rabbitmq/amqp091-go v1.5.0
 	github.com/sirupsen/logrus v1.9.0
-	github.com/streadway/amqp v1.1.0
 	go.uber.org/automaxprocs v1.5.1
 	golang.org/x/exp v0.0.0-20221026153819-32f3d567a233
 	google.golang.org/genproto v0.0.0-20221014213838-99cd37c6964a

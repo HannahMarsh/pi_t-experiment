@@ -6,8 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/HannahMarsh/pi_t-experiment/cmd/config"
-	"github.com/HannahMarsh/pi_t-experiment/internal/usecases"
-	"github.com/HannahMarsh/pi_t-experiment/pkg/api/handlers"
+	"github.com/HannahMarsh/pi_t-experiment/internal/node"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/infrastructure/logger"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/automaxprocs/maxprocs"
@@ -81,16 +80,14 @@ func main() {
 	// integrate Logrus with the slog logger
 	slog.New(logger.NewLogrusHandler(logrus.StandardLogger()))
 
-	nodeHandler := &handlers.NodeHandler{
-		Service: usecases.Init(nodeConfig.ID, nodeConfig.Host, nodeConfig.Port, nodeConfig.PublicKey),
-	}
+	node := node.NewNode(nodeConfig.ID, nodeConfig.Host, nodeConfig.Port, []byte(nodeConfig.PublicKey), []byte(nodeConfig.PrivateKey))
 
-	http.HandleFunc("/receive", nodeHandler.Receive)
+	http.HandleFunc("/receive", node.HandleReceive)
 
 	go func() {
 		address := fmt.Sprintf(":%d", nodeConfig.Port)
-		if err := http.ListenAndServe(address, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("failed to start HTTP server", err)
+		if err2 := http.ListenAndServe(address, nil); err2 != nil && !errors.Is(err2, http.ErrServerClosed) {
+			slog.Error("failed to start HTTP server", err2)
 		}
 	}()
 
