@@ -8,6 +8,7 @@ type Node struct {
 	Host          string
 	Port          int
 	LastHeartbeat time.Time
+	PublicKey     []byte
 }
 
 // NewNode creates a new node

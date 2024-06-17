@@ -9,7 +9,7 @@ import (
 )
 
 type BulletinBoardHandler struct {
-	service *usecases.BulletinBoardService
+	Service *usecases.BulletinBoardService
 }
 
 func (h *BulletinBoardHandler) RegisterNode(w http.ResponseWriter, r *http.Request) {
@@ -18,7 +18,7 @@ func (h *BulletinBoardHandler) RegisterNode(w http.ResponseWriter, r *http.Reque
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := h.service.RegisterNode(&node); err != nil {
+	if err := h.Service.RegisterNode(&node); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -26,5 +26,5 @@ func (h *BulletinBoardHandler) RegisterNode(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *BulletinBoardHandler) StartRuns() {
-	go h.service.StartRuns()
+	go h.Service.StartRuns()
 }

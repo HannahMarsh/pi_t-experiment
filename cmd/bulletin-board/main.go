@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/HannahMarsh/pi_t-experiment/cmd/node/config"
+	"github.com/HannahMarsh/pi_t-experiment/cmd/bulletin-board/config"
+	"github.com/HannahMarsh/pi_t-experiment/cmd/global_config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/repositories"
 	"github.com/HannahMarsh/pi_t-experiment/internal/usecases"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/api/handlers"
@@ -23,54 +25,67 @@ import (
 
 func main() {
 	// set GOMAXPROCS
-	_, err := maxprocs.Set()
-	if err != nil {
+	if _, err := maxprocs.Set(); err != nil {
 		slog.Error("failed set max procs", err)
+		os.Exit(1)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	cfg, err := config.NewConfig()
+	global_cfg, err := global_config.NewConfig()
 	if err != nil {
-		slog.Error("failed get config", err)
+		slog.Error("failed get global config", err)
+		os.Exit(1)
 	}
 
-	slog.Info("⚡ init app", "name", cfg.Name, "version", cfg.Version)
+	host := global_cfg.BulletinBoard.Host
+	port := global_cfg.BulletinBoard.Port
+
+	cfg, err := config.NewConfig()
+	if err != nil {
+		slog.Error("failed get bulletin board config", err)
+	}
+
+	slog.Info("⚡ init Bulletin board")
 
 	// set up logrus
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	logrus.SetOutput(os.Stdout)
-	logrus.SetLevel(logger.ConvertLogLevel(cfg.Log.Level))
+	logrus.SetLevel(logger.ConvertLogLevel(cfg.LogLevel))
 
 	// integrate Logrus with the slog logger
 	slog.New(logger.NewLogrusHandler(logrus.StandardLogger()))
 
 	bulletinBoardRepo := &repositories.BulletinBoardRepositoryImpl{}
 	bulletinBoardService := &usecases.BulletinBoardService{
-		repo:     bulletinBoardRepo,
-		interval: 10 * time.Second, // Interval for each run
+		Repo:     bulletinBoardRepo,
+		Interval: time.Duration(global_cfg.HeartbeatInterval) * time.Second, // Interval for each run
 	}
 	bulletinBoardHandler := &handlers.BulletinBoardHandler{
-		service: bulletinBoardService,
+		Service: bulletinBoardService,
 	}
 
 	go bulletinBoardHandler.StartRuns()
 
-	slog.Info("🌏 start bulletin board...", "address", fmt.Sprintf("%s:%d", cfg.HTTP.Host, cfg.HTTP.Port))
-
 	http.HandleFunc("/register", bulletinBoardHandler.RegisterNode)
-	http.ListenAndServe(":8080", nil)
+
+	go func() {
+		address := fmt.Sprintf(":%d", port)
+		if err := http.ListenAndServe(address, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("failed to start HTTP server", err)
+		}
+	}()
+
+	slog.Info("🌏 start node...", "address", fmt.Sprintf("%s:%d", host, port))
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
 	select {
 	case v := <-quit:
-		cleanup()
 		cancel()
 		slog.Info("signal.Notify", v)
 	case done := <-ctx.Done():
-		cleanup()
 		slog.Info("ctx.Done", done)
 	}
 }

@@ -1,0 +1,11 @@
+heartbeat_interval: 5
+bulletin_board:
+  host: 'http://localhost'
+  port: 5000
+nodes:
+  - id: 1
+    host: 'http://localhost'
+    port: 1122
+  - id: 2
+    host: 'http://localhost'
+    port: 1123

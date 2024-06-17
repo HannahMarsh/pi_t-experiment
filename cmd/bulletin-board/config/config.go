@@ -2,31 +2,14 @@ package config
 
 import (
 	"fmt"
+	"github.com/ilyakaznacheev/cleanenv"
 	"log"
 	"os"
-
-	"github.com/ilyakaznacheev/cleanenv"
-	configs "github.com/HannahMarsh/pi_t-experiment/pkg/config"
 )
 
-type (
-	Config struct {
-		configs.App  `yaml:"app"`
-		configs.HTTP `yaml:"http"`
-		configs.Log `yaml:"logger"`
-		PG          `yaml:"postgres"`
-		RabbitMQ    `yaml:"rabbitmq"`
-	}
-
-	PG struct {
-		PoolMax int    `env-required:"true" yaml:"pool_max" env:"PG_POOL_MAX"`
-		DsnURL  string `env-required:"true" yaml:"dsn_url" env:"PG_DSN_URL"`
-	}
-
-	RabbitMQ struct {
-		URL string `env-required:"true" yaml:"url" env:"RABBITMQ_URL"`
-	}
-)
+type Config struct {
+	LogLevel string `yaml:"log_level"`
+}
 
 func NewConfig() (*Config, error) {
 	cfg := &Config{}

@@ -8,20 +8,20 @@ import (
 )
 
 type NodeService struct {
-	repo     interfaces.NodeRepository
-	interval time.Duration
+	Repo     interfaces.NodeRepository
+	Interval time.Duration
 }
 
-func (s *NodeService) RegisterNode(node *models.Node) error {
-	return s.repo.RegisterNode(node)
+func (s *NodeService) Receive(o *models.Onion) error {
+	panic("not implemented")
 }
 
 func (s *NodeService) Heartbeat(nodeID string) error {
-	return s.repo.Heartbeat(nodeID)
+	return s.Repo.Heartbeat(nodeID)
 }
 
 func (s *NodeService) StartActions() {
-	ticker := time.NewTicker(s.interval)
+	ticker := time.NewTicker(s.Interval)
 	for {
 		select {
 		case <-ticker.C:

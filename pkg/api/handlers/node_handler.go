@@ -9,16 +9,16 @@ import (
 )
 
 type NodeHandler struct {
-	service *usecases.NodeService
+	Service *usecases.NodeService
 }
 
-func (h *NodeHandler) RegisterNode(w http.ResponseWriter, r *http.Request) {
-	var node models.Node
-	if err := json.NewDecoder(r.Body).Decode(&node); err != nil {
+func (h *NodeHandler) Receive(w http.ResponseWriter, r *http.Request) {
+	var msg models.Message
+	if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := h.service.RegisterNode(&node); err != nil {
+	if err := h.Service.Receive(&msg); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -26,5 +26,5 @@ func (h *NodeHandler) RegisterNode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *NodeHandler) StartActions() {
-	go h.service.StartActions()
+	go h.Service.StartActions()
 }
