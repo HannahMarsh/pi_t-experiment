@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
-	"github.com/HannahMarsh/pi_t-experiment/cmd/bulletin-board/config"
-	"github.com/HannahMarsh/pi_t-experiment/cmd/global_config"
+	"github.com/HannahMarsh/pi_t-experiment/cmd/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/repositories"
 	"github.com/HannahMarsh/pi_t-experiment/internal/usecases"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/api/handlers"
@@ -24,6 +24,17 @@ import (
 )
 
 func main() {
+	logLevel := flag.String("log-level", "debug", "Log level")
+
+	flag.Usage = func() {
+		if _, err := fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0]); err != nil {
+			slog.Error("Usage of %s:\n", err, os.Args[0])
+		}
+		flag.PrintDefaults()
+	}
+
+	flag.Parse()
+
 	// set GOMAXPROCS
 	if _, err := maxprocs.Set(); err != nil {
 		slog.Error("failed set max procs", err)
@@ -32,26 +43,21 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	global_cfg, err := global_config.NewConfig()
+	cfg, err := config.NewConfig()
 	if err != nil {
-		slog.Error("failed get global config", err)
+		slog.Error("failed get config", err)
 		os.Exit(1)
 	}
 
-	host := global_cfg.BulletinBoard.Host
-	port := global_cfg.BulletinBoard.Port
-
-	cfg, err := config.NewConfig()
-	if err != nil {
-		slog.Error("failed get bulletin board config", err)
-	}
+	host := cfg.BulletinBoard.Host
+	port := cfg.BulletinBoard.Port
 
 	slog.Info("⚡ init Bulletin board")
 
 	// set up logrus
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	logrus.SetOutput(os.Stdout)
-	logrus.SetLevel(logger.ConvertLogLevel(cfg.LogLevel))
+	logrus.SetLevel(logger.ConvertLogLevel(*logLevel))
 
 	// integrate Logrus with the slog logger
 	slog.New(logger.NewLogrusHandler(logrus.StandardLogger()))
@@ -59,7 +65,7 @@ func main() {
 	bulletinBoardRepo := &repositories.BulletinBoardRepositoryImpl{}
 	bulletinBoardService := &usecases.BulletinBoardService{
 		Repo:     bulletinBoardRepo,
-		Interval: time.Duration(global_cfg.HeartbeatInterval) * time.Second, // Interval for each run
+		Interval: time.Duration(cfg.HeartbeatInterval) * time.Second, // Interval for each run
 	}
 	bulletinBoardHandler := &handlers.BulletinBoardHandler{
 		Service: bulletinBoardService,

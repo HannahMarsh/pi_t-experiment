@@ -1,4 +1,4 @@
-package global_config
+package config
 
 import (
 	"fmt"
@@ -14,9 +14,10 @@ type BulletinBoard struct {
 }
 
 type Node struct {
-	ID   int    `yaml:"id"`
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
+	ID        int    `yaml:"id"`
+	Host      string `yaml:"host"`
+	Port      int    `yaml:"port"`
+	PublicKey string `yaml:"public_key"`
 }
 
 type GlobalConfig struct {

@@ -6,6 +6,8 @@ nodes:
   - id: 1
     host: 'http://localhost'
     port: 1122
+    pkey: '123456'
   - id: 2
     host: 'http://localhost'
     port: 1123
+    pkey: '7891011'

@@ -5,21 +5,17 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/HannahMarsh/pi_t-experiment/cmd/global_config"
-	"github.com/HannahMarsh/pi_t-experiment/cmd/node/config"
-	"github.com/HannahMarsh/pi_t-experiment/internal/repositories"
+	"github.com/HannahMarsh/pi_t-experiment/cmd/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/usecases"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/api/handlers"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/infrastructure/logger"
+	"github.com/sirupsen/logrus"
+	"go.uber.org/automaxprocs/maxprocs"
+	"golang.org/x/exp/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
-
-	"github.com/sirupsen/logrus"
-	"go.uber.org/automaxprocs/maxprocs"
-	"golang.org/x/exp/slog"
 
 	_ "github.com/lib/pq"
 )
@@ -31,7 +27,7 @@ func main() {
 
 	flag.Usage = func() {
 		if _, err := fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0]); err != nil {
-			slog.Error("Usage of %s:\n", err, os.Args[0]);
+			slog.Error("Usage of %s:\n", err, os.Args[0])
 		}
 		flag.PrintDefaults()
 	}
@@ -41,12 +37,11 @@ func main() {
 	// Check if the required flag is provided
 	if *id == 0 {
 		if _, err := fmt.Fprintf(os.Stderr, "Error: the -id flag is required\n"); err != nil {
-			slog.Error("Error: the -id flag is required\n", err);
+			slog.Error("Error: the -id flag is required\n", err)
 		}
 		flag.Usage()
 		os.Exit(2)
 	}
-
 
 	// set GOMAXPROCS
 	_, err := maxprocs.Set()
@@ -57,15 +52,10 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	global_cfg, err := global_config.NewConfig()
-	if err != nil {
-		slog.Error("failed get global config", err)
-		os.Exit(1)
-	}
-
 	cfg, err := config.NewConfig()
 	if err != nil {
-		slog.Error("failed get node config", err)
+		slog.Error("failed get config", err)
+		os.Exit(1)
 	}
 
 	var nodeConfig *config.Node
@@ -81,7 +71,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("⚡ init node", "heartbeat_interval", global_cfg.HeartbeatInterval, "id", *id)
+	slog.Info("⚡ init node", "heartbeat_interval", cfg.HeartbeatInterval, "id", *id)
 
 	// set up logrus
 	logrus.SetFormatter(&logrus.JSONFormatter{})
@@ -91,18 +81,11 @@ func main() {
 	// integrate Logrus with the slog logger
 	slog.New(logger.NewLogrusHandler(logrus.StandardLogger()))
 
-	nodeRepo := &repositories.NodeRepositoryImpl{}
-	nodeService := &usecases.NodeService{
-		Repo:     nodeRepo,
-		Interval: time.Duration(global_cfg.HeartbeatInterval) * time.Second, // Interval for each run
-	}
 	nodeHandler := &handlers.NodeHandler{
-		Service: nodeService,
+		Service: usecases.Init(nodeConfig.ID, nodeConfig.Host, nodeConfig.Port, nodeConfig.PublicKey),
 	}
 
-	go nodeHandler.StartActions()
-
-	http.HandleFunc("/receive", nodeHandler.)
+	http.HandleFunc("/receive", nodeHandler.Receive)
 
 	go func() {
 		address := fmt.Sprintf(":%d", nodeConfig.Port)
@@ -111,7 +94,7 @@ func main() {
 		}
 	}()
 
-	slog.Info("🌏 start node...", "address", fmt.Sprintf("%s:%d", nodeConfig.IP, nodeConfig.Port))
+	slog.Info("🌏 start node...", "address", fmt.Sprintf("%s:%d", nodeConfig.Host, nodeConfig.Port))
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
