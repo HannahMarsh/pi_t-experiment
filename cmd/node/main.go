@@ -80,7 +80,9 @@ func main() {
 	// integrate Logrus with the slog logger
 	slog.New(logger.NewLogrusHandler(logrus.StandardLogger()))
 
-	node := node.NewNode(nodeConfig.ID, nodeConfig.Host, nodeConfig.Port, []byte(nodeConfig.PublicKey), []byte(nodeConfig.PrivateKey))
+	baddress := fmt.Sprintf("%s:%d", cfg.BulletinBoard.Host, cfg.BulletinBoard.Port)
+
+	node := node.NewNode(nodeConfig.ID, nodeConfig.Host, nodeConfig.Port, []byte(nodeConfig.PublicKey), []byte(nodeConfig.PrivateKey), baddress)
 
 	http.HandleFunc("/receive", node.HandleReceive)
 
