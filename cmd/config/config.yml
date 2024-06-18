@@ -1,3 +1,4 @@
+server_load: 7
 heartbeat_interval: 5
 bulletin_board:
   host: 'http://localhost'
@@ -6,10 +7,6 @@ nodes:
   - id: 1
     host: 'http://localhost'
     port: 1122
-    pkey: '123456'
-    prkey: 'ss'
   - id: 2
     host: 'http://localhost'
     port: 1123
-    pkey: '7891011'
-    prkey: 'ss'

@@ -21,7 +21,7 @@ import (
 
 func main() {
 	// Define command-line flags
-	id := flag.Int("id", -1, "ID of the node (required)")
+	id := flag.Int("id", -1, "ID of the newNode (required)")
 	logLevel := flag.String("log-level", "debug", "Log level")
 
 	flag.Usage = func() {
@@ -34,7 +34,7 @@ func main() {
 	flag.Parse()
 
 	// Check if the required flag is provided
-	if *id == 0 {
+	if *id == -1 {
 		if _, err := fmt.Fprintf(os.Stderr, "Error: the -id flag is required\n"); err != nil {
 			slog.Error("Error: the -id flag is required\n", err)
 		}
@@ -58,19 +58,19 @@ func main() {
 	}
 
 	var nodeConfig *config.Node
-	for _, node := range cfg.Nodes {
-		if node.ID == *id {
-			nodeConfig = &node
+	for _, n := range cfg.Nodes {
+		if n.ID == *id {
+			nodeConfig = &n
 			break
 		}
 	}
 
 	if nodeConfig == nil {
-		slog.Error("invalid id", errors.New(fmt.Sprintf("failed to get node config for id=%d", *id)))
+		slog.Error("invalid id", errors.New(fmt.Sprintf("failed to get newNode config for id=%d", *id)))
 		os.Exit(1)
 	}
 
-	slog.Info("⚡ init node", "heartbeat_interval", cfg.HeartbeatInterval, "id", *id)
+	slog.Info("⚡ init newNode", "heartbeat_interval", cfg.HeartbeatInterval, "id", *id)
 
 	// set up logrus
 	logrus.SetFormatter(&logrus.JSONFormatter{})
@@ -82,9 +82,13 @@ func main() {
 
 	baddress := fmt.Sprintf("%s:%d", cfg.BulletinBoard.Host, cfg.BulletinBoard.Port)
 
-	node := node.NewNode(nodeConfig.ID, nodeConfig.Host, nodeConfig.Port, []byte(nodeConfig.PublicKey), []byte(nodeConfig.PrivateKey), baddress)
+	newNode, err := node.NewNode(nodeConfig.ID, nodeConfig.Host, nodeConfig.Port, baddress)
+	if err != nil {
+		slog.Error("failed to create newNode", err)
+		os.Exit(1)
+	}
 
-	http.HandleFunc("/receive", node.HandleReceive)
+	http.HandleFunc("/receive", newNode.HandleReceive)
 
 	go func() {
 		address := fmt.Sprintf(":%d", nodeConfig.Port)
@@ -93,7 +97,7 @@ func main() {
 		}
 	}()
 
-	slog.Info("🌏 start node...", "address", fmt.Sprintf("%s:%d", nodeConfig.Host, nodeConfig.Port))
+	slog.Info("🌏 start newNode...", "address", fmt.Sprintf("%s:%d", nodeConfig.Host, nodeConfig.Port))
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)

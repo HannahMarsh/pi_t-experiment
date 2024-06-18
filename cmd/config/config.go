@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/ilyakaznacheev/cleanenv"
@@ -14,14 +13,13 @@ type BulletinBoard struct {
 }
 
 type Node struct {
-	ID         int    `yaml:"id"`
-	Host       string `yaml:"host"`
-	Port       int    `yaml:"port"`
-	PublicKey  string `yaml:"public_key"`
-	PrivateKey string `yaml:"private_key"`
+	ID   int    `yaml:"id"`
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
 }
 
 type GlobalConfig struct {
+	ServerLoad        int           `yaml:"server_load"`
 	HeartbeatInterval int           `yaml:"heartbeat_interval"`
 	BulletinBoard     BulletinBoard `yaml:"bulletin_board"`
 	Nodes             []Node        `yaml:"nodes"`
@@ -30,23 +28,13 @@ type GlobalConfig struct {
 func NewConfig() (*GlobalConfig, error) {
 	cfg := &GlobalConfig{}
 
-	dir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
+	if dir, err := os.Getwd(); err != nil {
+		return nil, fmt.Errorf("config.NewConfig(): global config error: %w", err)
+	} else if err2 := cleanenv.ReadConfig(dir+"/.../.../global_config.yml", cfg); err2 != nil {
+		return nil, fmt.Errorf("config.NewConfig(): global config error: %w", err2)
+	} else if err3 := cleanenv.ReadEnv(cfg); err3 != nil {
+		return nil, fmt.Errorf("config.NewConfig(): global config error: %w", err3)
+	} else {
+		return cfg, nil
 	}
-
-	// debug
-	fmt.Println(dir)
-
-	err = cleanenv.ReadConfig(dir+"/.../.../global_config.yml", cfg)
-	if err != nil {
-		return nil, fmt.Errorf("global config error: %w", err)
-	}
-
-	err = cleanenv.ReadEnv(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	return cfg, nil
 }
