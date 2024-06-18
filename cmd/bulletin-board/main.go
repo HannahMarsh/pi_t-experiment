@@ -63,7 +63,7 @@ func main() {
 
 	go bulletinBoard.StartRuns()
 
-	http.HandleFunc("/register", bulletinBoard.RegisterNode)
+	http.HandleFunc("/register", bulletinBoard.HandleRegisterNode)
 
 	go func() {
 		address := fmt.Sprintf(":%d", port)

@@ -14,6 +14,7 @@ type NodeView struct {
 	mu                       sync.RWMutex
 	LastHeartbeat            time.Time
 	MaxTimeBetweenHeartbeats time.Duration
+	Api                      api.PublicNodeApi
 }
 
 func NewNodeView(n *api.PrivateNodeApi, maxTimeBetweenHeartbeats time.Duration) *NodeView {
@@ -24,6 +25,11 @@ func NewNodeView(n *api.PrivateNodeApi, maxTimeBetweenHeartbeats time.Duration) 
 		MessageQueue:             n.MessageQueue,
 		LastHeartbeat:            n.TimeOfRequest,
 		MaxTimeBetweenHeartbeats: maxTimeBetweenHeartbeats,
+		Api: api.PublicNodeApi{
+			ID:        n.ID,
+			Address:   n.Address,
+			PublicKey: n.PublicKey,
+		},
 	}
 }
 
