@@ -48,7 +48,7 @@ func qoLess(a, b QueuedOnion) bool {
 
 // NewNode creates a new node
 func NewNode(id int, host string, port int, bulletinBoardUrl string) (*Node, error) {
-	if publicKey, privateKey, err := pi_t.KeyGen(); err != nil {
+	if privateKey, publicKey, err := pi_t.KeyGen(); err != nil {
 		return nil, fmt.Errorf("node.NewNode(): failed to generate key pair: %w", err)
 	} else {
 		n := &Node{
@@ -128,12 +128,14 @@ func (n *Node) getRandomNode() *api.PublicNodeApi {
 
 func (n *Node) QueueOnion(msg api.Message, pathLength int) error {
 	timeReceived := time.Now()
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	if msgString, err := json.Marshal(msg); err != nil {
-		return fmt.Errorf("NewOnion(): failed to marshal message: %w", err)
+		return fmt.Errorf("QueueOnion(): failed to marshal message: %w", err)
 	} else if to := n.getNode(msg.To); to == nil {
-		return fmt.Errorf("NewOnion(): failed to get node with id %d", msg.To)
+		return fmt.Errorf("QueueOnion(): failed to get node with id %d", msg.To)
 	} else if routingPath, err2 := n.DetermineRoutingPath(pathLength); err2 != nil {
-		return fmt.Errorf("NewOnion(): failed to determine routing path: %w", err2)
+		return fmt.Errorf("QueueOnion(): failed to determine routing path: %w", err2)
 	} else {
 		publicKeys := utils.Map(routingPath, func(node api.PublicNodeApi) string {
 			return node.PublicKey
@@ -177,9 +179,9 @@ func (n *Node) IDsMatch(nodeApi api.PublicNodeApi) bool {
 }
 
 func (n *Node) startRun(activeNodes []api.PublicNodeApi) (didParticipate bool, e error) {
-	n.wg.Wait()
-	n.wg.Add(1)
-	defer n.wg.Done()
+	//n.wg.Wait()
+	//n.wg.Add(1)
+	//defer n.wg.Done()
 
 	n.mu.Lock()
 	if len(activeNodes) == 0 {
@@ -187,7 +189,8 @@ func (n *Node) startRun(activeNodes []api.PublicNodeApi) (didParticipate bool, e
 		return false, fmt.Errorf("startRun(): no active nodes")
 	}
 	n.ActiveNodes = utils.Copy(activeNodes)
-	onionsToSend := n.OnionQueue.Drain()
+	onionsToSend := n.OnionQueue.Values()
+	n.OnionQueue.Clear()
 	n.mu.Unlock()
 
 	slog.Info("Starting run with", "num_onions", len(onionsToSend))
@@ -209,23 +212,38 @@ func (n *Node) Receive(o string) error {
 	if destination, payload, err := pi_t.PeelOnion(o, n.PrivateKey); err != nil {
 		return fmt.Errorf("node.Receive(): failed to remove layer: %w", err)
 	} else {
-		bruised, err2 := pi_t.BruiseOnion(payload)
-		if err2 != nil {
-			return fmt.Errorf("node.Receive(): failed to bruise onion: %w", err2)
-		}
-		if err3 := sendToNode(QueuedOnion{
-			ConstructedOnion:   bruised,
-			DestinationAddress: destination,
-		}); err != nil {
-			return fmt.Errorf("node.Receive(): failed to send to next node: %w", err3)
+		if destination == "" {
+			var msg api.Message
+			if err2 := json.Unmarshal([]byte(payload), &msg); err2 != nil {
+				return fmt.Errorf("node.Receive(): failed to unmarshal message: %w", err2)
+			}
+			slog.Info("Received message", "from", msg.From, "to", msg.To, "msg", msg.Msg)
+
+		} else {
+			slog.Info("Received onion", "destination", destination)
+			//bruised, err2 := pi_t.BruiseOnion(payload)
+			//if err2 != nil {
+			//	return fmt.Errorf("node.Receive(): failed to bruise onion: %w", err2)
+			//}
+			if err3 := sendToNode(QueuedOnion{
+				ConstructedOnion:   payload,
+				DestinationAddress: destination,
+			}); err != nil {
+				return fmt.Errorf("node.Receive(): failed to send to next node: %w", err3)
+			}
 		}
 	}
 	return nil
 }
 
 func sendToNode(onion QueuedOnion) error {
-	url := fmt.Sprintf("http://%s/receive", onion.DestinationAddress)
-	if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer([]byte(onion.ConstructedOnion))); err2 != nil {
+	url := fmt.Sprintf("%s/receive", onion.DestinationAddress)
+	o := api.OnionApi{
+		Onion: onion.ConstructedOnion,
+	}
+	if data, err := json.Marshal(o); err != nil {
+		slog.Error("failed to marshal msgs", err)
+	} else if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
 		return fmt.Errorf("sendToNode(): failed to send POST request with onion to next node: %w", err2)
 	} else {
 		defer func(Body io.ReadCloser) {
@@ -236,6 +254,6 @@ func sendToNode(onion QueuedOnion) error {
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("sendToNode(): Failed to send to next node, status code: %d, status: %s", resp.StatusCode, resp.Status)
 		}
-		return nil
 	}
+	return nil
 }

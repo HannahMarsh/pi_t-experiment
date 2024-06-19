@@ -1,6 +1,8 @@
 package pi_t
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -9,6 +11,8 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 )
 
 // KeyGen generates an RSA key pair and returns the public and private keys in PEM format
@@ -43,6 +47,54 @@ func KeyGen() (privateKeyPEM, publicKeyPEM string, err error) {
 	return privateKeyPEM, publicKeyPEM, nil
 }
 
+// GenerateSymmetricKey generates a random AES key for encryption
+func GenerateSymmetricKey() ([]byte, error) {
+	key := make([]byte, 32) // AES-256
+	if _, err := rand.Read(key); err != nil {
+		return nil, err
+	}
+	return key, nil
+}
+
+// EncryptWithAES encrypts plaintext using AES encryption
+func EncryptWithAES(key, plaintext []byte) (string, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+
+	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
+	iv := ciphertext[:aes.BlockSize]
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		return "", err
+	}
+
+	stream := cipher.NewCFBEncrypter(block, iv)
+	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
+
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
+}
+
+// DecryptWithAES decrypts ciphertext using AES encryption
+func DecryptWithAES(key []byte, ct string) ([]byte, error) {
+	ciphertext, _ := base64.StdEncoding.DecodeString(ct)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ciphertext) < aes.BlockSize {
+		return nil, errors.New("ciphertext too short")
+	}
+	iv := ciphertext[:aes.BlockSize]
+	ciphertext = ciphertext[aes.BlockSize:]
+
+	stream := cipher.NewCFBDecrypter(block, iv)
+	stream.XORKeyStream(ciphertext, ciphertext)
+
+	return ciphertext, nil
+}
+
 type OnionLayer struct {
 	NextHop string
 	Payload string
@@ -50,14 +102,29 @@ type OnionLayer struct {
 
 // FormOnion creates an onion by encapsulating a message in multiple encryption layers
 func FormOnion(payload []byte, publicKeys []string, routingPath []string) (string, string, error) {
-
 	for i := len(publicKeys) - 1; i >= 0; i-- {
-		layer := OnionLayer{
-			NextHop: routingPath[i],
-			Payload: base64.StdEncoding.EncodeToString(payload),
+		var layerBytes []byte
+		var err error
+		if i == len(publicKeys)-1 {
+			layerBytes = payload
+		} else {
+			layer := OnionLayer{
+				NextHop: routingPath[i+1],
+				Payload: base64.StdEncoding.EncodeToString(payload),
+			}
+
+			layerBytes, err = json.Marshal(layer)
+			if err != nil {
+				return "", "", err
+			}
 		}
 
-		layerBytes, err := json.Marshal(layer)
+		symmetricKey, err := GenerateSymmetricKey()
+		if err != nil {
+			return "", "", err
+		}
+
+		encryptedPayload, err := EncryptWithAES(symmetricKey, layerBytes)
 		if err != nil {
 			return "", "", err
 		}
@@ -72,7 +139,20 @@ func FormOnion(payload []byte, publicKeys []string, routingPath []string) (strin
 			return "", "", err
 		}
 
-		payload, err = rsa.EncryptPKCS1v15(rand.Reader, pubKey.(*rsa.PublicKey), layerBytes)
+		encryptedKey, err := rsa.EncryptPKCS1v15(rand.Reader, pubKey.(*rsa.PublicKey), symmetricKey)
+		if err != nil {
+			return "", "", err
+		}
+
+		combinedPayload := struct {
+			Key     string
+			Payload string
+		}{
+			Key:     base64.StdEncoding.EncodeToString(encryptedKey),
+			Payload: encryptedPayload,
+		}
+
+		payload, err = json.Marshal(combinedPayload)
 		if err != nil {
 			return "", "", err
 		}
@@ -98,15 +178,37 @@ func PeelOnion(onion string, privateKeyPEM string) (string, string, error) {
 		return "", "", err
 	}
 
-	decryptedBytes, err := rsa.DecryptPKCS1v15(rand.Reader, privateKey, onionBytes)
+	var combinedPayload struct {
+		Key     string
+		Payload string
+	}
+	if err = json.Unmarshal(onionBytes, &combinedPayload); err != nil {
+		return "", "", err
+	}
+
+	encryptedKey, err := base64.StdEncoding.DecodeString(combinedPayload.Key)
 	if err != nil {
 		return "", "", err
+	}
+
+	symmetricKey, err := rsa.DecryptPKCS1v15(rand.Reader, privateKey, encryptedKey)
+	if err != nil {
+		return "", "", err
+	}
+
+	decryptedBytes, err := DecryptWithAES(symmetricKey, combinedPayload.Payload)
+	if err != nil {
+		return "", "", err
+	}
+
+	if !strings.HasPrefix(string(decryptedBytes), "{\"NextHop\":") {
+		return "", string(decryptedBytes), nil
 	}
 
 	var layer OnionLayer
 	err = json.Unmarshal(decryptedBytes, &layer)
 	if err != nil {
-		return "", "", err
+		return "", string(decryptedBytes), nil
 	}
 
 	return layer.NextHop, layer.Payload, nil
@@ -122,6 +224,8 @@ func BruiseOnion(onion string) (string, error) {
 	// Introduce bruising by modifying a small portion of the payload
 	if len(onionBytes) > 0 {
 		onionBytes[0] ^= 0xFF
+	} else {
+		return "", errors.New("empty onion")
 	}
 
 	return base64.StdEncoding.EncodeToString(onionBytes), nil

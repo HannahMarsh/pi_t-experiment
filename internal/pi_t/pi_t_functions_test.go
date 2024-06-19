@@ -2,7 +2,6 @@ package pi_t
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"testing"
 )
 
@@ -41,42 +40,48 @@ func TestFormOnion(t *testing.T) {
 }
 
 func TestPeelOnion(t *testing.T) {
-	privateKeyPEM, publicKeyPEM, err := KeyGen()
+	privateKeyPEM1, publicKeyPEM1, err := KeyGen()
+	if err != nil {
+		t.Fatalf("KeyGen() error: %v", err)
+	}
+	privateKeyPEM2, publicKeyPEM2, err := KeyGen()
 	if err != nil {
 		t.Fatalf("KeyGen() error: %v", err)
 	}
 
 	payload := []byte("secret message")
-	publicKeys := []string{publicKeyPEM, publicKeyPEM}
+	publicKeys := []string{publicKeyPEM1, publicKeyPEM2}
 	routingPath := []string{"node1", "node2"}
 
-	_, onion, err := FormOnion(payload, publicKeys, routingPath)
+	destination, onion, err := FormOnion(payload, publicKeys, routingPath)
 	if err != nil {
 		t.Fatalf("FormOnion() error: %v", err)
 	}
 
-	nextHop, peeledPayload, err := PeelOnion(onion, privateKeyPEM)
+	if destination != "node1" {
+		t.Fatalf("PeelOnion() expected destination to be 'node1', got %s", destination)
+	}
+
+	nextHop, peeledPayload, err := PeelOnion(onion, privateKeyPEM1)
 	if err != nil {
 		t.Fatalf("PeelOnion() error: %v", err)
 	}
 
 	if nextHop != "node2" {
-		t.Fatalf("PeelOnion() expected next hop 'node2', got %s", nextHop)
+		t.Fatalf("PeelOnion() expected next hop 'node1', got %s", nextHop)
 	}
 
-	decodedPayload, err := base64.StdEncoding.DecodeString(peeledPayload)
+	nextHop2, peeledPayload2, err := PeelOnion(peeledPayload, privateKeyPEM2)
 	if err != nil {
-		t.Fatalf("PeelOnion() error decoding payload: %v", err)
+		t.Fatalf("PeelOnion() error: %v", err)
 	}
 
-	var layer OnionLayer
-	err = json.Unmarshal(decodedPayload, &layer)
-	if err != nil {
-		t.Fatalf("PeelOnion() error unmarshaling layer: %v", err)
+	if nextHop2 != "" {
+		t.Fatalf("PeelOnion() expected next hop '', got %s", nextHop2)
 	}
 
-	if layer.Payload != base64.StdEncoding.EncodeToString(payload) {
-		t.Fatalf("PeelOnion() expected payload %s, got %s", base64.StdEncoding.EncodeToString(payload), layer.Payload)
+	if peeledPayload2 != string(payload) {
+		t.Fatalf("PeelOnion() expected payload %s, got %s", string(payload), peeledPayload2)
 	}
 }
 

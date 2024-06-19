@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api"
-	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"golang.org/x/exp/slog"
 	"io"
 	"net/http"
@@ -14,13 +13,13 @@ import (
 
 func (n *Node) HandleReceive(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Received onion")
-	var o string
+	var o api.OnionApi
 	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
 		slog.Error("Error decoding onion", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := n.Receive(o); err != nil {
+	if err := n.Receive(o.Onion); err != nil {
 		slog.Error("Error receiving onion", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -36,7 +35,7 @@ func (n *Node) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	slog.Info("Active nodes", "activeNodes", activeNodes)
+	//slog.Info("Active nodes", "activeNodes", activeNodes)
 	go func() {
 		if didParticipate, err := n.startRun(activeNodes); err != nil {
 			slog.Error("Error starting run", err)
@@ -54,11 +53,11 @@ func (n *Node) HandleClientRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	slog.Info("Received client request", "num_messages", len(msgs), "destinations", utils.Map(msgs, func(m api.Message) int { return m.To }))
+	//slog.Info("Received client request", "num_messages", len(msgs), "destinations", utils.Map(msgs, func(m api.Message) int { return m.To }))
 	//slog.Info("Enqueuing messages", "num_messages", len(msgs))
 	for _, msg := range msgs {
 		if err := n.QueueOnion(msg, 2); err != nil {
-			slog.Error("Error queuing message", err)
+			slog.Error("Error queueing message", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
