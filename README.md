@@ -1,18 +1,56 @@
-Pi\_t Experiment
+Implementing Pi\_t
 ================
 
-Overview
---------
+## Introduction
 
-This repository serves as a distributed system project that simulates onion routing with nodes registering to a bulletin board, sending and processing messages securely. Each node maintains a queue of incoming messages, reports its queue length to the bulletin board, and processes messages upon receiving a start signal from the bulletin board.
+This project focuses on implementing Pi_t, a differentially anonymous mixnet architecture, to explore its performance under 
+various conditions. We will conduct experiments to determine the minimum number of rounds required for a given server load 
+and desired parameters ϵ and δ. The experiment will be deployed on AWS with potentially hundreds of nodes, each acting as 
+a relay, and will use a bulletin board to manage node communication.
 
-Features
---------
+## Background
 
-*   **Node Registration**: Nodes register with the bulletin board and receive an acknowledgment.
-*   **Queue Management**: Nodes handle client requests, queue messages, and periodically report queue lengths.
-*   **Message Processing**: Nodes build and process onions (messages) and start processing upon receiving a signal from the bulletin board.
-*   **Bulletin Board**: Manages active nodes and coordinates message processing.
+An anonymous communication channel allows parties to communicate over the Internet while concealing their identities. 
+Onion routing is a widely used technique where messages are encapsulated in layers of encryption and sent through a series 
+of intermediary nodes (relays). This project implements Pi_t, an advanced mixnet architecture that enhances the standard 
+onion routing by ensuring differential privacy.
+
+Differential privacy in this context means that the observations of an adversary cannot significantly distinguish between 
+any two communication patterns, thereby protecting the anonymity of the communicating parties.
+
+## Objectives
+
+1. **Deploy Pi_t on AWS**: Set up a network of nodes acting as relays.
+2. Implement a replicated bulletin board to list all participating nodes and their public keys.
+3. **Determine optimal parameters**: Run experiments to find the minimum number of rounds required for specific values of \( \epsilon \) and \( \delta \), while considering server load and churn rates.
+
+## Experiment Design
+The experiment will involve the following steps:
+
+1. **Setup Nodes on AWS**:
+  - Deploy hundreds of nodes on AWS, each configured to act as a relay.
+  - Ensure nodes can communicate with the bulletin board to register their status.
+
+2. **Bulletin Board**:
+  - Implement a fault-tolerant, replicated bulletin board that maintains a list of active nodes and their public keys.
+  - The bulletin board will also broadcast start times and coordinate the rounds of message passing.
+
+3. **Message Passing and Rounds**:
+  - Nodes will send messages in rounds, encapsulating each message in multiple layers of encryption (onions).
+  - Each node will peel off one layer of encryption and forward the message to the next node.
+  - The process will repeat for a specified number of rounds.
+
+4. **Parameter Selection**:
+  - Choose appropriate values for \( \epsilon \) and \( \delta \) to ensure differential privacy.
+  - Calculate the minimum number of rounds required for these values given the server load and churn rates.
+
+## Choosing Parameters
+To determine the optimal parameters for the experiment, we consider the following:
+
+- **Onion Size and Layers**: The size of each onion depends on the number of layers, which corresponds to the number of rounds.
+- **Server Load**: Given a server load \( x \) and desired \( \epsilon \) and \( \delta \) values, determine the minimum number of rounds required.
+- **Churn Rate**: The rate at which nodes go offline (churn rate) affects the maximum number of rounds for maintaining the desired message delivery rate.
+
 
 Installation
 ------------
@@ -20,7 +58,8 @@ Installation
 1.  Clone the repository:
 
 ```bash
-git clone https://github.com/HannahMarsh/pi_t-experiment.git cd pi_t-experiment
+git clone https://github.com/HannahMarsh/pi_t-experiment.git;
+cd pi_t-experiment
 ```
 
 2.  Install dependencies:
