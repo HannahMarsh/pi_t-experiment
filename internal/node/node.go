@@ -24,9 +24,11 @@ type Node struct {
 	PrivateKey       []byte
 	OtherNodes       cmap.ConcurrentMap[string, *api.PublicNodeApi]
 	QueuedOnions     goconcurrentqueue.Queue
+	QueuedRequests   goconcurrentqueue.Queue
 	NodeInfo         api.PublicNodeApi
 	BulletinBoardUrl string
 	wg               sync.WaitGroup
+	requests         sync.Map
 }
 
 // NewNode creates a new node
@@ -35,13 +37,14 @@ func NewNode(id int, host string, port int, bulletinBoardUrl string) (*Node, err
 		return nil, fmt.Errorf("node.NewNode(): failed to generate key pair: %w", err)
 	} else {
 		n := &Node{
-			ID:           id,
-			Host:         host,
-			Port:         port,
-			PublicKey:    publicKey,
-			PrivateKey:   privateKey,
-			OtherNodes:   cmap.New[*api.PublicNodeApi](),
-			QueuedOnions: goconcurrentqueue.NewFIFO(),
+			ID:             id,
+			Host:           host,
+			Port:           port,
+			PublicKey:      publicKey,
+			PrivateKey:     privateKey,
+			OtherNodes:     cmap.New[*api.PublicNodeApi](),
+			QueuedOnions:   goconcurrentqueue.NewFIFO(),
+			QueuedRequests: goconcurrentqueue.NewFIFO(),
 			NodeInfo: api.PublicNodeApi{
 				ID:        id,
 				Address:   fmt.Sprintf("%s:%d", host, port),
@@ -63,6 +66,7 @@ func (n *Node) updateNode(node *api.PublicNodeApi) {
 }
 
 func (n *Node) startRun(activeNodes []api.PublicNodeApi) (didParticipate bool, e error) {
+	slog.Info("Starting run with", "num_onions", n.QueuedOnions.GetLen())
 	n.wg.Wait()
 	n.wg.Add(1)
 	defer n.wg.Done()

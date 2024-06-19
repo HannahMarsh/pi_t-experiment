@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -80,15 +81,22 @@ func main() {
 	// integrate Logrus with the slog logger
 	slog.New(logger.NewLogrusHandler(logrus.StandardLogger()))
 
-	baddress := fmt.Sprintf("%s:%d", cfg.BulletinBoard.Host, cfg.BulletinBoard.Port)
+	baddress := fmt.Sprintf("http://%s:%d", cfg.BulletinBoard.Host, cfg.BulletinBoard.Port)
 
-	newNode, err := node.NewNode(nodeConfig.ID, nodeConfig.Host, nodeConfig.Port, baddress)
-	if err != nil {
-		slog.Error("failed to create newNode", err)
-		os.Exit(1)
+	var newNode *node.Node
+	for {
+		if newNode, err = node.NewNode(nodeConfig.ID, nodeConfig.Host, nodeConfig.Port, baddress); err != nil {
+			slog.Error("failed to create newNode. Trying again in 5 seconds. ", err)
+			time.Sleep(5 * time.Second)
+			continue
+		} else {
+			break
+		}
 	}
 
 	http.HandleFunc("/receive", newNode.HandleReceive)
+	http.HandleFunc("/requestMsg", newNode.HandleClientRequest)
+	http.HandleFunc("/start", newNode.HandleStartRun)
 
 	go func() {
 		address := fmt.Sprintf(":%d", nodeConfig.Port)
@@ -97,7 +105,7 @@ func main() {
 		}
 	}()
 
-	slog.Info("🌏 start newNode...", "address", fmt.Sprintf("%s:%d", nodeConfig.Host, nodeConfig.Port))
+	slog.Info("🌏 start newNode...", "address", fmt.Sprintf("http://%s:%d", nodeConfig.Host, nodeConfig.Port))
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)

@@ -59,11 +59,12 @@ func main() {
 	// integrate Logrus with the slog logger
 	slog.New(logger.NewLogrusHandler(logrus.StandardLogger()))
 
-	bulletinBoard := bulletin_board.NewBulletinBoard()
+	bulletinBoard := bulletin_board.NewBulletinBoard(cfg)
 
 	go bulletinBoard.StartRuns()
 
 	http.HandleFunc("/register", bulletinBoard.HandleRegisterNode)
+	http.HandleFunc("/update", bulletinBoard.HandleUpdateNodeInfo)
 
 	go func() {
 		address := fmt.Sprintf(":%d", port)
@@ -72,7 +73,7 @@ func main() {
 		}
 	}()
 
-	slog.Info("🌏 start node...", "address", fmt.Sprintf("%s:%d", host, port))
+	slog.Info("🌏 start node...", "address", fmt.Sprintf("https://%s:%d", host, port))
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)

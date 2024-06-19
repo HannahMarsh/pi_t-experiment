@@ -1,12 +1,14 @@
 server_load: 7
 heartbeat_interval: 5
+min_nodes: 2
+min_queue_length: 1
 bulletin_board:
-  host: 'http://localhost'
-  port: 5000
+  host: 'localhost'
+  port: 8080
 nodes:
   - id: 1
-    host: 'http://localhost'
-    port: 1122
+    host: 'localhost'
+    port: 8081
   - id: 2
-    host: 'http://localhost'
-    port: 1123
+    host: 'localhost'
+    port: 8082

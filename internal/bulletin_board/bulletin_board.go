@@ -2,8 +2,10 @@ package bulletin_board
 
 import (
 	"fmt"
+	"github.com/HannahMarsh/pi_t-experiment/cmd/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
+	"golang.org/x/exp/slog"
 	"sync"
 	"time"
 )
@@ -12,11 +14,15 @@ import (
 type BulletinBoard struct {
 	Network map[int]*NodeView // Maps node IDs to their queue sizes
 	mu      sync.RWMutex
+	config  *config.GlobalConfig
 }
 
 // NewBulletinBoard creates a new bulletin board
-func NewBulletinBoard() *BulletinBoard {
-	return &BulletinBoard{}
+func NewBulletinBoard(config *config.GlobalConfig) *BulletinBoard {
+	return &BulletinBoard{
+		Network: make(map[int]*NodeView),
+		config:  config,
+	}
 }
 
 // UpdateNode adds a node to the active nodes list
@@ -56,9 +62,22 @@ func (bb *BulletinBoard) StartRuns() error {
 func (bb *BulletinBoard) allNodesReady() bool {
 	bb.mu.RLock()
 	defer bb.mu.RUnlock()
-	return utils.NewMapStream(bb.Network).Filter(func(_ int, node *NodeView) bool {
+	activeNodes := utils.NewMapStream(bb.Network).Filter(func(_ int, node *NodeView) bool {
 		return node.IsActive()
-	}).GetValues().All(func(node *NodeView) bool {
-		return len(node.MessageQueue) > 0
+	}).GetValues()
+
+	if len(activeNodes.Array) < bb.config.MinNodes {
+		slog.Info("Not enough active nodes")
+		return false
+	}
+
+	return activeNodes.All(func(node *NodeView) bool {
+		length := len(node.MessageQueue) >= bb.config.MinQueueLength
+		if !length {
+			slog.Info("Node not ready", "id", node.ID, "queue_length", len(node.MessageQueue), "min_queue_length", bb.config.MinQueueLength)
+		} else {
+			slog.Info("Node ready", "id", node.ID, "queue_length", len(node.MessageQueue), "min_queue_length", bb.config.MinQueueLength)
+		}
+		return length
 	})
 }
