@@ -1,124 +1,61 @@
-# go-coffeeshop
+Pi\_t Experiment
+================
 
-An event-driven microservices coffee shop application has been written in Golang and deployed using Nomad, Consul Connect, Vault, and Terraform.
+Overview
+--------
 
-Other versions in .NET/C# can be found at:
+This repository serves as a distributed system project that simulates onion routing with nodes registering to a bulletin board, sending and processing messages securely. Each node maintains a queue of incoming messages, reports its queue length to the bulletin board, and processes messages upon receiving a start signal from the bulletin board.
 
-- [.NET CoffeeShop with Microservices approach](https://github.com/thangchung/coffeeshop-on-nomad)
-- [.NET CoffeeShop with Modular Monolith approach](https://github.com/thangchung/coffeeshop-modular)
+Features
+--------
 
-## Technical stack
+*   **Node Registration**: Nodes register with the bulletin board and receive an acknowledgment.
+*   **Queue Management**: Nodes handle client requests, queue messages, and periodically report queue lengths.
+*   **Message Processing**: Nodes build and process onions (messages) and start processing upon receiving a signal from the bulletin board.
+*   **Bulletin Board**: Manages active nodes and coordinates message processing.
 
-- Backend building blocks
-  - [grpc-ecosystem/grpc-gateway/v2](https://github.com/grpc-ecosystem/grpc-gateway)
-  - [labstack/echo/v4](https://github.com/labstack/echo)
-  - [rabbitmq/amqp091-go](https://github.com/rabbitmq/amqp091-go)
-  - [kyleconroy/sqlc](https://github.com/kyleconroy/sqlc)
-    - [pq](github.com/lib/pq)
-  - [golang-migrate/migrate/v4](https://github.com/golang-migrate/migrate)
-  - Utils
-    - [google/wire](github.com/google/wire)
-    - [ilyakaznacheev/cleanenv](https://github.com/ilyakaznacheev/cleanenv)
-    - golang.org/x/exp/slog
-      - [sirupsen/logrus](https://github.com/sirupsen/logrus)
-    - [samber/lo](https://github.com/samber/lo)
-    - [automaxprocs/maxprocs](go.uber.org/automaxprocs/maxprocs)
-    - [stretchr/testify](github.com/stretchr/testify)
-    - golang/glog
-    - google/uuid
-    - google.golang.org/genproto
-    - google.golang.org/grpc
-    - google.golang.org/protobuf
-- Infrastructure
-  - Postgres, RabbitMQ
-  - Hashicorp Nomad, Consul (Connect), Vault, Terraform
-  - docker and docker-compose
-  - devcontainer for reproducible development environment
+Installation
+------------
 
-## CoffeeShop - Choreography Saga
-
-![coffeeshop](docs/coffeeshop.svg)
-
-## Services
-
-No. | Service | URI
---- | --- | ---
-1 | grpc-gateway | [http://localhost:5000](http://localhost:5000)
-2 | product service | [http://localhost:5001](http://localhost:5001)
-3 | counter service | [http://localhost:5002](http://localhost:5002)
-4 | barista service | worker only
-5 | kitchen service | worker only
-6 | web | [http://localhost:8888](http://localhost:8888)
-
-## Starting project
-
-Jump into [`.devcontainer`](https://code.visualstudio.com/docs/devcontainers/containers), then
+1.  Clone the repository:
 
 ```bash
-> make docker-compose
+git clone https://github.com/HannahMarsh/pi_t-experiment.git cd pi_t-experiment
 ```
 
-From `vscode` => Press F1 => Type `Simple Browser View` => Choose it and enter [http://localhost:8888](http://localhost:8888).
-Enjoy!!!
+2.  Install dependencies:
 
-## Screenshots
+```bash 
+go mod tidy
+```
 
-### Home screen
+Usage
+-----
 
-![home_screen](docs/home_screen.png)
-
-### Payment screen
-
-![payment_screen](docs/payment_screen.png)
-
-### Order list screen
-
-![order_list_screen](docs/order_list_screen.png)
-
-## HashiCorp stack deployment
-
-![coffeeshop_hashicorp](docs/coffeeshop_hashicorp.svg)
-
-The details of how to run it can be find at [deployment with Nomad, Consult Connect and Vault](build/README.md).
-
-## Development
-
-### Clean Domain-driven Design
-
-![clean_ddd](docs/clean_ddd.svg)
-
-### Generate dependency injection instances with wire
+### Running the Bulletin Board
 
 ```bash
-> make wire
+go run cmd/bulletin-board/main.go
 ```
 
-### Generate code with sqlc
+### Running a Node
 
 ```bash
-> make sqlc
+go run cmd/node/main.go -id=1
 ```
 
-### Debug Apps
+### Endpoints
 
-[Debug golang app in monorepo](https://github.com/HannahMarsh/pi_t-experiment/wiki/Golang#debug-app-in-monorepo)
+*   **Register Node**: `POST /register`
+*   **Get Active Nodes**: `GET /nodes`
+*   **Receive Message**: `POST /receive`
+*   **Start Run**: `POST /start`
 
-### Trouble shooting
+Example Workflow
+----------------
 
-[Development project trouble shooting](https://github.com/HannahMarsh/pi_t-experiment/wiki#trouble-shooting)
-
-## Roadmap
-
-- ✅ Enhance project structure with DDD patterns
-- Add testing
-- Add and integrate with observability libs and tools
-- Add user identity management (authentication and authorization)
-- Add resiliency
-
-## Credits
-
-- [project-layout](https://github.com/golang-standards/project-layout)
-- [repository-structure](https://peter.bourgon.org/go-best-practices-2016/#repository-structure)
-- [go-build-template](https://github.com/thockin/go-build-template)
-- [go-clean-template](https://github.com/evrone/go-clean-template)
-- [emsifa/tailwind-pos](https://github.com/emsifa/tailwind-pos)
+1.  Start the bulletin board.
+2.  Start multiple nodes.
+3.  Nodes periodically report their queue lengths.
+4.  Nodes receive messages from clients and build onions.
+5.  The bulletin board signals nodes to start processing when conditions are met.
