@@ -65,6 +65,7 @@ func main() {
 
 	http.HandleFunc("/register", bulletinBoard.HandleRegisterNode)
 	http.HandleFunc("/update", bulletinBoard.HandleUpdateNodeInfo)
+	http.HandleFunc("/nodes", bulletinBoard.HandleGetActiveNodes)
 
 	go func() {
 		address := fmt.Sprintf(":%d", port)

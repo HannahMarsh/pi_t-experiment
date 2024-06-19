@@ -8,8 +8,8 @@ type MapStream[K comparable, V any] struct {
 	Values map[K]V
 }
 
-func NewStream[T any](values []T) Stream[T] {
-	return Stream[T]{
+func NewStream[T any](values []T) *Stream[T] {
+	return &Stream[T]{
 		Array: values,
 	}
 }

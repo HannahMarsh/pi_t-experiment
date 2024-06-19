@@ -53,6 +53,18 @@ func (o *Onion) RemoveLayer(privateKey []byte) error {
 	}
 }
 
+func NewOnion(addr string, msg []byte, publicKey []byte) (*Onion, error) {
+	if encryptedData, err := encrypt(msg, publicKey); err != nil {
+		return nil, fmt.Errorf("newOnion(): failed to encrypt message: %w", err)
+	} else {
+		return &Onion{
+			Address: addr,
+			Data:    nil,
+			Message: encryptedData,
+		}, nil
+	}
+}
+
 func (o *Onion) AddLayer(addr string, publicKey []byte) error {
 	if b, err := toBytes(o); err != nil {
 		return fmt.Errorf("onion.AddLayer(): failed to add layer: %w", err)
@@ -61,6 +73,7 @@ func (o *Onion) AddLayer(addr string, publicKey []byte) error {
 	} else {
 		o.Address = addr
 		o.Data = encryptedData
+		o.Message = nil
 		return nil
 	}
 }

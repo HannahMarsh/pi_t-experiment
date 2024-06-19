@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api"
+	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"golang.org/x/exp/slog"
 	"io"
 	"net/http"
-	"time"
 )
 
 func (n *Node) HandleReceive(w http.ResponseWriter, r *http.Request) {
@@ -54,11 +54,9 @@ func (n *Node) HandleClientRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Info("Enqueuing messages", "num_messages", len(msgs))
 	for _, msg := range msgs {
-		if err := n.QueuedRequests.Enqueue(msg); err != nil {
-			slog.Error("Error enqueuing message", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		n.mu.Lock()
+		n.MessageQueue = append(n.MessageQueue, &msg)
+		n.mu.Unlock()
 	}
 	w.WriteHeader(http.StatusOK)
 }
@@ -85,16 +83,48 @@ func (n *Node) RegisterWithBulletinBoard() error {
 	}
 }
 
-func (n *Node) updateBulletinBoard() error {
-	// getsnapshot of requested messages
-	pr := api.PrivateNodeApi{
-		TimeOfRequest: time.Now(),
-		ID: n.ID,
-		Address: n.NodeInfo.Address,
-		PublicKey: n.PublicKey,
-		MessageQueue:
+func (n *Node) GetActiveNodes() ([]api.PublicNodeApi, error) {
+	url := fmt.Sprintf("%s/nodes", n.BulletinBoardUrl)
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("error making GET request to %s: %v", url, err)
 	}
-	if data, err := json.Marshal(n.NodeInfo); err != nil {
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			fmt.Printf("error closing response body: %v\n", err)
+		}
+	}(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var activeNodes []api.PublicNodeApi
+	if err = json.NewDecoder(resp.Body).Decode(&activeNodes); err != nil {
+		return nil, fmt.Errorf("error decoding response: %v", err)
+	}
+
+	return activeNodes, nil
+}
+
+func (n *Node) updateBulletinBoard() error {
+	n.mu.Lock()
+	a, _ := n.GetActiveNodes()
+	if a != nil && len(a) > 0 {
+		n.ActiveNodes = a
+	}
+	m := utils.NewStream(n.MessageQueue).MapToInt(func(msg *api.Message) int {
+		return msg.To
+	}).Array
+	n.mu.Unlock()
+	nodeInfo := api.PrivateNodeApi{
+		ID:           n.ID,
+		Address:      n.NodeInfo.Address,
+		PublicKey:    n.PublicKey,
+		MessageQueue: m,
+	}
+	if data, err := json.Marshal(nodeInfo); err != nil {
 		return fmt.Errorf("node.RegisterWithBulletinBoard(): failed to marshal node info: %w", err)
 	} else {
 		url := n.BulletinBoardUrl + "/update"
@@ -107,7 +137,7 @@ func (n *Node) updateBulletinBoard() error {
 					fmt.Printf("node.RegisterWithBulletinBoard(): error closing response body: %v\n", err2)
 				}
 			}(resp.Body)
-			if resp.StatusCode != http.StatusCreated {
+			if resp.StatusCode != http.StatusOK {
 				return fmt.Errorf("node.RegisterWithBulletinBoard(): failed to register node, status code: %d, %s", resp.StatusCode, resp.Status)
 			}
 			return nil

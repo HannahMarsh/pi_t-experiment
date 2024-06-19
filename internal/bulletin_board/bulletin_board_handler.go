@@ -35,13 +35,33 @@ func (bb *BulletinBoard) HandleUpdateNodeInfo(w http.ResponseWriter, r *http.Req
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	slog.Info("Updating node with id=%d", nodeInfo.ID)
+	slog.Info("Updating node with", "id", nodeInfo.ID)
 	if err := bb.UpdateNode(&nodeInfo); err != nil {
 		fmt.Printf("Error updating node %d: %v\n", nodeInfo.ID, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// HandleGetActiveNodes handles GET requests to return all active nodes
+func (bb *BulletinBoard) HandleGetActiveNodes(w http.ResponseWriter, r *http.Request) {
+	bb.mu.Lock()
+	defer bb.mu.Unlock()
+	activeNodes := utils.NewMapStream(bb.Network).Filter(func(_ int, node *NodeView) bool {
+		return node.IsActive()
+	}).GetValues().Array
+
+	activeNodesApis := utils.Map(activeNodes, func(node *NodeView) api.PublicNodeApi {
+		return node.Api
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(activeNodesApis); err != nil {
+		slog.Error("Error encoding response", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (bb *BulletinBoard) signalNodesToStart() error {
