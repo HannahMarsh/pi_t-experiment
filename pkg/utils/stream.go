@@ -1,5 +1,14 @@
 package utils
 
+import (
+	"cmp"
+	"context"
+	"github.com/jfcg/sorty/v2"
+	"runtime"
+	"sync"
+	"sync/atomic"
+)
+
 type Stream[T any] struct {
 	Array []T
 }
@@ -188,4 +197,207 @@ func Map[T any, O any](items []T, f func(T) O) []O {
 		result[i] = f(item)
 	}
 	return result
+}
+
+func Contains[T any](items []T, f func(T) bool) bool {
+	for _, item := range items {
+		if f(item) {
+			return true
+		}
+	}
+	return false
+}
+
+func DoesNotContain[T any](items []T, f func(T) bool) bool {
+	return !Contains(items, f)
+}
+
+func Find[T any](items []T, f func(T) bool) *T {
+	for _, item := range items {
+		if f(item) {
+			return &item
+		}
+	}
+	return nil
+}
+
+func FindInMap[K comparable, V any](m map[K]V, f func(K, V) bool, defaultKey K, defaultValue V) (K, V, bool) {
+	for k, v := range m {
+		if f(k, v) {
+			return k, v, true
+		}
+	}
+	return defaultKey, defaultValue, false
+}
+
+func FindKey[K comparable, V any](m map[K]V, f func(K, V) bool, defaultValue K) (K, bool) {
+	for k, v := range m {
+		if f(k, v) {
+			return k, true
+		}
+	}
+	return defaultValue, false
+}
+
+func FindValue[K comparable, V any](m map[K]V, f func(K, V) bool, defaultValue V) (V, bool) {
+	for k, v := range m {
+		if f(k, v) {
+			return v, true
+		}
+	}
+	return defaultValue, false
+}
+
+func DoesMapContain[K comparable, V any](m map[K]V, f func(K, V) bool) bool {
+	for k, v := range m {
+		if f(k, v) {
+			return true
+		}
+	}
+	return false
+}
+
+func DoesMapNotContain[K comparable, V any](m map[K]V, f func(K, V) bool) bool {
+	return !DoesMapContain(m, f)
+}
+
+func FindIndex[T any](items []T, f func(T) bool) int {
+	for i, item := range items {
+		if f(item) {
+			return i
+		}
+	}
+	return -1
+}
+
+func Copy[T any](items []T) []T {
+	result := make([]T, len(items))
+	copy(result, items)
+	return result
+}
+
+func CopyMap[K comparable, V any](m map[K]V) map[K]V {
+	result := make(map[K]V)
+	for k, v := range m {
+		result[k] = v
+	}
+	return result
+}
+
+func Swap[T any](items []*T, i, j int) {
+	items[i], items[j] = items[j], items[i]
+}
+
+func Flatten[T any](items [][]T) []T {
+	var result []T
+	for _, item := range items {
+		result = append(result, item...)
+	}
+	return result
+}
+
+func FlatMap[T any, O any](items []T, f func(T) []O) []O {
+	var result []O
+	for _, item := range items {
+		result = append(result, f(item)...)
+	}
+	return result
+}
+
+func Fold[T any, O any](items []T, initial O, f func(O, T) O) O {
+	result := initial
+	for _, item := range items {
+		result = f(result, item)
+	}
+	return result
+}
+
+func Apply[T any](items []T, f func(T)) {
+	for _, item := range items {
+		f(item)
+	}
+}
+
+func Unless[T any](items []T, f func(T) bool) bool {
+	for _, item := range items {
+		if !f(item) {
+			return false
+		}
+	}
+	return true
+}
+
+func ParallelFind[T any](items []T, f func(T) bool) *T {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel() // Ensure all paths cancel the context to avoid a context leak
+
+	var found atomic.Value
+	found.Store((*T)(nil)) // Initialize with nil
+
+	var wg sync.WaitGroup
+	numProcs := runtime.NumCPU() // Number of logical CPUs
+	segmentSize := (len(items) + numProcs - 1) / numProcs
+
+	for i := 0; i < len(items); i += segmentSize {
+		end := i + segmentSize
+		if end > len(items) {
+			end = len(items)
+		}
+
+		wg.Add(1)
+		go func(segment []T) {
+			defer wg.Done()
+			for _, item := range segment {
+				select {
+				case <-ctx.Done():
+					return // Exit if context is cancelled
+				default:
+					if f(item) {
+						found.Store(&item)
+						cancel() // Cancel other goroutines
+						return
+					}
+				}
+			}
+		}(items[i:end])
+	}
+
+	wg.Wait()
+	result, _ := found.Load().(*T)
+	return result
+}
+
+func Sort[T any](items []T, less func(T, T) bool) {
+	// Define the Lesswap function required by sorty
+	lesswap := func(i, k, r, s int) bool {
+		if less(items[i], items[k]) {
+			if r != s {
+				items[r], items[s] = items[s], items[r]
+			}
+			return true
+		}
+		return false
+	}
+
+	// Call sorty.Sort with the length of the items and the lesswap function
+	sorty.Sort(len(items), lesswap)
+}
+
+func SortOrdered[T cmp.Ordered](items []T) {
+	Sort(items, func(a, b T) bool {
+		return a < b
+	})
+}
+
+func ParallelContains[T any](items []T, f func(T) bool) bool {
+	return ParallelFind(items, f) != nil
+}
+
+func FindLast[T any](items []T, f func(T) bool) *T {
+	for i := len(items) - 1; i >= 0; i-- {
+		if f(items[i]) {
+			return &items[i]
+		}
+	}
+	return nil
 }

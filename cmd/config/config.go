@@ -18,7 +18,7 @@ type Node struct {
 	Port int    `yaml:"port"`
 }
 
-type GlobalConfig struct {
+type Config struct {
 	ServerLoad        int           `yaml:"server_load"`
 	HeartbeatInterval int           `yaml:"heartbeat_interval"`
 	MinNodes          int           `yaml:"min_nodes"`
@@ -30,16 +30,18 @@ type GlobalConfig struct {
 	Nodes             []Node        `yaml:"nodes"`
 }
 
-func NewConfig() (*GlobalConfig, error) {
-	cfg := &GlobalConfig{}
+var GlobalConfig *Config
+
+func InitConfig() error {
+	GlobalConfig = &Config{}
 
 	if dir, err := os.Getwd(); err != nil {
-		return nil, fmt.Errorf("config.NewConfig(): global config error: %w", err)
-	} else if err2 := cleanenv.ReadConfig(dir+"/cmd/config/config.yml", cfg); err2 != nil {
-		return nil, fmt.Errorf("config.NewConfig(): global config error: %w", err2)
-	} else if err3 := cleanenv.ReadEnv(cfg); err3 != nil {
-		return nil, fmt.Errorf("config.NewConfig(): global config error: %w", err3)
+		return fmt.Errorf("config.NewConfig(): global config error: %w", err)
+	} else if err2 := cleanenv.ReadConfig(dir+"/cmd/config/config.yml", GlobalConfig); err2 != nil {
+		return fmt.Errorf("config.NewConfig(): global config error: %w", err2)
+	} else if err3 := cleanenv.ReadEnv(GlobalConfig); err3 != nil {
+		return fmt.Errorf("config.NewConfig(): global config error: %w", err3)
 	} else {
-		return cfg, nil
+		return nil
 	}
 }

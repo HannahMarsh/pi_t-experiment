@@ -9,7 +9,7 @@ import (
 type NodeView struct {
 	ID                       int
 	Address                  string
-	PublicKey                []byte
+	PublicKey                string
 	MessageQueue             []int
 	mu                       sync.RWMutex
 	LastHeartbeat            time.Time

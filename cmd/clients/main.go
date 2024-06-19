@@ -44,11 +44,12 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	cfg, err := config.NewConfig()
-	if err != nil {
-		slog.Error("failed get config", err)
+	if err = config.InitConfig(); err != nil {
+		slog.Error("failed to init config", err)
 		os.Exit(1)
 	}
+
+	cfg := config.GlobalConfig
 
 	slog.Info("⚡ init client", "heartbeat_interval", cfg.HeartbeatInterval)
 

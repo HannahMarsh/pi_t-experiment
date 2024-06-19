@@ -15,3 +15,12 @@ nodes:
   - id: 2
     host: 'localhost'
     port: 8082
+  - id: 3
+    host: 'localhost'
+    port: 8083
+  - id: 4
+    host: 'localhost'
+    port: 8084
+  - id: 5
+    host: 'localhost'
+    port: 8085

@@ -9,17 +9,18 @@ import (
 	"golang.org/x/exp/slog"
 	"io"
 	"net/http"
+	"time"
 )
 
 func (n *Node) HandleReceive(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Received onion")
-	var o Onion
+	var o string
 	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
 		slog.Error("Error decoding onion", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := n.Receive(&o); err != nil {
+	if err := n.Receive(o); err != nil {
 		slog.Error("Error receiving onion", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -35,6 +36,7 @@ func (n *Node) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	slog.Info("Active nodes", "activeNodes", activeNodes)
 	go func() {
 		if didParticipate, err := n.startRun(activeNodes); err != nil {
 			slog.Error("Error starting run", err)
@@ -46,41 +48,27 @@ func (n *Node) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 }
 
 func (n *Node) HandleClientRequest(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Received client request")
+
 	var msgs []api.Message
 	if err := json.NewDecoder(r.Body).Decode(&msgs); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	slog.Info("Enqueuing messages", "num_messages", len(msgs))
+	slog.Info("Received client request", "num_messages", len(msgs), "destinations", utils.Map(msgs, func(m api.Message) int { return m.To }))
+	//slog.Info("Enqueuing messages", "num_messages", len(msgs))
 	for _, msg := range msgs {
-		n.mu.Lock()
-		n.MessageQueue = append(n.MessageQueue, &msg)
-		n.mu.Unlock()
+		if err := n.QueueOnion(msg, 2); err != nil {
+			slog.Error("Error queuing message", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
 func (n *Node) RegisterWithBulletinBoard() error {
-	if data, err := json.Marshal(n.NodeInfo); err != nil {
-		return fmt.Errorf("node.RegisterWithBulletinBoard(): failed to marshal node info: %w", err)
-	} else {
-		url := n.BulletinBoardUrl + "/register"
-		slog.Info("Sending node registration request.", "url", url, "id", n.NodeInfo.ID)
-		if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
-			return fmt.Errorf("node.RegisterWithBulletinBoard(): failed to send POST request to bulletin board: %w", err2)
-		} else {
-			defer func(Body io.ReadCloser) {
-				if err3 := Body.Close(); err3 != nil {
-					fmt.Printf("node.RegisterWithBulletinBoard(): error closing response body: %v\n", err2)
-				}
-			}(resp.Body)
-			if resp.StatusCode != http.StatusCreated {
-				return fmt.Errorf("node.RegisterWithBulletinBoard(): failed to register node, status code: %d, %s", resp.StatusCode, resp.Status)
-			}
-			return nil
-		}
-	}
+	slog.Info("Sending node registration request.", "id", n.ID)
+	return n.updateBulletinBoard("/register", http.StatusCreated)
 }
 
 func (n *Node) GetActiveNodes() ([]api.PublicNodeApi, error) {
@@ -90,8 +78,7 @@ func (n *Node) GetActiveNodes() ([]api.PublicNodeApi, error) {
 		return nil, fmt.Errorf("error making GET request to %s: %v", url, err)
 	}
 	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
+		if err2 := Body.Close(); err2 != nil {
 			fmt.Printf("error closing response body: %v\n", err)
 		}
 	}(resp.Body)
@@ -108,37 +95,27 @@ func (n *Node) GetActiveNodes() ([]api.PublicNodeApi, error) {
 	return activeNodes, nil
 }
 
-func (n *Node) updateBulletinBoard() error {
+func (n *Node) updateBulletinBoard(endpoint string, expectedStatusCode int) error {
 	n.mu.Lock()
-	a, _ := n.GetActiveNodes()
-	if a != nil && len(a) > 0 {
-		n.ActiveNodes = a
-	}
-	m := utils.NewStream(n.MessageQueue).MapToInt(func(msg *api.Message) int {
-		return msg.To
-	}).Array
-	n.mu.Unlock()
-	nodeInfo := api.PrivateNodeApi{
-		ID:           n.ID,
-		Address:      n.NodeInfo.Address,
-		PublicKey:    n.PublicKey,
-		MessageQueue: m,
-	}
-	if data, err := json.Marshal(nodeInfo); err != nil {
-		return fmt.Errorf("node.RegisterWithBulletinBoard(): failed to marshal node info: %w", err)
+	defer n.mu.Unlock()
+	t := time.Now()
+	if data, err := json.Marshal(n.getPrivateNodeInfo(t)); err != nil {
+		return fmt.Errorf("node.UpdateBulletinBoard(): failed to marshal node info: %w", err)
 	} else {
-		url := n.BulletinBoardUrl + "/update"
-		slog.Info("Sending node registration request.", "url", url, "id", n.NodeInfo.ID)
+		url := n.BulletinBoardUrl + endpoint
+		//slog.Info("Sending node registration request.", "url", url, "id", n.ID)
 		if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
-			return fmt.Errorf("node.RegisterWithBulletinBoard(): failed to send POST request to bulletin board: %w", err2)
+			return fmt.Errorf("node.UpdateBulletinBoard(): failed to send POST request to bulletin board: %w", err2)
 		} else {
 			defer func(Body io.ReadCloser) {
 				if err3 := Body.Close(); err3 != nil {
-					fmt.Printf("node.RegisterWithBulletinBoard(): error closing response body: %v\n", err2)
+					fmt.Printf("node.UpdateBulletinBoard(): error closing response body: %v\n", err2)
 				}
 			}(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				return fmt.Errorf("node.RegisterWithBulletinBoard(): failed to register node, status code: %d, %s", resp.StatusCode, resp.Status)
+			if resp.StatusCode != expectedStatusCode {
+				return fmt.Errorf("node.RegisterWithBulletinBoard(): failed to %s node, status code: %d, %s", endpoint, resp.StatusCode, resp.Status)
+			} else {
+				n.lastUpdate = t
 			}
 			return nil
 		}

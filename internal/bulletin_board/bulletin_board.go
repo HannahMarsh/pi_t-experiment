@@ -14,11 +14,11 @@ import (
 type BulletinBoard struct {
 	Network map[int]*NodeView // Maps node IDs to their queue sizes
 	mu      sync.RWMutex
-	config  *config.GlobalConfig
+	config  *config.Config
 }
 
 // NewBulletinBoard creates a new bulletin board
-func NewBulletinBoard(config *config.GlobalConfig) *BulletinBoard {
+func NewBulletinBoard(config *config.Config) *BulletinBoard {
 	return &BulletinBoard{
 		Network: make(map[int]*NodeView),
 		config:  config,

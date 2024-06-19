@@ -5,13 +5,13 @@ import "time"
 type PublicNodeApi struct {
 	ID        int
 	Address   string
-	PublicKey []byte
+	PublicKey string
 }
 
 type PrivateNodeApi struct {
 	TimeOfRequest time.Time
 	ID            int
 	Address       string
-	PublicKey     []byte
+	PublicKey     string
 	MessageQueue  []int
 }
