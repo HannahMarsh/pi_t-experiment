@@ -5,14 +5,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/cmd/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/node"
-	"github.com/HannahMarsh/pi_t-experiment/pkg/infrastructure/logger"
 	"github.com/sirupsen/logrus"
-	"github.com/sohlich/elogrus"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/exp/slog"
-	"gopkg.in/olivere/elastic.v5"
 	"net/http"
 	"os"
 	"os/signal"
@@ -76,27 +74,8 @@ func main() {
 
 	slog.Info("⚡ init newNode", "heartbeat_interval", cfg.HeartbeatInterval, "id", *id)
 
-	// set up logrus
-	logrus.SetFormatter(&logrus.JSONFormatter{})
-	logrus.SetOutput(os.Stdout)
-	logrus.SetLevel(logger.ConvertLogLevel(*logLevel))
-
-	// Set up Elasticsearch hook
-	client, err := elastic.NewClient(elastic.SetURL("https://localhost:9200"))
-	if err != nil {
-		slog.Error("failed to create Elasticsearch client", err)
-		os.Exit(1)
-	}
-
-	hook, err := elogrus.NewElasticHook(client, "localhost", logrus.DebugLevel, "logs")
-	if err != nil {
-		slog.Error("failed to create Elasticsearch hook", err)
-		os.Exit(1)
-	}
-	logrus.AddHook(hook)
-
-	// integrate Logrus with the slog logger
-	slog.New(logger.NewLogrusHandler(logrus.StandardLogger()))
+	PrettyLogger.InitDefault()
+	logrus.SetLevel(PrettyLogger.ConvertLogLevel(*logLevel))
 
 	baddress := fmt.Sprintf("http://%s:%d", cfg.BulletinBoard.Host, cfg.BulletinBoard.Port)
 
@@ -104,6 +83,7 @@ func main() {
 	for {
 		if newNode, err = node.NewNode(nodeConfig.ID, nodeConfig.Host, nodeConfig.Port, baddress); err != nil {
 			slog.Error("failed to create newNode. Trying again in 5 seconds. ", err)
+
 			time.Sleep(5 * time.Second)
 			continue
 		} else {

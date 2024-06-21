@@ -1,9 +1,9 @@
 package config
 
 import (
-	"fmt"
 	"os"
 
+	"github.com/HannahMarsh/PrettyLogger"
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
@@ -36,11 +36,11 @@ func InitConfig() error {
 	GlobalConfig = &Config{}
 
 	if dir, err := os.Getwd(); err != nil {
-		return fmt.Errorf("config.NewConfig(): global config error: %w", err)
+		return PrettyLogger.WrapError(err, "config.NewConfig(): global config error")
 	} else if err2 := cleanenv.ReadConfig(dir+"/cmd/config/config.yml", GlobalConfig); err2 != nil {
-		return fmt.Errorf("config.NewConfig(): global config error: %w", err2)
+		return PrettyLogger.WrapError(err2, "config.NewConfig(): global config error")
 	} else if err3 := cleanenv.ReadEnv(GlobalConfig); err3 != nil {
-		return fmt.Errorf("config.NewConfig(): global config error: %w", err3)
+		return PrettyLogger.WrapError(err3, "config.NewConfig(): global config error")
 	} else {
 		return nil
 	}

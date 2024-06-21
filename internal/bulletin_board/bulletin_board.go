@@ -1,13 +1,14 @@
 package bulletin_board
 
 import (
-	"fmt"
+	"sync"
+	"time"
+
+	"github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/cmd/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"golang.org/x/exp/slog"
-	"sync"
-	"time"
 )
 
 // BulletinBoard represents the bulletin board that keeps track of active nodes and coordinates the start signal
@@ -53,7 +54,7 @@ func (bb *BulletinBoard) StartRuns() error {
 		time.Sleep(time.Second * 10)
 		if bb.allNodesReady() {
 			if err := bb.signalNodesToStart(); err != nil {
-				return fmt.Errorf("StartRuns(): error signaling nodes to start: %w", err)
+				return PrettyLogger.WrapError(err, "error signaling nodes to start")
 			}
 		}
 	}

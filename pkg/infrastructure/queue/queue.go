@@ -3,14 +3,14 @@ package queue
 import (
 	//"github.com/streadway/amqp"
 
-	"fmt"
+	"github.com/HannahMarsh/PrettyLogger"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func ConnectToQueue() (*amqp.Connection, error) {
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	if err != nil {
-		return nil, fmt.Errorf("queue.ConnectToQueue(): error connecting to queue: %w", err)
+		return nil, PrettyLogger.WrapError(err, "queue.ConnectToQueue(): error connecting to queue")
 	}
 	return conn, nil
 }

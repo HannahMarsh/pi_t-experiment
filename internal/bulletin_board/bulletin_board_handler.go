@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
+
+	"github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"golang.org/x/exp/slog"
-	"net/http"
 )
 
 func (bb *BulletinBoard) HandleRegisterNode(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +77,7 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 	})
 
 	if data, err := json.Marshal(activeNodesApis); err != nil {
-		return fmt.Errorf("failed to marshal activeNodes: %w", err)
+		return PrettyLogger.WrapError(err, "failed to marshal activeNodes")
 	} else {
 		for _, node := range activeNodes {
 			node := node

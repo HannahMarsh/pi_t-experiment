@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/HannahMarsh/pi_t-experiment/internal/api"
-	"golang.org/x/exp/slog"
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/HannahMarsh/PrettyLogger"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api"
+	"golang.org/x/exp/slog"
 )
 
 func (n *Node) HandleReceive(w http.ResponseWriter, r *http.Request) {
@@ -98,12 +100,12 @@ func (n *Node) updateBulletinBoard(endpoint string, expectedStatusCode int) erro
 	defer n.mu.Unlock()
 	t := time.Now()
 	if data, err := json.Marshal(n.getPrivateNodeInfo(t)); err != nil {
-		return fmt.Errorf("node.UpdateBulletinBoard(): failed to marshal node info: %w", err)
+		return PrettyLogger.WrapError(err, "node.UpdateBulletinBoard(): failed to marshal node info")
 	} else {
 		url := n.BulletinBoardUrl + endpoint
 		//slog.Info("Sending node registration request.", "url", url, "id", n.ID)
 		if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
-			return fmt.Errorf("node.UpdateBulletinBoard(): failed to send POST request to bulletin board: %w", err2)
+			return PrettyLogger.WrapError(err2, "node.UpdateBulletinBoard(): failed to send POST request to bulletin board")
 		} else {
 			defer func(Body io.ReadCloser) {
 				if err3 := Body.Close(); err3 != nil {
@@ -111,7 +113,7 @@ func (n *Node) updateBulletinBoard(endpoint string, expectedStatusCode int) erro
 				}
 			}(resp.Body)
 			if resp.StatusCode != expectedStatusCode {
-				return fmt.Errorf("node.RegisterWithBulletinBoard(): failed to %s node, status code: %d, %s", endpoint, resp.StatusCode, resp.Status)
+				return PrettyLogger.NewError("failed to %s node, status code: %d, %s", endpoint, resp.StatusCode, resp.Status)
 			} else {
 				n.lastUpdate = t
 			}

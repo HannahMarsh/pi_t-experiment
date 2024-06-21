@@ -10,9 +10,10 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
+
+	"github.com/HannahMarsh/PrettyLogger"
 )
 
 // KeyGen generates an RSA key pair and returns the public and private keys in PEM format
@@ -20,7 +21,7 @@ func KeyGen() (privateKeyPEM, publicKeyPEM string, err error) {
 	// Generate RSA key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to generate private key: %w", err)
+		return "", "", PrettyLogger.WrapError(err, "failed to generate private key")
 	}
 
 	// Encode private key to PEM format
@@ -36,7 +37,7 @@ func KeyGen() (privateKeyPEM, publicKeyPEM string, err error) {
 	// Encode public key to PEM format
 	publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to marshal public key: %w", err)
+		return "", "", PrettyLogger.WrapError(err, "failed to marshal public key")
 	}
 	publicKeyPEMBytes := pem.EncodeToMemory(&pem.Block{
 		Type:  "RSA PUBLIC KEY",

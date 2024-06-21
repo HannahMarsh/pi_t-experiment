@@ -5,14 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/HannahMarsh/pi_t-experiment/internal/api"
-	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t"
-	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
-	"golang.org/x/exp/slog"
 	"io"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/HannahMarsh/PrettyLogger"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api"
+	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t"
+	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
+	"golang.org/x/exp/slog"
 
 	rng "math/rand"
 )
@@ -49,7 +51,7 @@ func qoLess(a, b QueuedOnion) bool {
 // NewNode creates a new node
 func NewNode(id int, host string, port int, bulletinBoardUrl string) (*Node, error) {
 	if privateKey, publicKey, err := pi_t.KeyGen(); err != nil {
-		return nil, fmt.Errorf("node.NewNode(): failed to generate key pair: %w", err)
+		return nil, PrettyLogger.WrapError(err, "node.NewNode(): failed to generate key pair")
 	} else {
 		n := &Node{
 			ID:               id,
@@ -63,7 +65,7 @@ func NewNode(id int, host string, port int, bulletinBoardUrl string) (*Node, err
 			wg:               sync.WaitGroup{},
 		}
 		if err2 := n.RegisterWithBulletinBoard(); err2 != nil {
-			return nil, fmt.Errorf("node.NewNode(): failed to register with bulletin board: %w", err2)
+			return nil, PrettyLogger.WrapError(err2, "node.NewNode(): failed to register with bulletin board")
 		}
 
 		go n.StartPeriodicUpdates(time.Second * 3)
@@ -131,11 +133,11 @@ func (n *Node) QueueOnion(msg api.Message, pathLength int) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if msgString, err := json.Marshal(msg); err != nil {
-		return fmt.Errorf("QueueOnion(): failed to marshal message: %w", err)
+		return PrettyLogger.WrapError(err, "failed to marshal message")
 	} else if to := n.getNode(msg.To); to == nil {
 		return fmt.Errorf("QueueOnion(): failed to get node with id %d", msg.To)
 	} else if routingPath, err2 := n.DetermineRoutingPath(pathLength); err2 != nil {
-		return fmt.Errorf("QueueOnion(): failed to determine routing path: %w", err2)
+		return PrettyLogger.WrapError(err2, "failed to determine routing path")
 	} else {
 		publicKeys := utils.Map(routingPath, func(node api.PublicNodeApi) string {
 			return node.PublicKey
@@ -144,7 +146,7 @@ func (n *Node) QueueOnion(msg api.Message, pathLength int) error {
 			return node.Address
 		})
 		if addr, onion, err3 := pi_t.FormOnion(msgString, publicKeys, addresses); err3 != nil {
-			return fmt.Errorf("NewOnion(): failed to create onion: %w", err3)
+			return PrettyLogger.WrapError(err3, "failed to create onion")
 		} else {
 			qo := QueuedOnion{
 				ConstructedOnion:   onion,
@@ -200,7 +202,7 @@ func (n *Node) startRun(activeNodes []api.PublicNodeApi) (didParticipate bool, e
 	if participate {
 		for _, onion := range onionsToSend {
 			if err2 := sendToNode(onion); err2 != nil {
-				return true, fmt.Errorf("startRun(): failed to send onion to next node: %w", err2)
+				return true, PrettyLogger.WrapError(err2, "failed to send onion to next node")
 			}
 		}
 		return true, nil
@@ -210,12 +212,12 @@ func (n *Node) startRun(activeNodes []api.PublicNodeApi) (didParticipate bool, e
 
 func (n *Node) Receive(o string) error {
 	if destination, payload, err := pi_t.PeelOnion(o, n.PrivateKey); err != nil {
-		return fmt.Errorf("node.Receive(): failed to remove layer: %w", err)
+		return PrettyLogger.WrapError(err, "node.Receive(): failed to remove layer")
 	} else {
 		if destination == "" {
 			var msg api.Message
 			if err2 := json.Unmarshal([]byte(payload), &msg); err2 != nil {
-				return fmt.Errorf("node.Receive(): failed to unmarshal message: %w", err2)
+				return PrettyLogger.WrapError(err2, "node.Receive(): failed to unmarshal message")
 			}
 			slog.Info("Received message", "from", msg.From, "to", msg.To, "msg", msg.Msg)
 
@@ -223,13 +225,13 @@ func (n *Node) Receive(o string) error {
 			slog.Info("Received onion", "destination", destination)
 			//bruised, err2 := pi_t.BruiseOnion(payload)
 			//if err2 != nil {
-			//	return fmt.Errorf("node.Receive(): failed to bruise onion: %w", err2)
+			//	return PrettyLogger.WrapError(err2, "node.Receive(): failed to bruise onion")
 			//}
 			if err3 := sendToNode(QueuedOnion{
 				ConstructedOnion:   payload,
 				DestinationAddress: destination,
 			}); err != nil {
-				return fmt.Errorf("node.Receive(): failed to send to next node: %w", err3)
+				return PrettyLogger.WrapError(err3, "node.Receive(): failed to send to next node")
 			}
 		}
 	}
@@ -244,7 +246,7 @@ func sendToNode(onion QueuedOnion) error {
 	if data, err := json.Marshal(o); err != nil {
 		slog.Error("failed to marshal msgs", err)
 	} else if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
-		return fmt.Errorf("sendToNode(): failed to send POST request with onion to next node: %w", err2)
+		return PrettyLogger.WrapError(err2, "failed to send POST request with onion to next node")
 	} else {
 		defer func(Body io.ReadCloser) {
 			if err3 := Body.Close(); err3 != nil {

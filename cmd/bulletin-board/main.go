@@ -53,9 +53,12 @@ func main() {
 	slog.Info("⚡ init Bulletin board")
 
 	// set up logrus
-	logrus.SetFormatter(&logrus.JSONFormatter{})
+	logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true})
 	logrus.SetOutput(os.Stdout)
 	logrus.SetLevel(logger.ConvertLogLevel(*logLevel))
+
+	// Add stack trace hook
+	logrus.AddHook(&logger.ErrorsStackHook{})
 
 	// integrate Logrus with the slog logger
 	slog.New(logger.NewLogrusHandler(logrus.StandardLogger()))

@@ -54,9 +54,12 @@ func main() {
 	slog.Info("⚡ init client", "heartbeat_interval", cfg.HeartbeatInterval)
 
 	// set up logrus
-	logrus.SetFormatter(&logrus.TextFormatter{})
+	logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true})
 	logrus.SetOutput(os.Stdout)
 	logrus.SetLevel(logger.ConvertLogLevel(*logLevel))
+
+	// Add stack trace hook
+	logrus.AddHook(&logger.ErrorsStackHook{})
 
 	// integrate Logrus with the slog logger
 	slog.New(logger.NewLogrusHandler(logrus.StandardLogger()))
