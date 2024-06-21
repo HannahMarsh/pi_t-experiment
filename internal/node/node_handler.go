@@ -12,7 +12,6 @@ import (
 )
 
 func (n *Node) HandleReceive(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Received onion")
 	var o api.OnionApi
 	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
 		slog.Error("Error decoding onion", err)
