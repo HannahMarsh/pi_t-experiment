@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/cmd/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api"
-	"github.com/HannahMarsh/pi_t-experiment/pkg/infrastructure/logger"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/exp/slog"
@@ -53,16 +53,8 @@ func main() {
 
 	slog.Info("⚡ init client", "heartbeat_interval", cfg.HeartbeatInterval)
 
-	// set up logrus
-	logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true})
-	logrus.SetOutput(os.Stdout)
-	logrus.SetLevel(logger.ConvertLogLevel(*logLevel))
-
-	// Add stack trace hook
-	logrus.AddHook(&logger.ErrorsStackHook{})
-
-	// integrate Logrus with the slog logger
-	slog.New(logger.NewLogrusHandler(logrus.StandardLogger()))
+	PrettyLogger.InitDefault()
+	logrus.SetLevel(PrettyLogger.ConvertLogLevel(*logLevel))
 
 	node_addresses := make(map[int][]string, 0)
 	for _, n := range cfg.Nodes {

@@ -135,7 +135,7 @@ func (n *Node) QueueOnion(msg api.Message, pathLength int) error {
 	if msgString, err := json.Marshal(msg); err != nil {
 		return PrettyLogger.WrapError(err, "failed to marshal message")
 	} else if to := n.getNode(msg.To); to == nil {
-		return fmt.Errorf("QueueOnion(): failed to get node with id %d", msg.To)
+		return PrettyLogger.NewError("QueueOnion(): failed to get node with id %d", msg.To)
 	} else if routingPath, err2 := n.DetermineRoutingPath(pathLength); err2 != nil {
 		return PrettyLogger.WrapError(err2, "failed to determine routing path")
 	} else {
@@ -188,7 +188,7 @@ func (n *Node) startRun(activeNodes []api.PublicNodeApi) (didParticipate bool, e
 	n.mu.Lock()
 	if len(activeNodes) == 0 {
 		n.mu.Unlock()
-		return false, fmt.Errorf("startRun(): no active nodes")
+		return false, PrettyLogger.NewError("no active nodes")
 	}
 	n.ActiveNodes = utils.Copy(activeNodes)
 	onionsToSend := n.OnionQueue.Values()
@@ -254,7 +254,7 @@ func sendToNode(onion QueuedOnion) error {
 			}
 		}(resp.Body)
 		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("sendToNode(): Failed to send to next node, status code: %d, status: %s", resp.StatusCode, resp.Status)
+			return PrettyLogger.NewError("sendToNode(): Failed to send to next node, status code: %d, status: %s", resp.StatusCode, resp.Status)
 		}
 	}
 	return nil

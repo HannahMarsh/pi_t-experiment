@@ -5,9 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/cmd/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/bulletin_board"
-	"github.com/HannahMarsh/pi_t-experiment/pkg/infrastructure/logger"
 	"net/http"
 	"os"
 	"os/signal"
@@ -52,16 +52,8 @@ func main() {
 
 	slog.Info("⚡ init Bulletin board")
 
-	// set up logrus
-	logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true})
-	logrus.SetOutput(os.Stdout)
-	logrus.SetLevel(logger.ConvertLogLevel(*logLevel))
-
-	// Add stack trace hook
-	logrus.AddHook(&logger.ErrorsStackHook{})
-
-	// integrate Logrus with the slog logger
-	slog.New(logger.NewLogrusHandler(logrus.StandardLogger()))
+	PrettyLogger.InitDefault()
+	logrus.SetLevel(PrettyLogger.ConvertLogLevel(*logLevel))
 
 	bulletinBoard := bulletin_board.NewBulletinBoard(cfg)
 

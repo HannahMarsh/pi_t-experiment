@@ -75,7 +75,7 @@ func (n *Node) GetActiveNodes() ([]api.PublicNodeApi, error) {
 	url := fmt.Sprintf("%s/nodes", n.BulletinBoardUrl)
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("error making GET request to %s: %v", url, err)
+		return nil, PrettyLogger.WrapError(err, fmt.Sprintf("error making GET request to %s", url))
 	}
 	defer func(Body io.ReadCloser) {
 		if err2 := Body.Close(); err2 != nil {
@@ -84,12 +84,12 @@ func (n *Node) GetActiveNodes() ([]api.PublicNodeApi, error) {
 	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return nil, PrettyLogger.NewError("unexpected status code: %d", resp.StatusCode)
 	}
 
 	var activeNodes []api.PublicNodeApi
 	if err = json.NewDecoder(resp.Body).Decode(&activeNodes); err != nil {
-		return nil, fmt.Errorf("error decoding response: %v", err)
+		return nil, PrettyLogger.WrapError(err, "error decoding response body")
 	}
 
 	return activeNodes, nil
