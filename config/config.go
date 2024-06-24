@@ -25,6 +25,11 @@ type Client struct {
 	Port int    `yaml:"port"`
 }
 
+type Metrics struct {
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
+}
+
 type Config struct {
 	ServerLoad        int           `yaml:"server_load"`
 	HeartbeatInterval int           `yaml:"heartbeat_interval"`
@@ -32,9 +37,10 @@ type Config struct {
 	Epsilon           float64       `yaml:"epsilon"`
 	Delta             float64       `yaml:"delta"`
 	Rounds            int           `yaml:"rounds"`
-	MinQueueLength    int           `yaml:"min_queue_length"`
+	MinTotalMessages  int           `yaml:"min_total_messages"`
 	BulletinBoard     BulletinBoard `yaml:"bulletin_board"`
 	Nodes             []Node        `yaml:"nodes"`
+	Metrics           Metrics       `yaml:"metrics"`
 	Clients           []Client      `yaml:"clients"`
 }
 
@@ -49,7 +55,7 @@ func InitGlobal() error {
 
 	if dir, err := os.Getwd(); err != nil {
 		return PrettyLogger.WrapError(err, "config.NewConfig(): global config error")
-	} else if err2 := cleanenv.ReadConfig(dir+"/cmd/config/config.yml", GlobalConfig); err2 != nil {
+	} else if err2 := cleanenv.ReadConfig(dir+"/config/config.yml", GlobalConfig); err2 != nil {
 		return PrettyLogger.WrapError(err2, "config.NewConfig(): global config error")
 	} else if err3 := cleanenv.ReadEnv(GlobalConfig); err3 != nil {
 		return PrettyLogger.WrapError(err3, "config.NewConfig(): global config error")

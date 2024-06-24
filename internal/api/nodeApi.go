@@ -1,20 +1,18 @@
 package api
 
 import (
-	"crypto/ecdh"
 	"time"
 )
 
 type PublicNodeApi struct {
 	ID        int
 	Address   string
-	PublicKey *ecdh.PublicKey
+	PublicKey string
+	Time      time.Time
 }
 
-type PrivateNodeApi struct {
-	TimeOfRequest time.Time
-	ID            int
-	Address       string
-	PublicKey     *ecdh.PublicKey
-	MessageQueue  []int
+type IntentToSend struct {
+	From PublicNodeApi
+	To   []PublicNodeApi
+	Time time.Time
 }

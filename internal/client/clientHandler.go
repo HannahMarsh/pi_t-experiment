@@ -44,7 +44,7 @@ func (c *Client) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (c *Client) GetActiveNodes() ([]api.PublicClientApi, error) {
+func (c *Client) GetActiveNodes() ([]api.PublicNodeApi, error) {
 	url := fmt.Sprintf("%s/Clients", c.BulletinBoardUrl)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -60,7 +60,7 @@ func (c *Client) GetActiveNodes() ([]api.PublicClientApi, error) {
 		return nil, PrettyLogger.NewError("unexpected status code: %d", resp.StatusCode)
 	}
 
-	var activeClients []api.PublicClientApi
+	var activeClients []api.PublicNodeApi
 	if err = json.NewDecoder(resp.Body).Decode(&activeClients); err != nil {
 		return nil, PrettyLogger.WrapError(err, "error decoding response body")
 	}

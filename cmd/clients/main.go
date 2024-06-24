@@ -96,11 +96,11 @@ func main() {
 
 	slog.Info("🌏 start newClient...", "address", fmt.Sprintf("http://%s:%d", clientConfig.Host, clientConfig.Port))
 
-	nodeAddresses := utils.Map(cfg.Nodes, func(n config.Node) string {
+	clientAddresses := utils.Map(cfg.Clients, func(n config.Client) string {
 		return fmt.Sprintf("http://%s:%d", n.Host, n.Port)
 	})
 
-	go newClient.StartGeneratingMessages(nodeAddresses)
+	go newClient.StartGeneratingMessages(clientAddresses)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)

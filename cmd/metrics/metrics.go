@@ -6,19 +6,18 @@ import (
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
-	"github.com/HannahMarsh/pi_t-experiment/internal/bulletin_board"
+	"github.com/HannahMarsh/pi_t-experiment/internal/metrics"
+	_ "github.com/lib/pq"
+	"go.uber.org/automaxprocs/maxprocs"
+	"golang.org/x/exp/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-
-	"go.uber.org/automaxprocs/maxprocs"
-	"golang.org/x/exp/slog"
-
-	_ "github.com/lib/pq"
 )
 
 func main() {
+	//isMixer := flag.Bool("mixer", false, "Included if this node is a mixer")
 	logLevel := flag.String("log-level", "debug", "Log level")
 
 	flag.Usage = func() {
@@ -45,29 +44,17 @@ func main() {
 
 	cfg := config.GlobalConfig
 
-	host := cfg.BulletinBoard.Host
-	port := cfg.BulletinBoard.Port
-	url := fmt.Sprintf("https://%s:%d", host, port)
+	slog.Info("⚡ init metrics", "host", cfg.Metrics.Host, "port", cfg.Metrics.Port)
 
-	slog.Info("⚡ init Bulletin board")
-
-	bulletinBoard := bulletin_board.NewBulletinBoard(cfg)
-
-	go func() {
-		err := bulletinBoard.StartRuns()
-		if err != nil {
-			slog.Error("failed to start runs", err)
-			config.GlobalCancel()
-		}
-	}()
-
-	http.HandleFunc("/registerNode", bulletinBoard.HandleRegisterNode)
-	http.HandleFunc("/registerClient", bulletinBoard.HandleRegisterClient)
-	http.HandleFunc("/registerIntentToSend", bulletinBoard.HandleRegisterIntentToSend)
-	http.HandleFunc("/updateNode", bulletinBoard.HandleUpdateNodeInfo)
+	http.HandleFunc("/client/updateMessageQueue", metrics.HandleUpdateMessageQueue)
+	http.HandleFunc("/startRun", metrics.HandleStartRun)
+	http.HandleFunc("/client/sentOnion", metrics.HandleClientSentOnion)
+	http.HandleFunc("/client/sentOnion", metrics.HandleClientReceivedOnion)
+	http.HandleFunc("/node/sentOnion", metrics.HandleNodeSentOnion)
+	http.HandleFunc("/node/sentOnion", metrics.HandleNodeReceivedOnion)
 
 	go func() {
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", cfg.Metrics.Port), nil); err != nil {
 			if errors.Is(err, http.ErrServerClosed) {
 				slog.Info("HTTP server closed")
 			} else {
@@ -76,7 +63,7 @@ func main() {
 		}
 	}()
 
-	slog.Info("🌏 starting bulletin board...", "address", url)
+	slog.Info("🌏 start metrics...", "address", fmt.Sprintf("%s:%d", cfg.Metrics.Host, cfg.Metrics.Port))
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
@@ -88,4 +75,5 @@ func main() {
 	case done := <-config.GlobalCtx.Done():
 		slog.Info("ctx.Done", done)
 	}
+
 }

@@ -22,7 +22,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.1.0 // indirect
-	github.com/HannahMarsh/PrettyLogger v0.0.0-20240624162539-3fa4daad85be // indirect
+	github.com/HannahMarsh/PrettyLogger v0.0.0-20240624195816-fafd56cd6e16 // indirect
 	github.com/golang/glog v1.0.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/jfcg/sixb v1.4.1 // indirect

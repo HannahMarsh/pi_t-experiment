@@ -1,6 +1,6 @@
 package api
 
 type StartRunApi struct {
-	ParticipatingClients []PublicClientApi
+	ParticipatingClients []PublicNodeApi
 	ActiveNodes          []PublicNodeApi
 }

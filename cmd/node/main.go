@@ -21,7 +21,7 @@ import (
 func main() {
 	// Define command-line flags
 	id := flag.Int("id", -1, "ID of the newNode (required)")
-	isMixer := flag.Bool("mixer", false, "Included if this node is a mixer")
+	//isMixer := flag.Bool("mixer", false, "Included if this node is a mixer")
 	logLevel := flag.String("log-level", "debug", "Log level")
 
 	flag.Usage = func() {

@@ -175,6 +175,24 @@ func FilterMap[K comparable, V any](m map[K]V, condition func(K, V) bool) map[K]
 	return filteredMap
 }
 
+func Filter[V any](values []V, condition func(V) bool) []V {
+	filteredValues := make([]V, 0)
+	for _, v := range values {
+		if condition(v) {
+			filteredValues = append(filteredValues, v)
+		}
+	}
+	return filteredValues
+}
+
+func Sum(values []int) int {
+	sum := 0
+	for _, v := range values {
+		sum += v
+	}
+	return sum
+}
+
 func GetValues[K comparable, V any](m map[K]V) []V {
 	values := make([]V, 0, len(m))
 	for _, v := range m {
@@ -199,6 +217,14 @@ func Map[T any, O any](items []T, f func(T) O) []O {
 	return result
 }
 
+func MapEntries[K comparable, V any, O any](m map[K]V, f func(K, V) O) []O {
+	result := make([]O, 0, len(m))
+	for k, v := range m {
+		result = append(result, f(k, v))
+	}
+	return result
+}
+
 func Contains[T any](items []T, f func(T) bool) bool {
 	for _, item := range items {
 		if f(item) {
@@ -212,13 +238,13 @@ func DoesNotContain[T any](items []T, f func(T) bool) bool {
 	return !Contains(items, f)
 }
 
-func Find[T any](items []T, f func(T) bool) *T {
+func Find[T any](items []T, defaultT T, f func(T) bool) (T, bool) {
 	for _, item := range items {
 		if f(item) {
-			return &item
+			return item, true
 		}
 	}
-	return nil
+	return defaultT, false
 }
 
 func FindInMap[K comparable, V any](m map[K]V, f func(K, V) bool, defaultKey K, defaultValue V) (K, V, bool) {

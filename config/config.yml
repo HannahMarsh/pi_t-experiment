@@ -1,10 +1,13 @@
 server_load: 7
 heartbeat_interval: 5
 min_nodes: 2
-min_queue_length: 1
+min_total_messages: 1
 epsilon: 0.1
 delta: 1e-5
 rounds: 50
+metrics:
+  host: 'localhost'
+  port: 8200
 bulletin_board:
   host: 'localhost'
   port: 8080
