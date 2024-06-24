@@ -12,6 +12,14 @@ github.com/HannahMarsh/PrettyLogger v0.0.0-20240621204825-2d6db832e63d h1:N06+oj
 github.com/HannahMarsh/PrettyLogger v0.0.0-20240621204825-2d6db832e63d/go.mod h1:dNK8XnrlHFYaE0Bub5sOVXEbcEniZlYAExTcfLsJ0JI=
 github.com/HannahMarsh/PrettyLogger v0.0.0-20240621205938-565288b7081d h1:AD70nZsYJ3cYGUbP5il0BPzIzC1F9dpAGc+/63iMnFA=
 github.com/HannahMarsh/PrettyLogger v0.0.0-20240621205938-565288b7081d/go.mod h1:dNK8XnrlHFYaE0Bub5sOVXEbcEniZlYAExTcfLsJ0JI=
+github.com/HannahMarsh/PrettyLogger v0.0.0-20240624130711-b23ff2d182da h1:R4UHs5UkGA8KNt8p5lS/XI6dMOd1zTJm5+mkj92atf8=
+github.com/HannahMarsh/PrettyLogger v0.0.0-20240624130711-b23ff2d182da/go.mod h1:dNK8XnrlHFYaE0Bub5sOVXEbcEniZlYAExTcfLsJ0JI=
+github.com/HannahMarsh/PrettyLogger v0.0.0-20240624132221-9639abb53344 h1:k7RVWwez/RV510y6NloxX1LFkIs8W5sY8AENf2Ph9Gk=
+github.com/HannahMarsh/PrettyLogger v0.0.0-20240624132221-9639abb53344/go.mod h1:dNK8XnrlHFYaE0Bub5sOVXEbcEniZlYAExTcfLsJ0JI=
+github.com/HannahMarsh/PrettyLogger v0.0.0-20240624132622-8dcc63038f9c h1:SpB3b6sB2bTMsJtPxF1BVYqxjDBOtb1JTA+HBy7tVig=
+github.com/HannahMarsh/PrettyLogger v0.0.0-20240624132622-8dcc63038f9c/go.mod h1:dNK8XnrlHFYaE0Bub5sOVXEbcEniZlYAExTcfLsJ0JI=
+github.com/HannahMarsh/PrettyLogger v0.0.0-20240624162539-3fa4daad85be h1:/6CqsM73QyCuE69NZ+CW/5NHuDk2qzS3VWkubrU/jeo=
+github.com/HannahMarsh/PrettyLogger v0.0.0-20240624162539-3fa4daad85be/go.mod h1:DnsFnxjM3dXHLKhtLJR4TGv7iTRhiLSP+AdZ1RWB4ew=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

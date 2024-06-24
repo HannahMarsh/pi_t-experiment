@@ -1,14 +1,12 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/HannahMarsh/PrettyLogger"
-	"github.com/HannahMarsh/pi_t-experiment/cmd/config"
+	pl "github.com/HannahMarsh/PrettyLogger"
+	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/node"
-	"github.com/sirupsen/logrus"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/exp/slog"
 	"net/http"
@@ -23,6 +21,7 @@ import (
 func main() {
 	// Define command-line flags
 	id := flag.Int("id", -1, "ID of the newNode (required)")
+	isMixer := flag.Bool("mixer", false, "Included if this node is a mixer")
 	logLevel := flag.String("log-level", "debug", "Log level")
 
 	flag.Usage = func() {
@@ -36,23 +35,20 @@ func main() {
 
 	// Check if the required flag is provided
 	if *id == -1 {
-		if _, err := fmt.Fprintf(os.Stderr, "Error: the -id flag is required\n"); err != nil {
-			slog.Error("Error: the -id flag is required\n", err)
-		}
+		_, _ = fmt.Fprintf(os.Stderr, "Error: the -id flag is required\n")
 		flag.Usage()
 		os.Exit(2)
 	}
 
+	pl.SetUpLogrusAndSlog(*logLevel)
+
 	// set GOMAXPROCS
-	_, err := maxprocs.Set()
-	if err != nil {
+	if _, err := maxprocs.Set(); err != nil {
 		slog.Error("failed set max procs", err)
 		os.Exit(1)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	if err = config.InitConfig(); err != nil {
+	if err := config.InitGlobal(); err != nil {
 		slog.Error("failed to init config", err)
 		os.Exit(1)
 	}
@@ -74,31 +70,30 @@ func main() {
 
 	slog.Info("⚡ init newNode", "heartbeat_interval", cfg.HeartbeatInterval, "id", *id)
 
-	PrettyLogger.InitDefault()
-	logrus.SetLevel(PrettyLogger.ConvertLogLevel(*logLevel))
-
 	baddress := fmt.Sprintf("http://%s:%d", cfg.BulletinBoard.Host, cfg.BulletinBoard.Port)
 
 	var newNode *node.Node
 	for {
-		if newNode, err = node.NewNode(nodeConfig.ID, nodeConfig.Host, nodeConfig.Port, baddress); err != nil {
+		if n, err := node.NewNode(nodeConfig.ID, nodeConfig.Host, nodeConfig.Port, baddress); err != nil {
 			slog.Error("failed to create newNode. Trying again in 5 seconds. ", err)
-
 			time.Sleep(5 * time.Second)
 			continue
 		} else {
+			newNode = n
 			break
 		}
 	}
 
-	http.HandleFunc("/receive", newNode.HandleReceive)
-	http.HandleFunc("/requestMsg", newNode.HandleClientRequest)
+	http.HandleFunc("/receiveOnion", newNode.HandleReceiveOnion)
 	http.HandleFunc("/start", newNode.HandleStartRun)
 
 	go func() {
-		address := fmt.Sprintf(":%d", nodeConfig.Port)
-		if err2 := http.ListenAndServe(address, nil); err2 != nil && !errors.Is(err2, http.ErrServerClosed) {
-			slog.Error("failed to start HTTP server", err2)
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", nodeConfig.Port), nil); err != nil {
+			if errors.Is(err, http.ErrServerClosed) {
+				slog.Info("HTTP server closed")
+			} else {
+				slog.Error("failed to start HTTP server", err)
+			}
 		}
 	}()
 
@@ -109,9 +104,9 @@ func main() {
 
 	select {
 	case v := <-quit:
-		cancel()
+		config.GlobalCancel()
 		slog.Info("signal.Notify", v)
-	case done := <-ctx.Done():
+	case done := <-config.GlobalCtx.Done():
 		slog.Info("ctx.Done", done)
 	}
 

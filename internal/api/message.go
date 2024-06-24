@@ -1,7 +1,7 @@
 package api
 
 type Message struct {
-	From int
-	To   int
+	From string
+	To   string
 	Msg  string
 }

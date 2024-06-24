@@ -1,6 +1,7 @@
 package bulletin_board
 
 import (
+	"crypto/ecdh"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api"
 	"sync"
 	"time"
@@ -9,38 +10,29 @@ import (
 type NodeView struct {
 	ID                       int
 	Address                  string
-	PublicKey                string
-	MessageQueue             []int
+	PublicKey                *ecdh.PublicKey
 	mu                       sync.RWMutex
 	LastHeartbeat            time.Time
 	MaxTimeBetweenHeartbeats time.Duration
-	Api                      api.PublicNodeApi
 }
 
-func NewNodeView(n *api.PrivateNodeApi, maxTimeBetweenHeartbeats time.Duration) *NodeView {
+func NewNodeView(n api.PrivateNodeApi, maxTimeBetweenHeartbeats time.Duration) *NodeView {
 	return &NodeView{
 		ID:                       n.ID,
 		Address:                  n.Address,
 		PublicKey:                n.PublicKey,
-		MessageQueue:             n.MessageQueue,
 		LastHeartbeat:            n.TimeOfRequest,
 		MaxTimeBetweenHeartbeats: maxTimeBetweenHeartbeats,
-		Api: api.PublicNodeApi{
-			ID:        n.ID,
-			Address:   n.Address,
-			PublicKey: n.PublicKey,
-		},
 	}
 }
 
-func (nv *NodeView) UpdateNode(n *api.PrivateNodeApi) {
+func (nv *NodeView) UpdateNode(c api.PrivateNodeApi) {
 	nv.mu.Lock()
 	defer nv.mu.Unlock()
-	if nv.LastHeartbeat.After(n.TimeOfRequest) {
+	if nv.LastHeartbeat.After(c.TimeOfRequest) {
 		return
 	} else {
-		nv.LastHeartbeat = n.TimeOfRequest
-		nv.MessageQueue = n.MessageQueue
+		nv.LastHeartbeat = c.TimeOfRequest
 	}
 }
 

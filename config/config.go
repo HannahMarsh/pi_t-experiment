@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"os"
 
 	"github.com/HannahMarsh/PrettyLogger"
@@ -18,6 +19,12 @@ type Node struct {
 	Port int    `yaml:"port"`
 }
 
+type Client struct {
+	ID   int    `yaml:"id"`
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
+}
+
 type Config struct {
 	ServerLoad        int           `yaml:"server_load"`
 	HeartbeatInterval int           `yaml:"heartbeat_interval"`
@@ -28,11 +35,16 @@ type Config struct {
 	MinQueueLength    int           `yaml:"min_queue_length"`
 	BulletinBoard     BulletinBoard `yaml:"bulletin_board"`
 	Nodes             []Node        `yaml:"nodes"`
+	Clients           []Client      `yaml:"clients"`
 }
 
 var GlobalConfig *Config
+var GlobalCtx context.Context
+var GlobalCancel context.CancelFunc
 
-func InitConfig() error {
+func InitGlobal() error {
+	GlobalCtx, GlobalCancel = context.WithCancel(context.Background())
+
 	GlobalConfig = &Config{}
 
 	if dir, err := os.Getwd(); err != nil {

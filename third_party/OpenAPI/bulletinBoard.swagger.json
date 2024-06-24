@@ -1,12 +1,12 @@
 {
   "swagger": "2.0",
   "info": {
-    "title": "counter.proto",
+    "title": "bulletinBoard.proto",
     "version": "version not set"
   },
   "tags": [
     {
-      "name": "CounterService"
+      "name": "BulletinBoardService"
     }
   ],
   "consumes": [
@@ -16,16 +16,16 @@
     "application/json"
   ],
   "paths": {
-    "/v1/api/orders": {
+    "/v1/api/registerNode": {
       "post": {
-        "summary": "Place an order",
-        "description": "Place an order on the server.",
-        "operationId": "CounterService_PlaceOrder",
+        "summary": "Register a node",
+        "description": "Register a new Node",
+        "operationId": "BulletinBoardService_RegisterNode",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/counterapiPlaceOrderResponse"
+              "$ref": "#/definitions/bulletinBoardapiRegisterNode"
             }
           },
           "default": {
@@ -41,7 +41,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/counterapiPlaceOrderRequest"
+              "$ref": "#/definitions/bulletinBoardapiPlaceOrderRequest"
             }
           }
         ],
@@ -54,12 +54,12 @@
       "get": {
         "summary": "List order fulfillment",
         "description": "List order fulfillment on the server.",
-        "operationId": "CounterService_GetListOrderFulfillment",
+        "operationId": "BulletinBoardService_GetListOrderFulfillment",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/counterapiGetListOrderFulfillmentResponse"
+              "$ref": "#/definitions/bulletinBoardapiGetListOrderFulfillmentResponse"
             }
           },
           "default": {
@@ -76,7 +76,7 @@
     }
   },
   "definitions": {
-    "counterapiCommandItem": {
+    "bulletinBoardapiCommandItem": {
       "type": "object",
       "properties": {
         "itemType": {
@@ -85,18 +85,18 @@
         }
       }
     },
-    "counterapiGetListOrderFulfillmentResponse": {
+    "bulletinBoardapiGetListOrderFulfillmentResponse": {
       "type": "object",
       "properties": {
         "orders": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/counterapiOrderDto"
+            "$ref": "#/definitions/bulletinBoardapiOrderDto"
           }
         }
       }
     },
-    "counterapiLineItemDto": {
+    "bulletinBoardapiLineItemDto": {
       "type": "object",
       "properties": {
         "id": {
@@ -122,7 +122,7 @@
         }
       }
     },
-    "counterapiOrderDto": {
+    "bulletinBoardapiOrderDto": {
       "type": "object",
       "properties": {
         "id": {
@@ -146,12 +146,12 @@
         "lineItems": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/counterapiLineItemDto"
+            "$ref": "#/definitions/bulletinBoardapiLineItemDto"
           }
         }
       }
     },
-    "counterapiPlaceOrderRequest": {
+    "bulletinBoardapiPlaceOrderRequest": {
       "type": "object",
       "properties": {
         "commandType": {
@@ -172,13 +172,13 @@
         "baristaItems": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/counterapiCommandItem"
+            "$ref": "#/definitions/bulletinBoardapiCommandItem"
           }
         },
         "kitchenItems": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/counterapiCommandItem"
+            "$ref": "#/definitions/bulletinBoardapiCommandItem"
           }
         },
         "timestamp": {
@@ -187,7 +187,7 @@
         }
       }
     },
-    "counterapiPlaceOrderResponse": {
+    "bulletinBoardapiRegisterNode": {
       "type": "object"
     },
     "googlerpcStatus": {

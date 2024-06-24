@@ -21,12 +21,45 @@ func (bb *BulletinBoard) HandleRegisterNode(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	slog.Info("Registering node with", "id", node.ID)
-	if err := bb.UpdateNode(&node); err != nil {
+	if err := bb.UpdateNode(node); err != nil {
 		slog.Error("Error updating node", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (bb *BulletinBoard) HandleRegisterClient(w http.ResponseWriter, r *http.Request) {
+	slog.Info("Received client registration request")
+	var client api.PublicClientApi
+	if err := json.NewDecoder(r.Body).Decode(&client); err != nil {
+		slog.Error("Error decoding client registration request", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	slog.Info("Registering client with", "id", client.ID)
+	if err := bb.RegisterClient(client); err != nil {
+		slog.Error("Error registering client", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (bb *BulletinBoard) HandleRegisterIntentToSend(w http.ResponseWriter, r *http.Request) {
+	slog.Info("Received intent-to-send request")
+	var its api.IntentToSend
+	if err := json.NewDecoder(r.Body).Decode(&its); err != nil {
+		slog.Error("Error decoding intent-to-send registration request", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := bb.RegisterIntentToSend(its); err != nil {
+		slog.Error("Error registering intent-to-send request", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func (bb *BulletinBoard) HandleUpdateNodeInfo(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +71,7 @@ func (bb *BulletinBoard) HandleUpdateNodeInfo(w http.ResponseWriter, r *http.Req
 		return
 	}
 	slog.Info("Updating node with", "id", nodeInfo.ID)
-	if err := bb.UpdateNode(&nodeInfo); err != nil {
+	if err := bb.UpdateNode(nodeInfo); err != nil {
 		fmt.Printf("Error updating node %d: %v\n", nodeInfo.ID, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -50,11 +83,11 @@ func (bb *BulletinBoard) HandleUpdateNodeInfo(w http.ResponseWriter, r *http.Req
 func (bb *BulletinBoard) HandleGetActiveNodes(w http.ResponseWriter, r *http.Request) {
 	bb.mu.Lock()
 	defer bb.mu.Unlock()
-	activeNodes := utils.NewMapStream(bb.Network).Filter(func(_ int, node *NodeView) bool {
+	activeNodes := utils.NewMapStream(bb.Network).Filter(func(_ int, node *ClientView) bool {
 		return node.IsActive()
 	}).GetValues().Array
 
-	activeNodesApis := utils.Map(activeNodes, func(node *NodeView) api.PublicNodeApi {
+	activeNodesApis := utils.Map(activeNodes, func(node *ClientView) api.PublicNodeApi {
 		return node.Api
 	})
 
@@ -68,11 +101,11 @@ func (bb *BulletinBoard) HandleGetActiveNodes(w http.ResponseWriter, r *http.Req
 
 func (bb *BulletinBoard) signalNodesToStart() error {
 	slog.Info("Signaling nodes to start")
-	activeNodes := utils.NewMapStream(bb.Network).Filter(func(_ int, node *NodeView) bool {
+	activeNodes := utils.NewMapStream(bb.Network).Filter(func(_ int, node *ClientView) bool {
 		return node.IsActive()
 	}).GetValues().Array
 
-	activeNodesApis := utils.Map(activeNodes, func(node *NodeView) api.PublicNodeApi {
+	activeNodesApis := utils.Map(activeNodes, func(node *ClientView) api.PublicNodeApi {
 		return node.Api
 	})
 

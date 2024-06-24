@@ -1,18 +1,15 @@
 package main
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
-	"github.com/HannahMarsh/PrettyLogger"
-	"github.com/HannahMarsh/pi_t-experiment/cmd/config"
-	"github.com/HannahMarsh/pi_t-experiment/internal/api"
-	"github.com/sirupsen/logrus"
+	pl "github.com/HannahMarsh/PrettyLogger"
+	"github.com/HannahMarsh/pi_t-experiment/config"
+	"github.com/HannahMarsh/pi_t-experiment/internal/client"
+	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/exp/slog"
-	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -24,6 +21,7 @@ import (
 
 func main() {
 	// Define command-line flags
+	id := flag.Int("id", -1, "ID of the newClient (required)")
 	logLevel := flag.String("log-level", "debug", "Log level")
 
 	flag.Usage = func() {
@@ -35,82 +33,83 @@ func main() {
 
 	flag.Parse()
 
+	// Check if the required flag is provided
+	if *id == -1 {
+		_, _ = fmt.Fprintf(os.Stderr, "Error: the -id flag is required\n")
+		flag.Usage()
+		os.Exit(2)
+	}
+
+	pl.SetUpLogrusAndSlog(*logLevel)
+
 	// set GOMAXPROCS
-	_, err := maxprocs.Set()
-	if err != nil {
+	if _, err := maxprocs.Set(); err != nil {
 		slog.Error("failed set max procs", err)
 		os.Exit(1)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	if err = config.InitConfig(); err != nil {
+	if err := config.InitGlobal(); err != nil {
 		slog.Error("failed to init config", err)
 		os.Exit(1)
 	}
 
 	cfg := config.GlobalConfig
 
-	slog.Info("⚡ init client", "heartbeat_interval", cfg.HeartbeatInterval)
-
-	PrettyLogger.InitDefault()
-	logrus.SetLevel(PrettyLogger.ConvertLogLevel(*logLevel))
-
-	node_addresses := make(map[int][]string, 0)
-	for _, n := range cfg.Nodes {
-		if _, ok := node_addresses[n.ID]; !ok {
-			node_addresses[n.ID] = make([]string, 0)
+	var clientConfig *config.Client
+	for _, client := range cfg.Clients {
+		if client.ID == *id {
+			clientConfig = &client
+			break
 		}
-		node_addresses[n.ID] = append(node_addresses[n.ID], fmt.Sprintf("http://%s:%d", n.Host, n.Port))
 	}
 
+	if clientConfig == nil {
+		slog.Error("invalid id", errors.New(fmt.Sprintf("failed to get newClient config for id=%d", *id)))
+		os.Exit(1)
+	}
+
+	slog.Info("⚡ init newClient", "heartbeat_interval", cfg.HeartbeatInterval, "id", *id)
+
+	baddress := fmt.Sprintf("http://%s:%d", cfg.BulletinBoard.Host, cfg.BulletinBoard.Port)
+
+	var newClient *client.Client
 	for {
-		for id, addresses := range node_addresses {
-			for _, addr := range addresses {
-				addr := addr
-				go func() {
-					var msgs []api.Message = make([]api.Message, 0)
-					for i, _ := range node_addresses {
-						if i != id {
-							msgs = append(msgs, api.Message{
-								From: id,
-								To:   i,
-								Msg:  fmt.Sprintf("msg %d", i),
-							})
-						}
-					}
-					if data, err2 := json.Marshal(msgs); err2 != nil {
-						slog.Error("failed to marshal msgs", err2)
-					} else {
-						url := addr + "/requestMsg"
-						slog.Info("Sending add msg request.", "url", url, "num_onions", len(msgs))
-						if resp, err3 := http.Post(url, "application/json", bytes.NewBuffer(data)); err3 != nil {
-							slog.Error("failed to send POST request with msgs to node", err3)
-						} else {
-							defer func(Body io.ReadCloser) {
-								if err4 := Body.Close(); err4 != nil {
-									fmt.Printf("error closing response body: %v\n", err2)
-								}
-							}(resp.Body)
-							if resp.StatusCode != http.StatusCreated {
-								slog.Info("failed to send msgs to node", "status_code", resp.StatusCode, "status", resp.Status)
-							}
-						}
-					}
-				}()
-			}
+		if n, err := client.NewClient(clientConfig.ID, clientConfig.Host, clientConfig.Port, baddress); err != nil {
+			slog.Error("failed to create new client. Trying again in 5 seconds. ", err)
+			time.Sleep(5 * time.Second)
+			continue
+		} else {
+			newClient = n
+			break
 		}
-		time.Sleep(time.Duration(2 * time.Second))
 	}
+
+	http.HandleFunc("/receive", newClient.HandleReceive)
+	http.HandleFunc("/start", newClient.HandleStartRun)
+
+	go func() {
+		address := fmt.Sprintf(":%d", clientConfig.Port)
+		if err2 := http.ListenAndServe(address, nil); err2 != nil && !errors.Is(err2, http.ErrServerClosed) {
+			slog.Error("failed to start HTTP server", err2)
+		}
+	}()
+
+	slog.Info("🌏 start newClient...", "address", fmt.Sprintf("http://%s:%d", clientConfig.Host, clientConfig.Port))
+
+	nodeAddresses := utils.Map(cfg.Nodes, func(n config.Node) string {
+		return fmt.Sprintf("http://%s:%d", n.Host, n.Port)
+	})
+
+	go newClient.StartGeneratingMessages(nodeAddresses)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
 	select {
 	case v := <-quit:
-		cancel()
+		config.GlobalCancel()
 		slog.Info("signal.Notify", v)
-	case done := <-ctx.Done():
+	case done := <-config.GlobalCtx.Done():
 		slog.Info("ctx.Done", done)
 	}
 

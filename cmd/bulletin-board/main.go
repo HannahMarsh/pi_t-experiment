@@ -1,19 +1,17 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/HannahMarsh/PrettyLogger"
-	"github.com/HannahMarsh/pi_t-experiment/cmd/config"
+	pl "github.com/HannahMarsh/PrettyLogger"
+	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/bulletin_board"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/sirupsen/logrus"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/exp/slog"
 
@@ -32,15 +30,15 @@ func main() {
 
 	flag.Parse()
 
+	pl.SetUpLogrusAndSlog(*logLevel)
+
 	// set GOMAXPROCS
 	if _, err := maxprocs.Set(); err != nil {
 		slog.Error("failed set max procs", err)
 		os.Exit(1)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	if err := config.InitConfig(); err != nil {
+	if err := config.InitGlobal(); err != nil {
 		slog.Error("failed to init config", err)
 		os.Exit(1)
 	}
@@ -49,37 +47,46 @@ func main() {
 
 	host := cfg.BulletinBoard.Host
 	port := cfg.BulletinBoard.Port
+	url := fmt.Sprintf("https://%s:%d", host, port)
 
 	slog.Info("⚡ init Bulletin board")
 
-	PrettyLogger.InitDefault()
-	logrus.SetLevel(PrettyLogger.ConvertLogLevel(*logLevel))
-
 	bulletinBoard := bulletin_board.NewBulletinBoard(cfg)
 
-	go bulletinBoard.StartRuns()
+	go func() {
+		err := bulletinBoard.StartRuns()
+		if err != nil {
+			slog.Error("failed to start runs", err)
+			config.GlobalCancel()
+		}
+	}()
 
-	http.HandleFunc("/register", bulletinBoard.HandleRegisterNode)
+	http.HandleFunc("/registerNode", bulletinBoard.HandleRegisterNode)
+	http.HandleFunc("/registerClient", bulletinBoard.HandleRegisterClient)
+	http.HandleFunc("/registerIntentToSend", bulletinBoard.HandleRegisterIntentToSend)
 	http.HandleFunc("/update", bulletinBoard.HandleUpdateNodeInfo)
 	http.HandleFunc("/nodes", bulletinBoard.HandleGetActiveNodes)
 
 	go func() {
-		address := fmt.Sprintf(":%d", port)
-		if err2 := http.ListenAndServe(address, nil); err2 != nil && !errors.Is(err2, http.ErrServerClosed) {
-			slog.Error("failed to start HTTP server", err2)
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
+			if errors.Is(err, http.ErrServerClosed) {
+				slog.Info("HTTP server closed")
+			} else {
+				slog.Error("failed to start HTTP server", err)
+			}
 		}
 	}()
 
-	slog.Info("🌏 start node...", "address", fmt.Sprintf("https://%s:%d", host, port))
+	slog.Info("🌏 starting bulletin board...", "address", url)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
 	select {
 	case v := <-quit:
-		cancel()
+		config.GlobalCancel()
 		slog.Info("signal.Notify", v)
-	case done := <-ctx.Done():
+	case done := <-config.GlobalCtx.Done():
 		slog.Info("ctx.Done", done)
 	}
 }

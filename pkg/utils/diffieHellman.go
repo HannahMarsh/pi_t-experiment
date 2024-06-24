@@ -1,34 +1,28 @@
 package utils
 
 import (
-	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
+	"crypto/ecdh"
 	"crypto/rand"
-	"math/big"
-
+	"crypto/sha256"
 	"github.com/HannahMarsh/PrettyLogger"
 )
 
-func generateDHKeyPair() (*big.Int, *big.Int, error) {
-	// Use standard Diffie-Hellman parameters (could be replaced with your own)
-	p, _ := new(big.Int).SetString("FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1"+
-		"29024E088A67CC74020BBEA63B139B22514A08798E3404DD"+
-		"EF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245"+
-		"E485B576625E7EC6F44C42E9A63A36210000000000090563", 16)
-	g := big.NewInt(2) // A common choice for g
-	privKey, err := rand.Int(rand.Reader, p)
-	if err != nil {
-		return nil, nil, err
+// GenerateECDHKeyPair generates a private/public key pair for ECDH using P256 curve.
+func GenerateECDHKeyPair() (*ecdh.PrivateKey, *ecdh.PublicKey, error) {
+	curve := ecdh.P256() // Using P256 curve
+	if privKey, err := curve.GenerateKey(rand.Reader); err != nil {
+		return nil, nil, PrettyLogger.WrapError(err, "failed to generate ECDH key pair")
+	} else {
+		return privKey, privKey.PublicKey(), nil
 	}
-	pubKey := new(big.Int).Exp(g, privKey, p)
-	return privKey, pubKey, nil
 }
 
-func generateECDHKeyPair() (*ecdsa.PrivateKey, crypto.PublicKey, error) {
-	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return nil, nil, PrettyLogger.WrapError(err, "failed to generate ECDSA key pair")
+// ComputeSharedKey computes the shared secret using the ECDH private key and a peer's public key.
+func ComputeSharedKey(privKey *ecdh.PrivateKey, pubKey *ecdh.PublicKey) ([]byte, error) {
+	if sharedKey, err := privKey.ECDH(pubKey); err != nil {
+		return nil, PrettyLogger.WrapError(err, "failed to compute shared key")
+	} else {
+		hashedSharedKey := sha256.Sum256(sharedKey)
+		return hashedSharedKey[:], nil
 	}
-	return privKey, privKey.PublicKey, nil
 }

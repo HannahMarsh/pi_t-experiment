@@ -8,6 +8,16 @@ rounds: 50
 bulletin_board:
   host: 'localhost'
   port: 8080
+clients:
+  - id: 1
+    host: 'localhost'
+    port: 8101
+  - id: 2
+    host: 'localhost'
+    port: 8102
+  - id: 3
+    host: 'localhost'
+    port: 8103
 nodes:
   - id: 1
     host: 'localhost'
