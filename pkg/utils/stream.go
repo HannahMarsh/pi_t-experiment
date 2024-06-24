@@ -193,6 +193,16 @@ func Sum(values []int) int {
 	return sum
 }
 
+func Max(values []int) int {
+	m := values[0]
+	for _, v := range values {
+		if v > m {
+			m = v
+		}
+	}
+	return m
+}
+
 func GetValues[K comparable, V any](m map[K]V) []V {
 	values := make([]V, 0, len(m))
 	for _, v := range m {

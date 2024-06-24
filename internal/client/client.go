@@ -88,6 +88,7 @@ func (c *Client) RegisterWithBulletinBoard() error {
 
 func (c *Client) StartGeneratingMessages(client_addresses []string) {
 	slog.Info("Client starting to generate messages", "id", c.ID)
+	var msgNum int = 0
 	for {
 		select {
 		case <-config.GlobalCtx.Done():
@@ -100,8 +101,9 @@ func (c *Client) StartGeneratingMessages(client_addresses []string) {
 					messages = append(messages, api.Message{
 						From: c.Adddress,
 						To:   addr,
-						Msg:  fmt.Sprintf("msg from client(id=%d)", c.ID),
+						Msg:  fmt.Sprintf("Msg#%d from client(id=%d)", msgNum, c.ID),
 					})
+					msgNum++
 				}
 			}
 			var wg sync.WaitGroup
@@ -120,7 +122,7 @@ func (c *Client) StartGeneratingMessages(client_addresses []string) {
 			}()
 			wg.Wait()
 		}
-		time.Sleep(15 * time.Second)
+		time.Sleep(5 * time.Second)
 	}
 }
 
@@ -146,7 +148,31 @@ func (c *Client) formOnions(start api.StartRunApi) (map[string][]api.OnionApi, e
 
 	onions := make(map[string][]api.OnionApi)
 
-	slog.Info("formOnions", "id", c.ID, "num_messages", len(c.Messages), "num_participants", len(start.ParticipatingClients), "num_active_nodes", len(start.ActiveNodes))
+	nodes := utils.Filter(start.ActiveNodes, func(node api.PublicNodeApi) bool {
+		return node.Address != c.Adddress && node.Address != ""
+	})
+
+	numMessagesToSend := make(map[string]int)
+
+	for _, msg := range c.Messages {
+		if _, found := numMessagesToSend[msg.To]; !found {
+			numMessagesToSend[msg.To] = 0
+		}
+		numMessagesToSend[msg.To]++
+	}
+
+	for addr, numMessages := range numMessagesToSend {
+		if numMessages < start.NumMessagesPerClient {
+			numDummyNeeded := start.NumMessagesPerClient - numMessages
+			for i := 0; i < numDummyNeeded; i++ {
+				c.Messages = append(c.Messages, api.Message{
+					From: c.Adddress,
+					To:   addr,
+					Msg:  "dummy",
+				})
+			}
+		}
+	}
 
 	for _, msg := range c.Messages {
 		if destination, found := utils.Find(start.ParticipatingClients, api.PublicNodeApi{}, func(client api.PublicNodeApi) bool {
@@ -157,7 +183,7 @@ func (c *Client) formOnions(start api.StartRunApi) (map[string][]api.OnionApi, e
 
 			if msgString, err := json.Marshal(msg); err != nil {
 				return nil, pl.WrapError(err, "failed to marshal message")
-			} else if routingPath, err2 := DetermineRoutingPath(3, start.ActiveNodes); err2 != nil {
+			} else if routingPath, err2 := DetermineRoutingPath(3, nodes); err2 != nil {
 				return nil, pl.WrapError(err2, "failed to determine routing path")
 			} else {
 				routingPath = append(routingPath, destination)
@@ -167,6 +193,7 @@ func (c *Client) formOnions(start api.StartRunApi) (map[string][]api.OnionApi, e
 				addresses := utils.Map(routingPath, func(node api.PublicNodeApi) string {
 					return node.Address
 				})
+				slog.Info("routing path", "path", addresses)
 				if addr, onion, err3 := pi_t.FormOnion(msgString, publicKeys, addresses); err3 != nil {
 					return nil, pl.WrapError(err3, "failed to create onion")
 				} else {
@@ -212,7 +239,7 @@ func (c *Client) startRun(start api.StartRunApi) (bool, error) {
 	} else {
 		for addr, onions := range toSend {
 			for _, onion := range onions {
-				url := fmt.Sprintf("%s/receiveOnion", addr)
+				url := fmt.Sprintf("%s/receive", addr)
 
 				if data, err2 := json.Marshal(onion); err2 != nil {
 					slog.Error("failed to marshal msgs", err2)
@@ -226,11 +253,14 @@ func (c *Client) startRun(start api.StartRunApi) (bool, error) {
 					}(resp.Body)
 					if resp.StatusCode != http.StatusOK {
 						return true, pl.NewError("%s: Failed to send to first node(url=%s), status code: %d, status: %s", pl.GetFuncName(), url, resp.StatusCode, resp.Status)
+					} else {
+						slog.Info("Client sent onion to first mixer", "mixer_address", addr)
 					}
 				}
 			}
 		}
 	}
+	c.Messages = make([]api.Message, 0)
 	return true, nil
 }
 
@@ -246,6 +276,20 @@ func (c *Client) startRun(start api.StartRunApi) (bool, error) {
 //}
 
 func (c *Client) Receive(o string) error {
+	if destination, payload, err := pi_t.PeelOnion(o, c.PrivateKey); err != nil {
+		return pl.WrapError(err, "node.Receive(): failed to remove layer")
+	} else {
+		if destination == "" {
+			var msg api.Message
+			if err2 := json.Unmarshal([]byte(payload), &msg); err2 != nil {
+				return pl.WrapError(err2, "node.Receive(): failed to unmarshal message")
+			}
+			slog.Info("Received message", "from", msg.From, "to", msg.To, "msg", msg.Msg)
+
+		} else {
+			return pl.NewError("Received onion", "destination", destination)
+		}
+	}
 	return nil
 }
 

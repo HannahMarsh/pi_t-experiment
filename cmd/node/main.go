@@ -84,7 +84,7 @@ func main() {
 		}
 	}
 
-	http.HandleFunc("/receiveOnion", newNode.HandleReceiveOnion)
+	http.HandleFunc("/receive", newNode.HandleReceiveOnion)
 	http.HandleFunc("/start", newNode.HandleStartRun)
 
 	go func() {

@@ -38,7 +38,7 @@ func (c *Client) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 		if didParticipate, err := c.startRun(start); err != nil {
 			slog.Error("Error starting run", err)
 		} else {
-			slog.Info("Run complete", "did_participate", didParticipate)
+			slog.Info("Done sending onions", "did_participate", didParticipate)
 		}
 	}()
 	w.WriteHeader(http.StatusOK)

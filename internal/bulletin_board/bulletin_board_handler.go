@@ -124,9 +124,14 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 		}
 	})
 
+	numMessages := utils.Max(utils.MapEntries(bb.Clients, func(_ int, client *ClientView) int {
+		return len(client.MessageQueue)
+	})) + 2
+
 	vs := api.StartRunApi{
 		ParticipatingClients: activeClients,
 		ActiveNodes:          activeNodes,
+		NumMessagesPerClient: numMessages,
 	}
 
 	if data, err := json.Marshal(vs); err != nil {

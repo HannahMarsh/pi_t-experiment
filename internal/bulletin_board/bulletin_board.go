@@ -107,6 +107,8 @@ func (bb *BulletinBoard) StartRuns() error {
 			if bb.allNodesReady() {
 				if err := bb.signalNodesToStart(); err != nil {
 					return PrettyLogger.WrapError(err, "error signaling nodes to start")
+				} else {
+					return nil
 				}
 			}
 		}
