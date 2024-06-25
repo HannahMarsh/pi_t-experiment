@@ -2,7 +2,6 @@ package api
 
 import (
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
-	"golang.org/x/exp/slog"
 )
 
 type Message struct {
@@ -13,11 +12,7 @@ type Message struct {
 }
 
 func NewMessage(from, to, msg string) Message {
-	h, err := utils.GenerateUniqueHash()
-	if err != nil {
-		slog.Error("failed to generate unique hash", err)
-		h = ""
-	}
+	h := utils.GenerateUniqueHash()
 	return Message{
 		From: from,
 		To:   to,

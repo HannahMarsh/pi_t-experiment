@@ -37,7 +37,7 @@ func (cs *ClientStatus) AddSent(clientReceiver PublicNodeApi, routingPath []Publ
 		TimeSent:       time.Now(),
 	})
 
-	slog.Info(PrettyLogger.GetFuncName(), "message", message)
+	//	slog.Info(PrettyLogger.GetFuncName(), "message", message)
 }
 
 func (cs *ClientStatus) AddReceived(message Message) {

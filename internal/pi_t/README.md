@@ -1,10 +1,10 @@
 # Directory: `/internal/pi_t`  
   
   
-- This directory contains the implementation of the Onion Routing protocol, `pi_t`. The key components are:
+- This directory contains the implementation of several Onion Routing functions from Pi_t. The key components are:
   - [`pi_t_functions.go`](pi_t_functions.go): Functions to form and peel onion layers.
-  - `keys`: HELPER package for key generation and encryption/decryption.
-  - `prf`: Package for Pseudo-Random Functions (PRF) used in the protocol.
+  - [`keys`](keys): Helper package for key generation and encryption/decryption.
+  - [`prf`](prf): Package for Pseudo-Random Functions (PRF) used in the protocol.
 
 ## Usage
 

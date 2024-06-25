@@ -23,6 +23,12 @@
         th {
             background-color: #f2f2f2;
         }
+        .true {
+            background-color: #eaffe0;
+        }
+        .false {
+            background-color: #ffe0eb;
+        }
         .node {
             color: green;
         }
@@ -59,6 +65,7 @@
     <a href="http://localhost:8200/client">Clients</a>
     <a href="http://localhost:8200/nodes">Nodes</a>
     <a href="http://localhost:8200/nodes/rounds">Rounds</a>
+    <a href="http://localhost:8200/nodes/checkpoints">Checkpoint Onions</a>
 </div>
 
 <div id="data">Loading...</div>
@@ -110,6 +117,8 @@
                     <th>Bruise Counter</th>
                     <th>Was Dropped?</th>
                     <th>Is Checkpoint Onion?</th>
+                    <th>Was Nonce Verified?</th>
+                    <th>Expect a Checkpoint onion?</th>
                 </tr>
             `;
 
@@ -121,8 +130,10 @@
                     <td>${onion.NextHop}</td>
                     <td>${onion.TimeReceived}</td>
                     <td>${onion.Bruises}</td>
-                    <td>${onion.Dropped}</td>
-                    <td>${onion.IsCheckPointOnion}</td>
+                    <td class="${onion.Dropped ? 'true' : 'false'}">${onion.Dropped}</td>
+                    <td class="${onion.IsCheckPointOnion ? 'true' : 'false'}">${onion.IsCheckPointOnion}</td>
+                    <td class="${onion.NonceVerification ? 'true' : 'false'}">${onion.NonceVerification}</td>
+                    <td class="${onion.ExpectCheckPoint ? 'true' : 'false'}">${onion.ExpectCheckPoint}</td>
                 `;
             });
 

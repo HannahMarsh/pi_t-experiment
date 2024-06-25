@@ -175,6 +175,32 @@ func FilterMap[K comparable, V any](m map[K]V, condition func(K, V) bool) map[K]
 	return filteredMap
 }
 
+func Remove[T any](items []T, condition func(T) bool) []T {
+	filteredItems := make([]T, 0)
+	for _, item := range items {
+		if !condition(item) {
+			filteredItems = append(filteredItems, item)
+		}
+	}
+	return filteredItems
+}
+
+func InsertAtIndex[T any](items []T, index int, value T) []T {
+	if index == 0 {
+		return append([]T{value}, items...)
+	}
+	if index == len(items) {
+		return append(items, value)
+	}
+	temp := append(items[:index], value)
+	items = append(temp, items[index:]...)
+	return items
+}
+
+func GetLast[T any](items []T) T {
+	return items[len(items)-1]
+}
+
 func Filter[V any](values []V, condition func(V) bool) []V {
 	filteredValues := make([]V, 0)
 	for _, v := range values {

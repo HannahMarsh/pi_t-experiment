@@ -176,6 +176,16 @@ func DetermineRoutingPath(pathLength int, participants []api.PublicNodeApi) ([]a
 	return selectedNodes, nil
 }
 
+func DetermineCheckpointRoutingPath(pathLength int, nodes []api.PublicNodeApi, participatingClients []api.PublicNodeApi, checkpointReceiver api.PublicNodeApi, round int) ([]api.PublicNodeApi, error) {
+	path, err := DetermineRoutingPath(pathLength-1, utils.Remove(nodes, func(p api.PublicNodeApi) bool {
+		return p.Address == checkpointReceiver.Address
+	}))
+	if err != nil {
+		return nil, pl.WrapError(err, "failed to determine routing path")
+	}
+	return append(utils.InsertAtIndex(path, round, checkpointReceiver), utils.RandomElement(participatingClients)), nil
+}
+
 func (c *Client) formOnions(start api.StartRunApi) (map[string][]api.OnionApi, error) {
 
 	onions := make(map[string][]api.OnionApi)
@@ -187,26 +197,26 @@ func (c *Client) formOnions(start api.StartRunApi) (map[string][]api.OnionApi, e
 		return node.Address != c.Adddress && node.Address != ""
 	})
 
-	numMessagesToSend := make(map[string]int)
-
-	for _, msg := range c.Messages {
-		if _, found := numMessagesToSend[msg.To]; !found {
-			numMessagesToSend[msg.To] = 0
-		}
-		numMessagesToSend[msg.To]++
-	}
-
-	dummyNum := 0
-
-	for addr, numMessages := range numMessagesToSend {
-		if numMessages < start.NumMessagesPerClient {
-			numDummyNeeded := start.NumMessagesPerClient - numMessages
-			for i := 0; i < numDummyNeeded; i++ {
-				c.Messages = append(c.Messages, api.NewMessage(c.Adddress, addr, fmt.Sprintf("dummy%d", dummyNum)))
-				dummyNum++
-			}
-		}
-	}
+	//numMessagesToSend := make(map[string]int)
+	//
+	//for _, msg := range c.Messages {
+	//	if _, found := numMessagesToSend[msg.To]; !found {
+	//		numMessagesToSend[msg.To] = 0
+	//	}
+	//	numMessagesToSend[msg.To]++
+	//}
+	//
+	//dummyNum := 0
+	//
+	//for addr, numMessages := range numMessagesToSend {
+	//	if numMessages < start.NumMessagesPerClient {
+	//		numDummyNeeded := start.NumMessagesPerClient - numMessages
+	//		for i := 0; i < numDummyNeeded; i++ {
+	//			c.Messages = append(c.Messages, api.NewMessage(c.Adddress, addr, fmt.Sprintf("dummy%d", dummyNum)))
+	//			dummyNum++
+	//		}
+	//	}
+	//}
 
 	for _, msg := range c.Messages {
 		if destination, found := utils.Find(start.ParticipatingClients, api.PublicNodeApi{}, func(client api.PublicNodeApi) bool {
@@ -228,13 +238,56 @@ func (c *Client) formOnions(start api.StartRunApi) (map[string][]api.OnionApi, e
 					return node.Address
 				})
 				slog.Info("routing path", "path", addresses)
-				if addr, onion, err3 := pi_t.FormOnion(c.PrivateKey, c.PublicKey, msgString, publicKeys, addresses, -1); err3 != nil {
+				if addr, onion, checkpoints, err3 := pi_t.FormOnion(c.PrivateKey, c.PublicKey, msgString, publicKeys, addresses, -1); err3 != nil {
 					return nil, pl.WrapError(err3, "failed to create onion")
 				} else {
+					// generate checkpoint onions
+					for i, node := range routingPath {
+						if checkpoints[i] {
+							path, err5 := DetermineCheckpointRoutingPath(config.GlobalConfig.Rounds, nodes, utils.Filter(start.ParticipatingClients, func(publicNodeApi api.PublicNodeApi) bool {
+								return publicNodeApi.Address != c.Adddress && publicNodeApi.Address != ""
+							}), node, i)
+							if err5 != nil {
+								return nil, pl.WrapError(err5, "failed to determine checkpoint routing path")
+							}
+
+							checkPointPublicKeys := utils.Map(path, func(node api.PublicNodeApi) string {
+								return node.PublicKey
+							})
+							checkPointAddresses := utils.Map(path, func(node api.PublicNodeApi) string {
+								return node.Address
+							})
+
+							dummyMsg := api.Message{
+								From: c.Adddress,
+								To:   utils.GetLast(path).Address,
+								Msg:  "checkpoint onion",
+								Hash: utils.GenerateUniqueHash(),
+							}
+							dummyPayload, err6 := json.Marshal(dummyMsg)
+							if err6 != nil {
+								return nil, pl.WrapError(err6, "failed to marshal dummy message")
+							}
+							if firstHop, checkpointOnion, _, err4 := pi_t.FormOnion(c.PrivateKey, c.PublicKey, dummyPayload, checkPointPublicKeys, checkPointAddresses, -i); err4 != nil {
+								return nil, pl.WrapError(err4, "failed to create onion")
+							} else {
+								if _, present := onions[firstHop]; !present {
+									onions[firstHop] = make([]api.OnionApi, 0)
+								}
+								onions[firstHop] = append(onions[firstHop], api.OnionApi{
+									Onion: checkpointOnion,
+									From:  c.Adddress,
+									To:    firstHop,
+								})
+								c.status.AddSent(utils.GetLast(path), routingPath, dummyMsg)
+							}
+						}
+					}
+
 					if _, present := onions[addr]; !present {
 						onions[addr] = make([]api.OnionApi, 0)
 					}
-					onions[addr] = append(onions[msg.To], api.OnionApi{
+					onions[addr] = append(onions[addr], api.OnionApi{
 						Onion: onion,
 						From:  c.Adddress,
 						To:    addr,
@@ -300,7 +353,7 @@ func (c *Client) startRun(start api.StartRunApi) (bool, error) {
 }
 
 func (c *Client) Receive(o string) error {
-	if peeled, bruises, err := pi_t.PeelOnion(o, c.PrivateKey); err != nil {
+	if peeled, bruises, _, _, err := pi_t.PeelOnion(o, c.PrivateKey); err != nil {
 		return pl.WrapError(err, "node.Receive(): failed to remove layer")
 	} else {
 		slog.Info("Client received onion", "bruises", bruises, "from", peeled.LastHop, "to", peeled.NextHop, "layer", peeled.Layer, "is_checkpoint_onion", peeled.IsCheckpointOnion)

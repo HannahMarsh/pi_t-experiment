@@ -19,16 +19,18 @@ import (
 
 // Node represents a node in the onion routing network
 type Node struct {
-	ID               int
-	Host             string
-	Port             int
-	PrivateKey       string
-	PublicKey        string
-	isMixer          bool
-	mu               sync.RWMutex
-	BulletinBoardUrl string
-	lastUpdate       time.Time
-	status           *api.NodeStatus
+	ID                  int
+	Host                string
+	Port                int
+	PrivateKey          string
+	PublicKey           string
+	isMixer             bool
+	mu                  sync.RWMutex
+	BulletinBoardUrl    string
+	lastUpdate          time.Time
+	status              *api.NodeStatus
+	checkpoints         map[int]int
+	expectedCheckpoints map[int]int
 }
 
 // NewNode creates a new node
@@ -37,23 +39,16 @@ func NewNode(id int, host string, port int, bulletinBoardUrl string, isMixer boo
 		return nil, pl.WrapError(err, "node.NewClient(): failed to generate key pair")
 	} else {
 		n := &Node{
-			ID:               id,
-			Host:             host,
-			Port:             port,
-			PublicKey:        publicKey,
-			PrivateKey:       privateKey,
-			BulletinBoardUrl: bulletinBoardUrl,
-			isMixer:          isMixer,
-			status: &api.NodeStatus{
-				Received: make([]api.OnionStatus, 0),
-				Node: api.PublicNodeApi{
-					ID:        id,
-					Address:   fmt.Sprintf("http://%s:%d", host, port),
-					PublicKey: publicKey,
-					Time:      time.Now(),
-					IsMixer:   isMixer,
-				},
-			},
+			ID:                  id,
+			Host:                host,
+			Port:                port,
+			PublicKey:           publicKey,
+			PrivateKey:          privateKey,
+			BulletinBoardUrl:    bulletinBoardUrl,
+			isMixer:             isMixer,
+			status:              api.NewNodeStatus(id, fmt.Sprintf("http://%s:%d", host, port), publicKey, isMixer),
+			checkpoints:         make(map[int]int),
+			expectedCheckpoints: make(map[int]int),
 		}
 		if err2 := n.RegisterWithBulletinBoard(); err2 != nil {
 			return nil, pl.WrapError(err2, "node.NewNode(): failed to register with bulletin board")
@@ -103,42 +98,42 @@ func (n *Node) startRun(start api.StartRunApi) (didParticipate bool, e error) {
 }
 
 func (n *Node) Receive(o string) error {
-	if peeled, bruises, err := pi_t.PeelOnion(o, n.PrivateKey); err != nil {
+	if peeled, bruises, nonceVerification, expectCheckpoint, err := pi_t.PeelOnion(o, n.PrivateKey); err != nil {
 		return pl.WrapError(err, "node.Receive(): failed to remove layer")
 	} else {
+		n.mu.Lock()
+		defer n.mu.Unlock()
 
-		if peeled.NextHop == "" {
-			n.status.AddOnion(peeled.LastHop, fmt.Sprintf("http://%s:%d", n.Host, n.Port), peeled.NextHop, peeled.Layer, peeled.IsCheckpointOnion, bruises, true)
-			var msg api.Message
-			if err2 := json.Unmarshal([]byte(peeled.Payload), &msg); err2 != nil {
-				return pl.WrapError(err2, "node.Receive(): failed to unmarshal message")
+		if expectCheckpoint {
+			n.expectedCheckpoints[peeled.Layer]++
+			n.status.AddExpectedCheckpoint(peeled.Layer)
+		}
+		if peeled.IsCheckpointOnion {
+			n.checkpoints[peeled.Layer]++
+			n.status.AddCheckpointOnion(peeled.Layer)
+		}
+		slog.Info("Received onion", "layer", peeled.Layer, "destination", peeled.NextHop, "nonceVerification", nonceVerification, "expectCheckpoint", expectCheckpoint)
+
+		if !nonceVerification {
+			bruises += 1
+		}
+
+		if !n.isMixer && bruises > config.GlobalConfig.MaxBruises {
+
+			n.status.AddOnion(peeled.LastHop, fmt.Sprintf("http://%s:%d", n.Host, n.Port), peeled.NextHop, peeled.Layer, peeled.IsCheckpointOnion, bruises, true, nonceVerification, expectCheckpoint)
+			slog.Info("Dropping onion", "layer", peeled.Layer, "destination", peeled.NextHop)
+			return nil
+
+		} else if !peeled.IsCheckpointOnion {
+
+			n.status.AddOnion(peeled.LastHop, fmt.Sprintf("http://%s:%d", n.Host, n.Port), peeled.NextHop, peeled.Layer, peeled.IsCheckpointOnion, bruises, false, nonceVerification, expectCheckpoint)
+
+			addedHeader, err4 := pi_t.AddHeader(peeled, bruises, n.PrivateKey, n.PublicKey)
+			if err4 != nil {
+				return pl.WrapError(err4, "node.Receive(): failed to add header")
 			}
-			slog.Info("Received message", "from", msg.From, "to", msg.To, "msg", msg.Msg)
-
-		} else {
-			if !n.isMixer && bruises > config.GlobalConfig.MaxBruises {
-				n.status.AddOnion(peeled.LastHop, fmt.Sprintf("http://%s:%d", n.Host, n.Port), peeled.NextHop, peeled.Layer, peeled.IsCheckpointOnion, bruises, true)
-				slog.Info("Dropping onion", "layer", peeled.Layer, "destination", peeled.NextHop)
-				return nil
-			} else {
-				n.status.AddOnion(peeled.LastHop, fmt.Sprintf("http://%s:%d", n.Host, n.Port), peeled.NextHop, peeled.Layer, peeled.IsCheckpointOnion, bruises, false)
-
-				if peeled.IsCheckpointOnion {
-					slog.Info("Received checkpoint onion", "layer", peeled.Layer, "destination", peeled.NextHop)
-				} else {
-					slog.Info("Received onion", "layer", peeled.Layer, "destination", peeled.NextHop)
-				}
-				//bruised, err2 := pi_t.BruiseOnion(payload)
-				//if err2 != nil {
-				//	return pl.WrapError(err2, "node.Receive(): failed to bruise onion")
-				//}
-				addedHeader, err4 := pi_t.AddHeader(peeled, bruises, n.PrivateKey, n.PublicKey)
-				if err4 != nil {
-					return pl.WrapError(err4, "node.Receive(): failed to add header")
-				}
-				if err3 := sendToNode(peeled.NextHop, addedHeader); err != nil {
-					return pl.WrapError(err3, "node.Receive(): failed to send to next node")
-				}
+			if err3 := sendToNode(peeled.NextHop, addedHeader); err != nil {
+				return pl.WrapError(err3, "node.Receive(): failed to send to next node")
 			}
 		}
 	}

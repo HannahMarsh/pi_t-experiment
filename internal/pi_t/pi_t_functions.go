@@ -53,7 +53,15 @@ type Header struct {
 // - The destination node identifier.
 // - The base64-encoded onion with the added header.
 // - An error object if an error occurred, otherwise nil.
-func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, publicKeys []string, routingPath []string, checkpoint int) (string, string, error) {
+func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, publicKeys []string, routingPath []string, checkpoint int) (string, string, []bool, error) {
+	var sendCheckPoints []bool
+	if checkpoint <= 0 {
+		sendCheckPoints = make([]bool, len(publicKeys))
+		for i := range sendCheckPoints {
+			sendCheckPoints[i] = false
+		}
+	}
+
 	for i := len(publicKeys) - 1; i >= 0; i-- {
 		var layerBytes []byte
 		var err error
@@ -74,16 +82,22 @@ func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, public
 				NextHopPubKey:     publicKeys[i+1],
 			}
 
-			// Use PRF_F1 to determine if a checkpoint onion is expected
-			checkpointExpected := prf.PRF_F1(privateKeyPEM, publicKeys[i], i)
 			var nonce []byte
-			if checkpointExpected == 0 {
-				nonce = prf.PRF_F2(privateKeyPEM, publicKeys[i], i)
-			} else {
+			if checkpoint <= 0 {
+				// Use PRF_F1 to determine if a checkpoint onion is expected
+				checkpointExpected := prf.PRF_F1(privateKeyPEM, publicKeys[i], i)
+				if checkpointExpected == 0 {
+					sendCheckPoints[i] = true
+				}
+				if checkpointExpected == 0 {
+					nonce = prf.PRF_F2(privateKeyPEM, publicKeys[i], i)
+				}
+			}
+			if nonce == nil {
 				nonce = make([]byte, 16)
 				_, err = rand.Read(nonce)
 				if err != nil {
-					return "", "", pl.WrapError(err, "failed to generate random nonce")
+					return "", "", nil, pl.WrapError(err, "failed to generate random nonce")
 				}
 			}
 
@@ -91,28 +105,28 @@ func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, public
 
 			layerBytes, err = json.Marshal(layer)
 			if err != nil {
-				return "", "", pl.WrapError(err, "failed to marshal onion layer")
+				return "", "", nil, pl.WrapError(err, "failed to marshal onion layer")
 			}
 		}
 
 		symmetricKey, err := keys.GenerateSymmetricKey()
 		if err != nil {
-			return "", "", pl.WrapError(err, "failed to generate symmetric key")
+			return "", "", nil, pl.WrapError(err, "failed to generate symmetric key")
 		}
 
 		encryptedPayload, err := keys.EncryptWithAES(symmetricKey, layerBytes)
 		if err != nil {
-			return "", "", pl.WrapError(err, "failed to encrypt payload")
+			return "", "", nil, pl.WrapError(err, "failed to encrypt payload")
 		}
 
 		sharedKey, err := keys.ComputeSharedKey(privateKeyPEM, publicKeys[i])
 		if err != nil {
-			return "", "", pl.WrapError(err, "failed to compute shared key")
+			return "", "", nil, pl.WrapError(err, "failed to compute shared key")
 		}
 
 		encryptedKey, err := keys.EncryptWithAES(sharedKey, symmetricKey)
 		if err != nil {
-			return "", "", pl.WrapError(err, "failed to encrypt key")
+			return "", "", nil, pl.WrapError(err, "failed to encrypt key")
 		}
 
 		combinedPayload := CombinedPayload{
@@ -123,16 +137,16 @@ func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, public
 
 		payload, err = json.Marshal(combinedPayload)
 		if err != nil {
-			return "", "", pl.WrapError(err, "failed to marshal combined payload")
+			return "", "", nil, pl.WrapError(err, "failed to marshal combined payload")
 		}
 	}
 
 	onionWithHeader, err := addHeaderAfterPeeling(base64.StdEncoding.EncodeToString(payload), privateKeyPEM, publicKeyPEM, publicKeys[0], 0)
 	if err != nil {
-		return "", "", pl.WrapError(err, "failed to add header")
+		return "", "", nil, pl.WrapError(err, "failed to add header")
 	}
 
-	return routingPath[0], onionWithHeader, nil
+	return routingPath[0], onionWithHeader, sendCheckPoints, nil
 }
 
 // AddHeader adds a header to the peeled onion payload.
@@ -212,19 +226,20 @@ func removeHeader(onion string, privateKeyPEM string) (string, int, error) {
 // - The peeled onion payload.
 // - The bruise counter.
 // - A boolean indicating if the nonce verification passed.
+// - A boolean indicating if we should expect a checkpoint onion this round
 // - An error object if an error occurred, otherwise nil.
-func PeelOnion(onion string, privateKeyPEM string) (*OnionPayload, int, bool, error) {
+func PeelOnion(onion string, privateKeyPEM string) (*OnionPayload, int, bool, bool, error) {
 	headerRemoved, bruises, err := removeHeader(onion, privateKeyPEM)
 	if err != nil {
-		return nil, -1, true, err
+		return nil, -1, true, false, err
 	}
 
-	peeled, nonceVerification, err := peelOnionAfterRemovingPayload(headerRemoved, privateKeyPEM)
+	peeled, nonceVerification, expectCheckpoint, err := peelOnionAfterRemovingPayload(headerRemoved, privateKeyPEM)
 	if err != nil {
-		return nil, -1, nonceVerification, err
+		return nil, -1, nonceVerification, expectCheckpoint, err
 	}
 
-	return peeled, bruises, nonceVerification, nil
+	return peeled, bruises, nonceVerification, expectCheckpoint, nil
 }
 
 // peelOnionAfterRemovingPayload removes the outermost layer of the onion after removing the header.
@@ -235,36 +250,36 @@ func PeelOnion(onion string, privateKeyPEM string) (*OnionPayload, int, bool, er
 // - The peeled onion payload.
 // - A boolean indicating if the nonce verification passed.
 // - An error object if an error occurred, otherwise nil.
-func peelOnionAfterRemovingPayload(onion string, privateKeyPEM string) (*OnionPayload, bool, error) {
+func peelOnionAfterRemovingPayload(onion string, privateKeyPEM string) (*OnionPayload, bool, bool, error) {
 
 	onionBytes, err := base64.StdEncoding.DecodeString(onion)
 	if err != nil {
-		return nil, true, err
+		return nil, true, false, err
 	}
 
 	var combinedPayload CombinedPayload
 	if err = json.Unmarshal(onionBytes, &combinedPayload); err != nil {
-		return nil, true, err
+		return nil, true, false, err
 	}
 
 	encryptedKey, err := base64.StdEncoding.DecodeString(combinedPayload.EncryptedSharedKey)
 	if err != nil {
-		return nil, true, err
+		return nil, true, false, err
 	}
 
 	sharedKey, err := keys.ComputeSharedKey(privateKeyPEM, combinedPayload.OriginalSenderPubKey)
 	if err != nil {
-		return nil, true, err
+		return nil, true, false, err
 	}
 
 	symmetricKey, err := keys.DecryptWithAES(sharedKey, string(encryptedKey))
 	if err != nil {
-		return nil, true, err
+		return nil, true, false, err
 	}
 
 	decryptedBytes, err := keys.DecryptWithAES(symmetricKey, combinedPayload.EncryptedPayload)
 	if err != nil {
-		return nil, true, err
+		return nil, true, false, err
 	}
 
 	if !strings.HasPrefix(string(decryptedBytes), "{\"IsCheckpointOnion\":") {
@@ -274,18 +289,18 @@ func peelOnionAfterRemovingPayload(onion string, privateKeyPEM string) (*OnionPa
 			NextHop:           "",
 			LastHop:           "",
 			Payload:           string(decryptedBytes),
-		}, true, nil
+		}, true, false, nil
 	}
 
 	var layer OnionPayload
 	err = json.Unmarshal(decryptedBytes, &layer)
 	if err != nil {
-		return nil, true, err
+		return nil, true, false, err
 	}
 
 	nonce, err := base64.StdEncoding.DecodeString(layer.Nonce)
 	if err != nil {
-		return nil, true, pl.WrapError(err, "failed to decode nonce")
+		return nil, true, false, pl.WrapError(err, "failed to decode nonce")
 	}
 
 	checkpointExpected := prf.PRF_F1(privateKeyPEM, combinedPayload.OriginalSenderPubKey, layer.Layer)
@@ -293,9 +308,9 @@ func peelOnionAfterRemovingPayload(onion string, privateKeyPEM string) (*OnionPa
 		expectedNonce := prf.PRF_F2(privateKeyPEM, combinedPayload.OriginalSenderPubKey, layer.Layer)
 		if !hmac.Equal(nonce, expectedNonce) {
 			slog.Warn("nonce verification failed")
-			return &layer, false, nil
+			return &layer, false, true, nil
 		}
 	}
 
-	return &layer, true, nil
+	return &layer, true, checkpointExpected == 0, nil
 }

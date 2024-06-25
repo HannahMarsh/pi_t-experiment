@@ -85,52 +85,54 @@
         const dataDiv = document.getElementById('data');
         dataDiv.innerHTML = '';
 
+        const layers = {};
+
+        if (!data.Nodes) {
+            dataDiv.textContent = 'No data available';
+            return;
+        }
+
+        // Organize onions by layer
         for (const [node, status] of Object.entries(data.Nodes)) {
-            const nodeDiv = document.createElement('div');
-            nodeDiv.innerHTML = status.Node.IsMixer ? `<h2>Node${status.Node.ID} (mixer): ${node}</h2>` : `<h2>Node${status.Node.ID} (gatekeeper): ${node}</h2>`;
+            if (status.Received && Array.isArray(status.Received)) {
+                status.Received.forEach(onion => {
+                    if (!layers[onion.Layer]) {
+                        layers[onion.Layer] = [];
+                    }
+                    layers[onion.Layer].push(onion);
+                });
+            }
+        }
+
+        const maxLayer = Math.max(...Object.keys(layers).map(layer => parseInt(layer)));
+        for (let round = 0; round <= maxLayer; round++) {
+            const layerDiv = document.createElement('div');
+            layerDiv.innerHTML = `<h2>Round ${round}</h2>`;
 
             const onionTable = document.createElement('table');
             onionTable.innerHTML = `
                 <tr>
-                    <th colspan="9">Onions</th>
-                </tr>
-                <tr>
-                    <th>Last Hop</th>
-                    <th>Next Hop</th>
-                    <th>Time Received</th>
-                    <th>Bruise Counter</th>
-                    <th>Was Dropped?</th>
-                    <th>Is Checkpoint Onion?</th>
-                    <th>Was Nonce Verified?</th>
-                    <th>Expect a Checkpoint onion?</th>
-                    <th>Layer</th>
+                    <th>Node</th>
+                    <th>Number of Checkpoints Expected</th>
+                    <th>Number of Checkpoints Received</th>
                 </tr>
             `;
-
-            status.Received.forEach(onion => {
+            for (const [node, status] of Object.entries(data.Nodes)) {
                 const row = onionTable.insertRow();
                 row.innerHTML = `
-                    <td>${onion.LastHop}</td>
-                    <td>${onion.NextHop}</td>
-                    <td>${onion.TimeReceived}</td>
-                    <td>${onion.Bruises}</td>
-                    <td>${onion.Dropped}</td>
-                    <td>${onion.IsCheckPointOnion}</td>
-                    <td>${onion.NonceVerification}</td>
-                    <td>${onion.ExpectCheckPoint}</td>
-                    <td>${onion.Layer}</td>
+                    <td>${node}</td>
+                    <td>${status.ExpectedCheckpoints[round] || 0}</td>
+                    <td>${status.CheckpointOnionsReceived[round] || 0}</td>
                 `;
-            });
-
-            nodeDiv.appendChild(onionTable);
-            dataDiv.appendChild(nodeDiv);
+            }
+            layerDiv.appendChild(onionTable);
+            dataDiv.appendChild(layerDiv);
         }
     }
 
-
     function startFetchingData() {
         fetchData();
-        setInterval(fetchData, 500); // Update every half second
+        setInterval(fetchData, 1000); // Update every half second
     }
 
     document.addEventListener('DOMContentLoaded', startFetchingData);
