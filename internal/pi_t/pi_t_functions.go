@@ -3,52 +3,130 @@ package pi_t
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/ecdh"
+	"crypto/ecdsa"
 	"crypto/rand"
-	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
-	"errors"
-	"github.com/HannahMarsh/PrettyLogger"
+	pl "github.com/HannahMarsh/PrettyLogger"
 	"io"
 	"strings"
 )
 
-// KeyGen generates an RSA key pair and returns the public and private keys in PEM format
-func KeyGen2() (privateKeyPEM, publicKeyPEM string, err error) {
-	// Generate RSA key
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+// GenerateECDHKeyPair generates an ECDH key pair using the P256 curve
+func KeyGen() (privateKeyPEM string, publicKeyPEM string, err error) {
+	curve := ecdh.P256() // Using P256 curve
+	privKey, err := curve.GenerateKey(rand.Reader)
 	if err != nil {
-		return "", "", PrettyLogger.WrapError(err, "failed to generate private key")
+		return "", "", pl.WrapError(err, "failed to generate ECDH key pair")
 	}
 
-	// Encode private key to PEM format
-	privateKeyPEMBytes := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
-	})
-	privateKeyPEM = string(privateKeyPEMBytes)
-
-	// Generate public key
-	publicKey := &privateKey.PublicKey
-
-	// Encode public key to PEM format
-	publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+	privateKeyPEM, publicKeyPEM, err = encodeKeys(privKey)
 	if err != nil {
-		return "", "", PrettyLogger.WrapError(err, "failed to marshal public key")
+		return "", "", pl.WrapError(err, "failed to encode keys")
 	}
-	publicKeyPEMBytes := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PUBLIC KEY",
-		Bytes: publicKeyBytes,
-	})
-	publicKeyPEM = string(publicKeyPEMBytes)
 
 	return privateKeyPEM, publicKeyPEM, nil
 }
 
+func encodeKeys(privKey *ecdh.PrivateKey) (privateKeyPEM string, publicKeyPEM string, err error) {
+	publicKeyBytes, err := x509.MarshalPKIXPublicKey(privKey.Public())
+	if err != nil {
+		return "", "", pl.WrapError(err, "failed to marshal public key")
+	}
+
+	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privKey)
+	if err != nil {
+		return "", "", pl.WrapError(err, "failed to marshal private key")
+	}
+
+	publicKeyPEM = string(pem.EncodeToMemory(&pem.Block{
+		Type:  "EC PUBLIC KEY",
+		Bytes: publicKeyBytes,
+	}))
+
+	privateKeyPEM = string(pem.EncodeToMemory(&pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: privateKeyBytes,
+	}))
+
+	return privateKeyPEM, publicKeyPEM, nil
+}
+
+func decodePrivateKey(privateKeyPEM string) (*ecdh.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(privateKeyPEM))
+	if block == nil || block.Type != "EC PRIVATE KEY" {
+		return nil, pl.NewError("invalid private key PEM block")
+	}
+
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, pl.WrapError(err, "failed to parse private key")
+	}
+
+	privKeyECDSA, ok := key.(*ecdsa.PrivateKey)
+	if !ok {
+		return nil, pl.NewError("failed to cast key to *ecdsa.PrivateKey")
+	}
+
+	privKey, err := privKeyECDSA.ECDH()
+	if err != nil {
+		return nil, pl.WrapError(err, "failed to cast key to *ecdh.PrivateKey")
+	}
+
+	return privKey, nil
+}
+
+func decodePublicKey(publicKeyPEM string) (*ecdh.PublicKey, error) {
+	block, _ := pem.Decode([]byte(publicKeyPEM))
+	if block == nil || block.Type != "EC PUBLIC KEY" {
+		return nil, pl.NewError("invalid public key PEM block")
+	}
+
+	key, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, pl.WrapError(err, "failed to parse public key")
+	}
+
+	pubKeyECDSA, ok := key.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, pl.NewError("failed to cast key to *ecdsa.PublicKey")
+	}
+
+	pubKey, err := pubKeyECDSA.ECDH()
+	if err != nil {
+		return nil, pl.WrapError(err, "failed to cast key to *ecdh.PublicKey")
+	}
+
+	return pubKey, nil
+}
+
+// ComputeSharedKey computes the shared secret using the ECDH private key and a peer's public key
+func ComputeSharedKey(privKeyPEM, pubKeyPEM string) ([]byte, error) {
+	privKey, err := decodePrivateKey(privKeyPEM)
+	if err != nil {
+		return nil, pl.WrapError(err, "failed to decode private key")
+	}
+
+	pubKey, err := decodePublicKey(pubKeyPEM)
+	if err != nil {
+		return nil, pl.WrapError(err, "failed to decode public key")
+	}
+
+	sharedKey, err := privKey.ECDH(pubKey)
+	if err != nil {
+		return nil, pl.WrapError(err, "failed to compute shared key")
+	}
+
+	hashedSharedKey := sha256.Sum256(sharedKey)
+	return hashedSharedKey[:], nil
+}
+
 // GenerateSymmetricKey generates a random AES key for encryption
-func GenerateSymmetricKey2() ([]byte, error) {
+func GenerateSymmetricKey() ([]byte, error) {
 	key := make([]byte, 32) // AES-256
 	if _, err := rand.Read(key); err != nil {
 		return nil, err
@@ -57,7 +135,7 @@ func GenerateSymmetricKey2() ([]byte, error) {
 }
 
 // EncryptWithAES encrypts plaintext using AES encryption
-func EncryptWithAES2(key, plaintext []byte) (string, error) {
+func EncryptWithAES(key, plaintext []byte) (string, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
@@ -76,7 +154,7 @@ func EncryptWithAES2(key, plaintext []byte) (string, error) {
 }
 
 // DecryptWithAES decrypts ciphertext using AES encryption
-func DecryptWithAES2(key []byte, ct string) ([]byte, error) {
+func DecryptWithAES(key []byte, ct string) ([]byte, error) {
 	ciphertext, _ := base64.StdEncoding.DecodeString(ct)
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -84,7 +162,7 @@ func DecryptWithAES2(key []byte, ct string) ([]byte, error) {
 	}
 
 	if len(ciphertext) < aes.BlockSize {
-		return nil, errors.New("ciphertext too short")
+		return nil, pl.NewError("ciphertext too short")
 	}
 	iv := ciphertext[:aes.BlockSize]
 	ciphertext = ciphertext[aes.BlockSize:]
@@ -95,75 +173,78 @@ func DecryptWithAES2(key []byte, ct string) ([]byte, error) {
 	return ciphertext, nil
 }
 
-type OnionLayer2 struct {
-	NextHop string
-	Payload string
-}
+//type OnionLayer struct {
+//	NextHop string
+//	Payload string
+//}
 
-type Onion2 struct {
+type Onion struct {
 	IsCheckpointOnion bool
 	Layer             int
+	LastHop           string
 	NextHop           string
 	Payload           string
 }
 
 // FormOnion creates an onion by encapsulating a message in multiple encryption layers
-func FormOnion2(payload []byte, publicKeys []string, routingPath []string, checkpoint int) (string, string, error) {
+func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, publicKeys []string, routingPath []string, checkpoint int) (string, string, error) {
 	for i := len(publicKeys) - 1; i >= 0; i-- {
 		var layerBytes []byte
 		var err error
 		if i == len(publicKeys)-1 {
 			layerBytes = payload
 		} else {
+			lastHop := ""
+			if i > 0 {
+				lastHop = routingPath[i-1]
+			}
 			layer := Onion{
 				IsCheckpointOnion: checkpoint == i,
 				Layer:             i,
+				LastHop:           lastHop,
 				NextHop:           routingPath[i+1],
 				Payload:           base64.StdEncoding.EncodeToString(payload),
 			}
 
 			layerBytes, err = json.Marshal(layer)
 			if err != nil {
-				return "", "", err
+				return "", "", pl.WrapError(err, "failed to marshal onion layer")
 			}
 		}
 
 		symmetricKey, err := GenerateSymmetricKey()
 		if err != nil {
-			return "", "", err
+			return "", "", pl.WrapError(err, "failed to generate symmetric key")
 		}
 
 		encryptedPayload, err := EncryptWithAES(symmetricKey, layerBytes)
 		if err != nil {
-			return "", "", err
+			return "", "", pl.WrapError(err, "failed to encrypt payload")
 		}
 
-		pubKeyBlock, _ := pem.Decode([]byte(publicKeys[i]))
-		if pubKeyBlock == nil || pubKeyBlock.Type != "RSA PUBLIC KEY" {
-			return "", "", errors.New("invalid public key PEM block")
-		}
-
-		pubKey, err := x509.ParsePKIXPublicKey(pubKeyBlock.Bytes)
+		sharedKey, err := ComputeSharedKey(privateKeyPEM, publicKeys[i])
 		if err != nil {
-			return "", "", err
+			return "", "", pl.WrapError(err, "failed to compute shared key")
 		}
 
-		encryptedKey, err := rsa.EncryptPKCS1v15(rand.Reader, pubKey.(*rsa.PublicKey), symmetricKey)
+		encryptedKey, err := EncryptWithAES(sharedKey, symmetricKey)
 		if err != nil {
-			return "", "", err
+			return "", "", pl.WrapError(err, "failed to encrypt key")
 		}
 
 		combinedPayload := struct {
-			Key     string
-			Payload string
+			Key       string
+			Payload   string
+			PublicKey string
 		}{
-			Key:     base64.StdEncoding.EncodeToString(encryptedKey),
-			Payload: encryptedPayload,
+			Key:       base64.StdEncoding.EncodeToString([]byte(encryptedKey)),
+			Payload:   encryptedPayload,
+			PublicKey: publicKeyPEM,
 		}
 
 		payload, err = json.Marshal(combinedPayload)
 		if err != nil {
-			return "", "", err
+			return "", "", pl.WrapError(err, "failed to marshal combined payload")
 		}
 	}
 
@@ -171,16 +252,7 @@ func FormOnion2(payload []byte, publicKeys []string, routingPath []string, check
 }
 
 // PeelOnion removes the outermost layer of the onion
-func PeelOnion2(onion string, privateKeyPEM string) (*Onion, error) {
-	privateKeyBlock, _ := pem.Decode([]byte(privateKeyPEM))
-	if privateKeyBlock == nil || privateKeyBlock.Type != "RSA PRIVATE KEY" {
-		return nil, errors.New("invalid private key PEM block")
-	}
-
-	privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBlock.Bytes)
-	if err != nil {
-		return nil, err
-	}
+func PeelOnion(onion string, privateKeyPEM string) (*Onion, error) {
 
 	onionBytes, err := base64.StdEncoding.DecodeString(onion)
 	if err != nil {
@@ -188,8 +260,9 @@ func PeelOnion2(onion string, privateKeyPEM string) (*Onion, error) {
 	}
 
 	var combinedPayload struct {
-		Key     string
-		Payload string
+		Key       string
+		Payload   string
+		PublicKey string
 	}
 	if err = json.Unmarshal(onionBytes, &combinedPayload); err != nil {
 		return nil, err
@@ -200,7 +273,12 @@ func PeelOnion2(onion string, privateKeyPEM string) (*Onion, error) {
 		return nil, err
 	}
 
-	symmetricKey, err := rsa.DecryptPKCS1v15(rand.Reader, privateKey, encryptedKey)
+	sharedKey, err := ComputeSharedKey(privateKeyPEM, combinedPayload.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	symmetricKey, err := DecryptWithAES(sharedKey, string(encryptedKey))
 	if err != nil {
 		return nil, err
 	}
@@ -215,6 +293,7 @@ func PeelOnion2(onion string, privateKeyPEM string) (*Onion, error) {
 			IsCheckpointOnion: false,
 			Layer:             0,
 			NextHop:           "",
+			LastHop:           "",
 			Payload:           string(decryptedBytes),
 		}, nil
 	}
@@ -225,21 +304,4 @@ func PeelOnion2(onion string, privateKeyPEM string) (*Onion, error) {
 		return nil, err
 	}
 	return &layer, nil
-}
-
-// BruiseOnion modifies the onion payload to introduce bruising
-func BruiseOnion2(onion string) (string, error) {
-	onionBytes, err := base64.StdEncoding.DecodeString(onion)
-	if err != nil {
-		return "", err
-	}
-
-	// Introduce bruising by modifying a small portion of the payload
-	if len(onionBytes) > 0 {
-		onionBytes[0] ^= 0xFF
-	} else {
-		return "", errors.New("empty onion")
-	}
-
-	return base64.StdEncoding.EncodeToString(onionBytes), nil
 }
