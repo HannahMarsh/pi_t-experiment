@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdh"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
@@ -55,7 +56,7 @@ func encodeKeys(privKey *ecdh.PrivateKey) (privateKeyPEM string, publicKeyPEM st
 	return privateKeyPEM, publicKeyPEM, nil
 }
 
-func decodePrivateKey(privateKeyPEM string, publicKeyPEM string) (*ecdh.PrivateKey, error) {
+func decodePrivateKey(privateKeyPEM string) (*ecdh.PrivateKey, error) {
 	block, _ := pem.Decode([]byte(privateKeyPEM))
 	if block == nil || block.Type != "EC PRIVATE KEY" {
 		return nil, pl.NewError("invalid private key PEM block")
@@ -66,19 +67,14 @@ func decodePrivateKey(privateKeyPEM string, publicKeyPEM string) (*ecdh.PrivateK
 		return nil, pl.WrapError(err, "failed to parse private key")
 	}
 
-	privKeyECDSA, ok := key.(*ecdh.PrivateKey)
+	privKeyECDSA, ok := key.(*ecdsa.PrivateKey)
 	if !ok {
 		return nil, pl.NewError("failed to cast key to *ecdsa.PrivateKey")
 	}
 
-	pubKey, err := decodePublicKey(publicKeyPEM)
+	privKey, err := privKeyECDSA.ECDH()
 	if err != nil {
-		return nil, pl.WrapError(err, "failed to decode public key")
-	}
-
-	privKey, err := privKeyECDSA.ECDH(pubKey)
-	if err != nil {
-		return nil, pl.WrapError(err, "failed to convert to ECDH private key")
+		return nil, pl.WrapError(err, "failed to cast key to *ecdh.PrivateKey")
 	}
 
 	return privKey, nil
@@ -95,9 +91,14 @@ func decodePublicKey(publicKeyPEM string) (*ecdh.PublicKey, error) {
 		return nil, pl.WrapError(err, "failed to parse public key")
 	}
 
-	pubKey, ok := key.(*ecdh.PublicKey)
+	pubKeyECDSA, ok := key.(*ecdsa.PublicKey)
 	if !ok {
-		return nil, pl.NewError("failed to cast key to *ecdh.PublicKey")
+		return nil, pl.NewError("failed to cast key to *ecdsa.PublicKey")
+	}
+
+	pubKey, err := pubKeyECDSA.ECDH()
+	if err != nil {
+		return nil, pl.WrapError(err, "failed to cast key to *ecdh.PublicKey")
 	}
 
 	return pubKey, nil
