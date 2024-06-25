@@ -6,7 +6,7 @@ import (
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
-	"github.com/HannahMarsh/pi_t-experiment/internal/client"
+	"github.com/HannahMarsh/pi_t-experiment/internal/model/client"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/exp/slog"

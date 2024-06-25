@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/HannahMarsh/pi_t-experiment/config"
+	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/keys"
 	"io"
 	"net/http"
 	"sync"
@@ -32,7 +33,7 @@ type Node struct {
 
 // NewNode creates a new node
 func NewNode(id int, host string, port int, bulletinBoardUrl string, isMixer bool) (*Node, error) {
-	if privateKey, publicKey, err := pi_t.KeyGen(); err != nil {
+	if privateKey, publicKey, err := keys.KeyGen(); err != nil {
 		return nil, pl.WrapError(err, "node.NewClient(): failed to generate key pair")
 	} else {
 		n := &Node{

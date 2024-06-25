@@ -8,6 +8,7 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t"
+	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/keys"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"golang.org/x/exp/slog"
 	"io"
@@ -35,7 +36,7 @@ type Client struct {
 
 // NewNode creates a new node
 func NewClient(id int, host string, port int, bulletinBoardUrl string) (*Client, error) {
-	if privateKey, publicKey, err := pi_t.KeyGen(); err != nil {
+	if privateKey, publicKey, err := keys.KeyGen(); err != nil {
 		return nil, pl.WrapError(err, "node.NewClient(): failed to generate key pair")
 	} else {
 		c := &Client{
@@ -297,17 +298,6 @@ func (c *Client) startRun(start api.StartRunApi) (bool, error) {
 	c.Messages = make([]api.Message, 0)
 	return true, nil
 }
-
-//func (c *Client) RegisterNode(nodeID string, nodePubKey *ecdh.OriginalSenderPubKey) error {
-//	c.mu.Lock()
-//	defer c.mu.Unlock()
-//	if sharedKey, err := utils.ComputeSharedKey(c.PrivateKey, nodePubKey); err != nil {
-//		return pl.WrapError(err, "error computing shared key")
-//	} else {
-//		c.SessionKeys[nodeID] = sharedKey
-//		return nil
-//	}
-//}
 
 func (c *Client) Receive(o string) error {
 	if peeled, bruises, err := pi_t.PeelOnion(o, c.PrivateKey); err != nil {

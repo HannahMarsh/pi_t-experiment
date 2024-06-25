@@ -1,7 +1,11 @@
 package bulletin_board
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"github.com/HannahMarsh/pi_t-experiment/config"
+	"net/http"
 	"sync"
 	"time"
 
@@ -68,38 +72,88 @@ func (bb *BulletinBoard) RegisterIntentToSend(its api.IntentToSend) error {
 	return nil
 }
 
-//// GetActiveNodes returns the list of active nodes
-//func (bb *BulletinBoard) GetActiveNodes() []api.PublicNodeApi {
-//	bb.mu.RLock()
-//	defer bb.mu.RUnlock()
-//
-//	return utils.Map(utils.NewMapStream(bb.Network).Filter(func(_ int, node *NodeView) bool {
-//		return node.IsActive()
-//	}).GetValues().Array, func(node *NodeView) api.PublicNodeApi {
-//		return api.PublicNodeApi{
-//			ID:        node.ID,
-//			Address:   node.Address,
-//			OriginalSenderPubKey: node.OriginalSenderPubKey,
-//			IsMixer: node.IsMixer,
-//		}
-//	})
-//}
-//
-//// GetActiveNodes returns the list of active nodes
-//func (bb *BulletinBoard) GetActiveClients() []api.PublicNodeApi {
-//	bb.mu.RLock()
-//	defer bb.mu.RUnlock()
-//
-//	return utils.Map(utils.NewMapStream(bb.Clients).Filter(func(_ int, client *ClientView) bool {
-//		return client.IsActive()
-//	}).GetValues().Array, func(client *ClientView) api.PublicNodeApi {
-//		return api.PublicNodeApi{
-//			ID:        client.ID,
-//			Address:   client.Address,
-//			OriginalSenderPubKey: client.OriginalSenderPubKey,
-//		}
-//	})
-//}
+func (bb *BulletinBoard) signalNodesToStart() error {
+	slog.Info("Signaling nodes to start")
+	activeNodes := utils.MapEntries(utils.FilterMap(bb.Network, func(_ int, node *NodeView) bool {
+		return node.IsActive()
+	}), func(_ int, nv *NodeView) api.PublicNodeApi {
+		return api.PublicNodeApi{
+			ID:        nv.ID,
+			Address:   nv.Address,
+			PublicKey: nv.PublicKey,
+			Time:      nv.LastHeartbeat,
+			IsMixer:   nv.IsMixer,
+		}
+	})
+
+	activeClients := utils.MapEntries(utils.FilterMap(bb.Clients, func(_ int, cl *ClientView) bool {
+		return cl.IsActive()
+	}), func(_ int, cv *ClientView) api.PublicNodeApi {
+		return api.PublicNodeApi{
+			ID:        cv.ID,
+			Address:   cv.Address,
+			PublicKey: cv.PublicKey,
+		}
+	})
+
+	numMessages := utils.Max(utils.MapEntries(bb.Clients, func(_ int, client *ClientView) int {
+		return len(client.MessageQueue)
+	})) + 2
+
+	mixers := utils.Filter(activeNodes, func(n api.PublicNodeApi) bool {
+		return n.Address != "" && n.IsMixer
+	})
+
+	gatekeepers := utils.Filter(activeNodes, func(n api.PublicNodeApi) bool {
+		return n.Address != "" && !n.IsMixer
+	})
+
+	vs := api.StartRunApi{
+		ParticipatingClients: activeClients,
+		Mixers:               mixers,
+		Gatekeepers:          gatekeepers,
+		NumMessagesPerClient: numMessages,
+	}
+
+	if data, err := json.Marshal(vs); err != nil {
+		return PrettyLogger.WrapError(err, "failed to marshal start signal")
+	} else {
+		var wg sync.WaitGroup
+		all := utils.Copy(activeNodes)
+		all = append(all, activeClients...)
+		all = utils.Filter(all, func(n api.PublicNodeApi) bool {
+			return n.Address != ""
+		})
+		for _, n := range all {
+			n := n
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				url := fmt.Sprintf("%s/start", n.Address)
+				if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
+					slog.Error("Error signaling node to start \n"+url, err2)
+				} else if err3 := resp.Body.Close(); err3 != nil {
+					fmt.Printf("Error closing response body: %v\n", err3)
+				}
+			}()
+		}
+		//for _, c := range activeClients {
+		//	c := c
+		//	wg.Add(1)
+		//	go func() {
+		//		defer wg.Done()
+		//		url := fmt.Sprintf("%s/start", c.Address)
+		//		if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
+		//			slog.Error("Error signaling client to start\n", err2)
+		//		} else if err3 := resp.Body.Close(); err3 != nil {
+		//			fmt.Printf("Error closing response body: %v\n", err3)
+		//		}
+		//	}()
+		//}
+		wg.Wait()
+		return nil
+	}
+}
 
 func (bb *BulletinBoard) StartRuns() error {
 	for {

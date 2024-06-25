@@ -6,7 +6,7 @@ import (
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
-	"github.com/HannahMarsh/pi_t-experiment/internal/bulletin_board"
+	"github.com/HannahMarsh/pi_t-experiment/internal/model/bulletin_board"
 	"net/http"
 	"os"
 	"os/signal"
