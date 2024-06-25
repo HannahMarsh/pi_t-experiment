@@ -85,6 +85,7 @@ func main() {
 
 	http.HandleFunc("/receive", newNode.HandleReceiveOnion)
 	http.HandleFunc("/start", newNode.HandleStartRun)
+	http.HandleFunc("/status", newNode.HandleGetStatus)
 
 	go func() {
 		if err := http.ListenAndServe(fmt.Sprintf(":%d", nodeConfig.Port), nil); err != nil {

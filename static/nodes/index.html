@@ -84,66 +84,38 @@
         const dataDiv = document.getElementById('data');
         dataDiv.innerHTML = '';
 
-        for (const [client, status] of Object.entries(data.Clients)) {
-            const clientDiv = document.createElement('div');
-            clientDiv.innerHTML = `<h2>Client: ${client}</h2>`;
+        for (const [node, status] of Object.entries(data.Nodes)) {
+            const nodeDiv = document.createElement('div');
+            nodeDiv.innerHTML = status.Node.IsMixer ? `<h2>Node${status.Node.ID} (mixer): ${node}</h2>` : `<h2>Node${status.Node.ID} (gatekeeper): ${node}</h2>`;
 
-            const sentTable = document.createElement('table');
-            sentTable.innerHTML = `
+            const onionTable = document.createElement('table');
+            onionTable.innerHTML = `
                 <tr>
-                    <th colspan="4">Sent Messages</th>
-                </tr>
-                <tr>
-                    <th>To</th>
-                    <th>Routing Path</th>
-                    <th>Message</th>
-                    <th>Time Sent</th>
-                </tr>
-            `;
-
-            status.MessagesSent.forEach(sent => {
-                const row = sentTable.insertRow();
-                row.innerHTML = `
-                    <td>${sent.Message.To}</td>
-                    <td>${formatRoutingPath(sent.RoutingPath)}</td>
-                    <td>${sent.Message.Msg}</td>
-                    <td>${sent.TimeSent}</td>
-                `;
-            });
-
-            const receivedTable = document.createElement('table');
-            receivedTable.innerHTML = `
-                <tr>
-                    <th colspan="2">Received Messages</th>
+                    <th colspan="5">Onions</th>
                 </tr>
                 <tr>
                     <th>From</th>
-                    <th>Message</th>
+                    <th>To</th>
                     <th>Time Received</th>
+                    <th>Is Checkpoint Onion?</th>
+                    <th>Layer</th>
                 </tr>
             `;
 
-            status.MessagesReceived.forEach(received => {
-                const row = receivedTable.insertRow();
+            status.Received.forEach(onion => {
+                const row = onionTable.insertRow();
                 row.innerHTML = `
-                    <td>${received.Message.From}</td>
-                    <td>${received.Message.Msg}</td>
-                    <td>${received.TimeReceived}</td>
+                    <td>${onion.LastHop}</td>
+                    <td>${onion.NextHop}</td>
+                    <td>${onion.TimeReceived}</td>
+                    <td>${onion.IsCheckPointOnion}</td>
+                    <td>${onion.Layer}</td>
                 `;
             });
 
-            clientDiv.appendChild(sentTable);
-            clientDiv.appendChild(receivedTable);
-            dataDiv.appendChild(clientDiv);
+            nodeDiv.appendChild(onionTable);
+            dataDiv.appendChild(nodeDiv);
         }
-    }
-
-    function formatRoutingPath(routingPath) {
-        return routingPath.map((node, index) => {
-            const label = (index === routingPath.length - 1) ? 'client' : 'node';
-            const className = (index === routingPath.length - 1) ? 'client' : (node.IsMixer ? 'mixer' : 'node');
-            return `<span class="${className}">${label}${node.ID}</span>`;
-        }).join(' → ');
     }
 
 

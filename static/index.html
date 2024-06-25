@@ -56,6 +56,8 @@
 <div class="nav-buttons">
     <a href="http://localhost:8200/">Messages</a>
     <a href="http://localhost:8200/client">Clients</a>
+    <a href="http://localhost:8200/nodes">Nodes</a>
+    <a href="http://localhost:8200/nodes/rounds">Rounds</a>
 </div>
 <div id="data">Loading...</div>
 <script>
@@ -107,8 +109,8 @@
                 <td>${message.To}</td>
                 <td>${formatRoutingPath(message.RoutingPath)}</td>
                 <td>${message.Msg}</td>
-                <td>${new Date(message.TimeSent).toLocaleString()}</td>
-                <td>${new Date(message.TimeReceived).toLocaleString()}</td>
+                <td>${message.TimeSent}</td>
+                <td>${message.TimeReceived}</td>
             `;
         });
 

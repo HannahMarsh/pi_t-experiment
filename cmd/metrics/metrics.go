@@ -16,7 +16,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 )
 
 func main() {
@@ -52,6 +51,8 @@ func main() {
 	http.HandleFunc("/data", serveData)
 	http.Handle("/", http.FileServer(http.Dir("./static")))
 	http.Handle("/clients", http.FileServer(http.Dir("./static/client")))
+	http.Handle("/nodes", http.FileServer(http.Dir("./static/nodes")))
+	http.Handle("/nodes/rounds", http.FileServer(http.Dir("./static/nodes/rounds")))
 
 	go func() {
 		if err := http.ListenAndServe(fmt.Sprintf(":%d", cfg.Metrics.Port), nil); err != nil {
@@ -81,6 +82,7 @@ func main() {
 type Data struct {
 	Clients  map[string]api.ClientStatus
 	Messages []Message
+	Nodes    map[string]api.NodeStatus
 	mu       sync.RWMutex
 }
 
@@ -89,14 +91,16 @@ type Message struct {
 	To           string
 	RoutingPath  []api.PublicNodeApi
 	Msg          string
-	TimeSent     time.Time
-	TimeReceived time.Time
+	TimeSent     string
+	TimeReceived string
+	Hash         string
 }
 
 var (
 	data Data = Data{
 		Clients:  make(map[string]api.ClientStatus),
 		Messages: make([]Message, 0),
+		Nodes:    make(map[string]api.NodeStatus),
 	}
 )
 
@@ -123,19 +127,48 @@ func serveData(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	for _, node := range config.GlobalConfig.Nodes {
+		addr := fmt.Sprintf("http://%s:%d/status", node.Host, node.Port)
+		resp, err := http.Get(addr)
+		if err != nil {
+			slog.Error("failed to get client status", err)
+		} else {
+			defer resp.Body.Close()
+			var status api.NodeStatus
+			if err = json.NewDecoder(resp.Body).Decode(&status); err != nil {
+				slog.Error("failed to decode client status", err)
+			} else {
+				data.Nodes[addr] = status
+			}
+		}
+	}
+
 	m := make(map[string]Message)
 
 	for _, client := range data.Clients {
 		for _, sent := range client.MessagesSent {
-			mstr := sent.Message.From + sent.Message.To + sent.Message.Msg
+			mstr := sent.Message.Hash
 			if _, present := m[mstr]; present {
+				if m[mstr].From != sent.Message.From {
+					pl.LogNewError("from (%s) and sent.from (%s) do not match", m[mstr].From, sent.Message.From)
+				}
+				if m[mstr].To != sent.Message.To {
+					pl.LogNewError("to (%s) and sent.to (%s) do not match", m[mstr].To, sent.Message.To)
+				}
+				if m[mstr].Msg != sent.Message.Msg {
+					pl.LogNewError("msg (%s) and sent.msg (%s) do not match", m[mstr].Msg, sent.Message.Msg)
+				}
+				if m[mstr].Hash != sent.Message.Hash {
+					pl.LogNewError("hash (%s) and sent.hash (%s) do not match", m[mstr].Hash, sent.Message.Hash)
+				}
 				msg := Message{
 					From:         sent.Message.From,
 					To:           sent.Message.To,
 					RoutingPath:  sent.RoutingPath,
 					Msg:          sent.Message.Msg,
-					TimeSent:     sent.TimeSent,
-					TimeReceived: m[sent.Message.Msg].TimeReceived,
+					TimeSent:     sent.TimeSent.Format("2006-01-02 15:04:05"),
+					TimeReceived: m[mstr].TimeReceived,
+					Hash:         sent.Message.Hash,
 				}
 				m[mstr] = msg
 			} else {
@@ -144,21 +177,35 @@ func serveData(w http.ResponseWriter, r *http.Request) {
 					To:           sent.Message.To,
 					RoutingPath:  sent.RoutingPath,
 					Msg:          sent.Message.Msg,
-					TimeSent:     sent.TimeSent,
-					TimeReceived: time.Time{},
+					TimeSent:     sent.TimeSent.Format("2006-01-02 15:04:05"),
+					TimeReceived: "not received",
+					Hash:         sent.Message.Hash,
 				}
 			}
 		}
 		for _, received := range client.MessagesReceived {
-			mstr := received.Message.From + received.Message.To + received.Message.Msg
+			mstr := received.Message.Hash
 			if _, present := m[mstr]; present {
+				if m[mstr].From != received.Message.From {
+					pl.LogNewError("from (%s) and received.from (%s) do not match", m[mstr].From, received.Message.From)
+				}
+				if m[mstr].To != received.Message.To {
+					pl.LogNewError("to (%s) and received.to (%s) do not match", m[mstr].To, received.Message.To)
+				}
+				if m[mstr].Msg != received.Message.Msg {
+					pl.LogNewError("msg (%s) and received.msg (%s) do not match", m[mstr].Msg, received.Message.Msg)
+				}
+				if m[mstr].Hash != received.Message.Hash {
+					pl.LogNewError("hash (%s) and received.hash (%s) do not match", m[mstr].Hash, received.Message.Hash)
+				}
 				msg := Message{
 					From:         received.Message.From,
 					To:           received.Message.To,
 					RoutingPath:  m[mstr].RoutingPath,
 					Msg:          received.Message.Msg,
 					TimeSent:     m[mstr].TimeSent,
-					TimeReceived: received.TimeReceived,
+					TimeReceived: received.TimeReceived.Format("2006-01-02 15:04:05"),
+					Hash:         received.Message.Hash,
 				}
 				m[mstr] = msg
 			} else {
@@ -167,8 +214,9 @@ func serveData(w http.ResponseWriter, r *http.Request) {
 					To:           received.Message.To,
 					RoutingPath:  make([]api.PublicNodeApi, 0),
 					Msg:          received.Message.Msg,
-					TimeSent:     time.Time{},
-					TimeReceived: received.TimeReceived,
+					TimeSent:     "not sent",
+					TimeReceived: received.TimeReceived.Format("2006-01-02 15:04:05"),
+					Hash:         received.Message.Hash,
 				}
 			}
 		}

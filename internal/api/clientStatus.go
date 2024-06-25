@@ -11,6 +11,7 @@ import (
 type ClientStatus struct {
 	MessagesSent     []Sent
 	MessagesReceived []Received
+	Client           PublicNodeApi
 	mu               sync.RWMutex
 }
 

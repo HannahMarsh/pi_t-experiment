@@ -173,14 +173,15 @@ func DecryptWithAES(key []byte, ct string) ([]byte, error) {
 	return ciphertext, nil
 }
 
-type OnionLayer struct {
-	NextHop string
-	Payload string
-}
+//type OnionLayer struct {
+//	NextHop string
+//	Payload string
+//}
 
 type Onion struct {
 	IsCheckpointOnion bool
 	Layer             int
+	LastHop           string
 	NextHop           string
 	Payload           string
 }
@@ -193,9 +194,14 @@ func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, public
 		if i == len(publicKeys)-1 {
 			layerBytes = payload
 		} else {
+			lastHop := ""
+			if i > 0 {
+				lastHop = routingPath[i-1]
+			}
 			layer := Onion{
 				IsCheckpointOnion: checkpoint == i,
 				Layer:             i,
+				LastHop:           lastHop,
 				NextHop:           routingPath[i+1],
 				Payload:           base64.StdEncoding.EncodeToString(payload),
 			}
@@ -291,6 +297,7 @@ func PeelOnion(onion string, privateKeyPEM string) (*Onion, error) {
 			IsCheckpointOnion: false,
 			Layer:             0,
 			NextHop:           "",
+			LastHop:           "",
 			Payload:           string(decryptedBytes),
 		}, nil
 	}

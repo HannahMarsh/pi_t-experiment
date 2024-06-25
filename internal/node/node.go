@@ -26,6 +26,7 @@ type Node struct {
 	mu               sync.RWMutex
 	BulletinBoardUrl string
 	lastUpdate       time.Time
+	status           *api.NodeStatus
 }
 
 // NewNode creates a new node
@@ -41,6 +42,16 @@ func NewNode(id int, host string, port int, bulletinBoardUrl string, isMixer boo
 			PrivateKey:       privateKey,
 			BulletinBoardUrl: bulletinBoardUrl,
 			isMixer:          isMixer,
+			status: &api.NodeStatus{
+				Received: make([]api.OnionStatus, 0),
+				Node: api.PublicNodeApi{
+					ID:        id,
+					Address:   fmt.Sprintf("http://%s:%d", host, port),
+					PublicKey: publicKey,
+					Time:      time.Now(),
+					IsMixer:   isMixer,
+				},
+			},
 		}
 		if err2 := n.RegisterWithBulletinBoard(); err2 != nil {
 			return nil, pl.WrapError(err2, "node.NewNode(): failed to register with bulletin board")
@@ -50,6 +61,10 @@ func NewNode(id int, host string, port int, bulletinBoardUrl string, isMixer boo
 
 		return n, nil
 	}
+}
+
+func (n *Node) GetStatus() string {
+	return n.status.GetStatus()
 }
 
 func (n *Node) getPublicNodeInfo() api.PublicNodeApi {
@@ -89,6 +104,8 @@ func (n *Node) Receive(o string) error {
 	if peeled, err := pi_t.PeelOnion(o, n.PrivateKey); err != nil {
 		return pl.WrapError(err, "node.Receive(): failed to remove layer")
 	} else {
+		n.status.AddOnion(peeled.LastHop, fmt.Sprintf("http://%s:%d", n.Host, n.Port), peeled.NextHop, peeled.Layer, peeled.IsCheckpointOnion)
+
 		if peeled.NextHop == "" {
 			var msg api.Message
 			if err2 := json.Unmarshal([]byte(peeled.Payload), &msg); err2 != nil {

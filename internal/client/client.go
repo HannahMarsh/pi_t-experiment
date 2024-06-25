@@ -53,6 +53,11 @@ func NewClient(id int, host string, port int, bulletinBoardUrl string) (*Client,
 			status: &api.ClientStatus{
 				MessagesSent:     make([]api.Sent, 0),
 				MessagesReceived: make([]api.Received, 0),
+				Client: api.PublicNodeApi{
+					ID:        id,
+					Address:   fmt.Sprintf("http://%s:%d", host, port),
+					PublicKey: publicKey,
+				},
 			},
 		}
 
@@ -107,11 +112,7 @@ func (c *Client) StartGeneratingMessages(client_addresses []string) {
 			messages := make([]api.Message, 0)
 			for _, addr := range client_addresses {
 				if addr != c.Adddress && addr != "" {
-					messages = append(messages, api.Message{
-						From: c.Adddress,
-						To:   addr,
-						Msg:  fmt.Sprintf("Msg#%d from client(id=%d)", msgNum, c.ID),
-					})
+					messages = append(messages, api.NewMessage(c.Adddress, addr, fmt.Sprintf("Msg#%d from client(id=%d)", msgNum, c.ID)))
 					msgNum = msgNum + 1
 				}
 			}
@@ -200,11 +201,7 @@ func (c *Client) formOnions(start api.StartRunApi) (map[string][]api.OnionApi, e
 		if numMessages < start.NumMessagesPerClient {
 			numDummyNeeded := start.NumMessagesPerClient - numMessages
 			for i := 0; i < numDummyNeeded; i++ {
-				c.Messages = append(c.Messages, api.Message{
-					From: c.Adddress,
-					To:   addr,
-					Msg:  fmt.Sprintf("dummy%d", dummyNum),
-				})
+				c.Messages = append(c.Messages, api.NewMessage(c.Adddress, addr, fmt.Sprintf("dummy%d", dummyNum)))
 				dummyNum++
 			}
 		}
@@ -230,7 +227,7 @@ func (c *Client) formOnions(start api.StartRunApi) (map[string][]api.OnionApi, e
 					return node.Address
 				})
 				slog.Info("routing path", "path", addresses)
-				if addr, onion, err3 := pi_t.FormOnion(msgString, publicKeys, addresses, -1); err3 != nil {
+				if addr, onion, err3 := pi_t.FormOnion(c.PrivateKey, c.PublicKey, msgString, publicKeys, addresses, -1); err3 != nil {
 					return nil, pl.WrapError(err3, "failed to create onion")
 				} else {
 					if _, present := onions[addr]; !present {

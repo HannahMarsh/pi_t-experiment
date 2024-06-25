@@ -22,6 +22,13 @@ func (n *Node) HandleReceiveOnion(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (n *Node) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write([]byte(n.GetStatus())); err != nil {
+		slog.Error("Error writing response", err)
+	}
+}
+
 func (n *Node) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Starting run")
 	var start api.StartRunApi
