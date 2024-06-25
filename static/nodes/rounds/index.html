@@ -107,6 +107,8 @@
                     <th>Current Hop</th>
                     <th>Next Hop</th>
                     <th>Time</th>
+                    <th>Bruise Counter</th>
+                    <th>Was Dropped?</th>
                     <th>Is Checkpoint Onion?</th>
                 </tr>
             `;
@@ -118,6 +120,8 @@
                     <td>${onion.ThisAddress}</td>
                     <td>${onion.NextHop}</td>
                     <td>${onion.TimeReceived}</td>
+                    <td>${onion.Bruises}</td>
+                    <td>${onion.Dropped}</td>
                     <td>${onion.IsCheckPointOnion}</td>
                 `;
             });
@@ -129,7 +133,7 @@
 
     function startFetchingData() {
         fetchData();
-        setInterval(fetchData, 500); // Update every half second
+        setInterval(fetchData, 1000); // Update every half second
     }
 
     document.addEventListener('DOMContentLoaded', startFetchingData);

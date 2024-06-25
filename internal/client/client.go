@@ -298,7 +298,7 @@ func (c *Client) startRun(start api.StartRunApi) (bool, error) {
 	return true, nil
 }
 
-//func (c *Client) RegisterNode(nodeID string, nodePubKey *ecdh.PublicKey) error {
+//func (c *Client) RegisterNode(nodeID string, nodePubKey *ecdh.OriginalSenderPubKey) error {
 //	c.mu.Lock()
 //	defer c.mu.Unlock()
 //	if sharedKey, err := utils.ComputeSharedKey(c.PrivateKey, nodePubKey); err != nil {
@@ -310,9 +310,10 @@ func (c *Client) startRun(start api.StartRunApi) (bool, error) {
 //}
 
 func (c *Client) Receive(o string) error {
-	if peeled, err := pi_t.PeelOnion(o, c.PrivateKey); err != nil {
+	if peeled, bruises, err := pi_t.PeelOnion(o, c.PrivateKey); err != nil {
 		return pl.WrapError(err, "node.Receive(): failed to remove layer")
 	} else {
+		slog.Info("Client received onion", "bruises", bruises, "from", peeled.LastHop, "to", peeled.NextHop, "layer", peeled.Layer, "is_checkpoint_onion", peeled.IsCheckpointOnion)
 		if peeled.NextHop == "" {
 			var msg api.Message
 			if err2 := json.Unmarshal([]byte(peeled.Payload), &msg); err2 != nil {

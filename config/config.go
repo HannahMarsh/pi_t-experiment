@@ -43,6 +43,7 @@ type Config struct {
 	Nodes             []Node        `yaml:"nodes"`
 	Metrics           Metrics       `yaml:"metrics"`
 	Clients           []Client      `yaml:"clients"`
+	MaxBruises        int           `yaml:"max_bruises"`
 }
 
 var GlobalConfig *Config

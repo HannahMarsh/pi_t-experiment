@@ -79,7 +79,7 @@ func (bb *BulletinBoard) RegisterIntentToSend(its api.IntentToSend) error {
 //		return api.PublicNodeApi{
 //			ID:        node.ID,
 //			Address:   node.Address,
-//			PublicKey: node.PublicKey,
+//			OriginalSenderPubKey: node.OriginalSenderPubKey,
 //			IsMixer: node.IsMixer,
 //		}
 //	})
@@ -96,7 +96,7 @@ func (bb *BulletinBoard) RegisterIntentToSend(its api.IntentToSend) error {
 //		return api.PublicNodeApi{
 //			ID:        client.ID,
 //			Address:   client.Address,
-//			PublicKey: client.PublicKey,
+//			OriginalSenderPubKey: client.OriginalSenderPubKey,
 //		}
 //	})
 //}

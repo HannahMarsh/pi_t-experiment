@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/HannahMarsh/pi_t-experiment/config"
 	"io"
 	"net/http"
 	"sync"
@@ -101,12 +102,12 @@ func (n *Node) startRun(start api.StartRunApi) (didParticipate bool, e error) {
 }
 
 func (n *Node) Receive(o string) error {
-	if peeled, err := pi_t.PeelOnion(o, n.PrivateKey); err != nil {
+	if peeled, bruises, err := pi_t.PeelOnion(o, n.PrivateKey); err != nil {
 		return pl.WrapError(err, "node.Receive(): failed to remove layer")
 	} else {
-		n.status.AddOnion(peeled.LastHop, fmt.Sprintf("http://%s:%d", n.Host, n.Port), peeled.NextHop, peeled.Layer, peeled.IsCheckpointOnion)
 
 		if peeled.NextHop == "" {
+			n.status.AddOnion(peeled.LastHop, fmt.Sprintf("http://%s:%d", n.Host, n.Port), peeled.NextHop, peeled.Layer, peeled.IsCheckpointOnion, bruises, true)
 			var msg api.Message
 			if err2 := json.Unmarshal([]byte(peeled.Payload), &msg); err2 != nil {
 				return pl.WrapError(err2, "node.Receive(): failed to unmarshal message")
@@ -114,17 +115,29 @@ func (n *Node) Receive(o string) error {
 			slog.Info("Received message", "from", msg.From, "to", msg.To, "msg", msg.Msg)
 
 		} else {
-			if peeled.IsCheckpointOnion {
-				slog.Info("Received checkpoint onion", "layer", peeled.Layer, "destination", peeled.NextHop)
+			if !n.isMixer && bruises > config.GlobalConfig.MaxBruises {
+				n.status.AddOnion(peeled.LastHop, fmt.Sprintf("http://%s:%d", n.Host, n.Port), peeled.NextHop, peeled.Layer, peeled.IsCheckpointOnion, bruises, true)
+				slog.Info("Dropping onion", "layer", peeled.Layer, "destination", peeled.NextHop)
+				return nil
 			} else {
-				slog.Info("Received onion", "layer", peeled.Layer, "destination", peeled.NextHop)
-			}
-			//bruised, err2 := pi_t.BruiseOnion(payload)
-			//if err2 != nil {
-			//	return pl.WrapError(err2, "node.Receive(): failed to bruise onion")
-			//}
-			if err3 := sendToNode(peeled.NextHop, peeled.Payload); err != nil {
-				return pl.WrapError(err3, "node.Receive(): failed to send to next node")
+				n.status.AddOnion(peeled.LastHop, fmt.Sprintf("http://%s:%d", n.Host, n.Port), peeled.NextHop, peeled.Layer, peeled.IsCheckpointOnion, bruises, false)
+
+				if peeled.IsCheckpointOnion {
+					slog.Info("Received checkpoint onion", "layer", peeled.Layer, "destination", peeled.NextHop)
+				} else {
+					slog.Info("Received onion", "layer", peeled.Layer, "destination", peeled.NextHop)
+				}
+				//bruised, err2 := pi_t.BruiseOnion(payload)
+				//if err2 != nil {
+				//	return pl.WrapError(err2, "node.Receive(): failed to bruise onion")
+				//}
+				addedHeader, err4 := pi_t.AddHeader(peeled, bruises, n.PrivateKey, n.PublicKey)
+				if err4 != nil {
+					return pl.WrapError(err4, "node.Receive(): failed to add header")
+				}
+				if err3 := sendToNode(peeled.NextHop, addedHeader); err != nil {
+					return pl.WrapError(err3, "node.Receive(): failed to send to next node")
+				}
 			}
 		}
 	}

@@ -20,9 +20,11 @@ type OnionStatus struct {
 	Layer             int
 	IsCheckPointOnion bool
 	TimeReceived      time.Time
+	Bruises           int
+	Dropped           bool
 }
 
-func (ns *NodeStatus) AddOnion(lastHop, thisAddress, nextHop string, layer int, isCheckPointOnion bool) {
+func (ns *NodeStatus) AddOnion(lastHop, thisAddress, nextHop string, layer int, isCheckPointOnion bool, bruises int, dropped bool) {
 	ns.mu.Lock()
 	defer ns.mu.Unlock()
 	ns.Received = append(ns.Received, OnionStatus{
@@ -32,6 +34,8 @@ func (ns *NodeStatus) AddOnion(lastHop, thisAddress, nextHop string, layer int, 
 		Layer:             layer,
 		IsCheckPointOnion: isCheckPointOnion,
 		TimeReceived:      time.Now(),
+		Bruises:           bruises,
+		Dropped:           dropped,
 	})
 }
 
