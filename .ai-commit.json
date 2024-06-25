@@ -1,0 +1,16 @@
+{
+  "ignore": [
+    ".devcontainer/*",
+    "build/*",
+    "node_modules/*",
+    ".ai-commit.json",
+    ".dockerignore",
+    ".gitignore",
+    "go.mod/*",
+    "go.mod",
+    "go.sum",
+    ".git/*",
+    "*/dev/null",
+    "git add . ; npm link ai-commit ; ai-commit"
+  ]
+}

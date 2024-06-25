@@ -1,0 +1,41 @@
+server_load: 7
+heartbeat_interval: 5
+min_nodes: 2
+min_total_messages: 1
+num_rounds: 4
+epsilon: 0.1
+delta: 1e-5
+metrics:
+  host: 'localhost'
+  port: 8200
+bulletin_board:
+  host: 'localhost'
+  port: 8080
+clients:
+  - id: 1
+    host: 'localhost'
+    port: 8101
+  - id: 2
+    host: 'localhost'
+    port: 8102
+nodes:
+  - id: 1
+    host: 'localhost'
+    port: 8081
+    is_mixer: true
+  - id: 2
+    host: 'localhost'
+    port: 8082
+    is_mixer: true
+  - id: 3
+    host: 'localhost'
+    port: 8083
+    is_mixer: true
+  - id: 4
+    host: 'localhost'
+    port: 8084
+    is_mixer: false
+  - id: 5
+    host: 'localhost'
+    port: 8085
+    is_mixer: false

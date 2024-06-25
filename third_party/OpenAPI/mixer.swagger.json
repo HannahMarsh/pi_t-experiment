@@ -1,0 +1,67 @@
+{
+  "openapi": "2.0.0",
+  "info": {
+    "title": "Pi_t API",
+    "version": "1.0.0"
+  },
+  "schemes": [
+    "https"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/send_onion": {
+      "post": {
+        "summary": "Send onion",
+        "operationId": "sendOnion",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendOnionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Onion sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendOnionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SendOnionRequest": {
+        "type": "object",
+        "properties": {
+          "onion": {
+            "type": "string"
+          }
+        },
+        "required": ["onion"]
+      },
+      "SendOnionResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

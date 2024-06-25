@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi_t</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .node {
+            color: green;
+        }
+        .mixer {
+            color: blue;
+        }
+        .client {
+            color: black;
+        }
+        .nav-buttons {
+            margin-bottom: 20px;
+        }
+        .nav-buttons a {
+            text-decoration: none;
+            margin-right: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            display: inline-block;
+        }
+        .nav-buttons a:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+<h1>Pi_t</h1>
+<div class="nav-buttons">
+    <a href="http://localhost:8200/">Messages</a>
+    <a href="http://localhost:8200/client">Clients</a>
+</div>
+<div id="data">Loading...</div>
+<script>
+    async function fetchData() {
+        try {
+            const response = await fetch('/data');
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const data = await response.json();
+            displayData(data);
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            document.getElementById('data').textContent = 'Error loading data';
+        }
+    }
+
+    function displayData(data) {
+        const dataDiv = document.getElementById('data');
+        dataDiv.innerHTML = '';
+
+        const clientDiv = document.createElement('div');
+        clientDiv.innerHTML = `<h2>Messages</h2>`;
+
+        const messageTable = document.createElement('table');
+        messageTable.innerHTML = `
+            <tr>
+                <th>From</th>
+                <th>To</th>
+                <th>Routing Path</th>
+                <th>Message</th>
+                <th>Time Sent</th>
+                <th>Time Received</th>
+            </tr>
+        `;
+
+        // Sort messages by the concatenation of From and To strings
+        data.Messages.sort((a, b) => {
+            const aConcat = a.From + a.To;
+            const bConcat = b.From + b.To;
+            return aConcat.localeCompare(bConcat);
+        });
+
+        data.Messages.forEach((message) => {
+
+            const row = messageTable.insertRow();
+            row.innerHTML = `
+                <td>${message.From}</td>
+                <td>${message.To}</td>
+                <td>${formatRoutingPath(message.RoutingPath)}</td>
+                <td>${message.Msg}</td>
+                <td>${new Date(message.TimeSent).toLocaleString()}</td>
+                <td>${new Date(message.TimeReceived).toLocaleString()}</td>
+            `;
+        });
+
+
+        clientDiv.appendChild(messageTable);
+        dataDiv.appendChild(clientDiv);
+    }
+
+    function formatRoutingPath(routingPath) {
+        return routingPath.map((node, index) => {
+           // const className = node.IsMixer ? 'mixer' : 'node';
+            const label = (index === routingPath.length - 1) ? 'client' : 'node';
+            const className = (index === routingPath.length - 1) ? 'client' : (node.IsMixer ? 'mixer' : 'node')
+            return `<span class="${className}">${label}${node.ID}</span>`;
+        }).join(' → ');
+    }
+
+
+    function startFetchingData() {
+        fetchData();
+        setInterval(fetchData, 500); // Update every half second
+    }
+
+    document.addEventListener('DOMContentLoaded', startFetchingData);
+</script>
+</body>
+</html>
