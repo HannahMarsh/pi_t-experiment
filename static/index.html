@@ -94,8 +94,8 @@
 
         // Sort messages by the concatenation of From and To strings
         data.Messages.sort((a, b) => {
-            const aConcat = a.From + a.To;
-            const bConcat = b.From + b.To;
+            const aConcat = a.From + a.To + a.Msg;
+            const bConcat = b.From + b.To + b.Msg;
             return aConcat.localeCompare(bConcat);
         });
 
@@ -129,7 +129,7 @@
 
     function startFetchingData() {
         fetchData();
-        setInterval(fetchData, 500); // Update every half second
+        setInterval(fetchData, 1000); // Update every half second
     }
 
     document.addEventListener('DOMContentLoaded', startFetchingData);

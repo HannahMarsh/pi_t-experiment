@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"github.com/HannahMarsh/PrettyLogger"
 	"golang.org/x/exp/slog"
 	"sync"
 	"time"
@@ -34,6 +35,8 @@ func (cs *ClientStatus) AddSent(clientReceiver PublicNodeApi, routingPath []Publ
 		Message:        message,
 		TimeSent:       time.Now(),
 	})
+
+	slog.Info(PrettyLogger.GetFuncName(), "message", message)
 }
 
 func (cs *ClientStatus) AddReceived(message Message) {
@@ -43,6 +46,7 @@ func (cs *ClientStatus) AddReceived(message Message) {
 		Message:      message,
 		TimeReceived: time.Now(),
 	})
+	slog.Info(PrettyLogger.GetFuncName(), "message", message)
 }
 
 func (cs *ClientStatus) GetStatus() string {

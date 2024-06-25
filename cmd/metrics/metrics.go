@@ -127,7 +127,8 @@ func serveData(w http.ResponseWriter, r *http.Request) {
 
 	for _, client := range data.Clients {
 		for _, sent := range client.MessagesSent {
-			if _, present := m[sent.Message.Msg]; present {
+			mstr := sent.Message.From + sent.Message.To + sent.Message.Msg
+			if _, present := m[mstr]; present {
 				msg := Message{
 					From:         sent.Message.From,
 					To:           sent.Message.To,
@@ -136,9 +137,9 @@ func serveData(w http.ResponseWriter, r *http.Request) {
 					TimeSent:     sent.TimeSent,
 					TimeReceived: m[sent.Message.Msg].TimeReceived,
 				}
-				m[sent.Message.Msg] = msg
+				m[mstr] = msg
 			} else {
-				m[sent.Message.Msg] = Message{
+				m[mstr] = Message{
 					From:         sent.Message.From,
 					To:           sent.Message.To,
 					RoutingPath:  sent.RoutingPath,
@@ -149,24 +150,25 @@ func serveData(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		for _, received := range client.MessagesReceived {
-			if _, present := m[received.Message.Msg]; present {
+			mstr := received.Message.From + received.Message.To + received.Message.Msg
+			if _, present := m[mstr]; present {
 				msg := Message{
 					From:         received.Message.From,
 					To:           received.Message.To,
-					RoutingPath:  m[received.Message.Msg].RoutingPath,
+					RoutingPath:  m[mstr].RoutingPath,
 					Msg:          received.Message.Msg,
-					TimeSent:     m[received.Message.Msg].TimeSent,
-					TimeReceived: m[received.Message.Msg].TimeReceived,
+					TimeSent:     m[mstr].TimeSent,
+					TimeReceived: received.TimeReceived,
 				}
-				m[received.Message.Msg] = msg
+				m[mstr] = msg
 			} else {
-				m[received.Message.Msg] = Message{
+				m[mstr] = Message{
 					From:         received.Message.From,
 					To:           received.Message.To,
 					RoutingPath:  make([]api.PublicNodeApi, 0),
 					Msg:          received.Message.Msg,
-					TimeSent:     m[received.Message.Msg].TimeSent,
-					TimeReceived: time.Time{},
+					TimeSent:     time.Time{},
+					TimeReceived: received.TimeReceived,
 				}
 			}
 		}

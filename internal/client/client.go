@@ -95,39 +95,36 @@ func (c *Client) RegisterWithBulletinBoard() error {
 
 func (c *Client) StartGeneratingMessages(client_addresses []string) {
 	slog.Info("Client starting to generate messages", "id", c.ID)
-	var msgNum int = 0
+	msgNum := 0
+	var mu sync.Mutex
 	for {
 		select {
 		case <-config.GlobalCtx.Done():
 			slog.Info(pl.GetFuncName()+": ctx.done -> Client stopping to generate messages", "id", c.ID)
 			return // Exit if context is cancelled
 		default:
+			mu.Lock()
 			messages := make([]api.Message, 0)
 			for _, addr := range client_addresses {
-				if addr != c.Adddress {
+				if addr != c.Adddress && addr != "" {
 					messages = append(messages, api.Message{
 						From: c.Adddress,
 						To:   addr,
 						Msg:  fmt.Sprintf("Msg#%d from client(id=%d)", msgNum, c.ID),
 					})
-					msgNum++
+					msgNum = msgNum + 1
 				}
 			}
-			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				c.mu.Lock()
-				defer func() {
-					c.mu.Unlock()
-					wg.Done()
-				}()
-				if err := c.RegisterIntentToSend(messages); err != nil {
-					slog.Error(pl.GetFuncName()+": Error registering intent to send", err)
-				} else {
-					c.Messages = append(c.Messages, messages...)
-				}
-			}()
-			wg.Wait()
+			mu.Unlock()
+
+			c.mu.Lock()
+			messages = append(c.Messages, messages...)
+			if err := c.RegisterIntentToSend(messages); err != nil {
+				slog.Error(pl.GetFuncName()+": Error registering intent to send", err)
+			} else {
+				c.Messages = messages
+			}
+			c.mu.Unlock()
 		}
 		time.Sleep(5 * time.Second)
 	}
@@ -197,6 +194,8 @@ func (c *Client) formOnions(start api.StartRunApi) (map[string][]api.OnionApi, e
 		numMessagesToSend[msg.To]++
 	}
 
+	dummyNum := 0
+
 	for addr, numMessages := range numMessagesToSend {
 		if numMessages < start.NumMessagesPerClient {
 			numDummyNeeded := start.NumMessagesPerClient - numMessages
@@ -204,8 +203,9 @@ func (c *Client) formOnions(start api.StartRunApi) (map[string][]api.OnionApi, e
 				c.Messages = append(c.Messages, api.Message{
 					From: c.Adddress,
 					To:   addr,
-					Msg:  "dummy",
+					Msg:  fmt.Sprintf("dummy%d", dummyNum),
 				})
+				dummyNum++
 			}
 		}
 	}
