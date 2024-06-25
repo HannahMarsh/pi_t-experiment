@@ -16,7 +16,7 @@ import (
 )
 
 // KeyGen generates an RSA key pair and returns the public and private keys in PEM format
-func KeyGen() (privateKeyPEM, publicKeyPEM string, err error) {
+func KeyGen2() (privateKeyPEM, publicKeyPEM string, err error) {
 	// Generate RSA key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -48,7 +48,7 @@ func KeyGen() (privateKeyPEM, publicKeyPEM string, err error) {
 }
 
 // GenerateSymmetricKey generates a random AES key for encryption
-func GenerateSymmetricKey() ([]byte, error) {
+func GenerateSymmetricKey2() ([]byte, error) {
 	key := make([]byte, 32) // AES-256
 	if _, err := rand.Read(key); err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func GenerateSymmetricKey() ([]byte, error) {
 }
 
 // EncryptWithAES encrypts plaintext using AES encryption
-func EncryptWithAES(key, plaintext []byte) (string, error) {
+func EncryptWithAES2(key, plaintext []byte) (string, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
@@ -76,7 +76,7 @@ func EncryptWithAES(key, plaintext []byte) (string, error) {
 }
 
 // DecryptWithAES decrypts ciphertext using AES encryption
-func DecryptWithAES(key []byte, ct string) ([]byte, error) {
+func DecryptWithAES2(key []byte, ct string) ([]byte, error) {
 	ciphertext, _ := base64.StdEncoding.DecodeString(ct)
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -95,12 +95,12 @@ func DecryptWithAES(key []byte, ct string) ([]byte, error) {
 	return ciphertext, nil
 }
 
-type OnionLayer struct {
+type OnionLayer2 struct {
 	NextHop string
 	Payload string
 }
 
-type Onion struct {
+type Onion2 struct {
 	IsCheckpointOnion bool
 	Layer             int
 	NextHop           string
@@ -108,7 +108,7 @@ type Onion struct {
 }
 
 // FormOnion creates an onion by encapsulating a message in multiple encryption layers
-func FormOnion(payload []byte, publicKeys []string, routingPath []string, checkpoint int) (string, string, error) {
+func FormOnion2(payload []byte, publicKeys []string, routingPath []string, checkpoint int) (string, string, error) {
 	for i := len(publicKeys) - 1; i >= 0; i-- {
 		var layerBytes []byte
 		var err error
@@ -171,7 +171,7 @@ func FormOnion(payload []byte, publicKeys []string, routingPath []string, checkp
 }
 
 // PeelOnion removes the outermost layer of the onion
-func PeelOnion(onion string, privateKeyPEM string) (*Onion, error) {
+func PeelOnion2(onion string, privateKeyPEM string) (*Onion, error) {
 	privateKeyBlock, _ := pem.Decode([]byte(privateKeyPEM))
 	if privateKeyBlock == nil || privateKeyBlock.Type != "RSA PRIVATE KEY" {
 		return nil, errors.New("invalid private key PEM block")
@@ -228,7 +228,7 @@ func PeelOnion(onion string, privateKeyPEM string) (*Onion, error) {
 }
 
 // BruiseOnion modifies the onion payload to introduce bruising
-func BruiseOnion(onion string) (string, error) {
+func BruiseOnion2(onion string) (string, error) {
 	onionBytes, err := base64.StdEncoding.DecodeString(onion)
 	if err != nil {
 		return "", err
