@@ -1,6 +1,16 @@
 Implementing &Pi;<sub>t</sub>
 ================
 
+
+**TODO**
+- Client: Encrypt nonces into header
+- Client: use prf to calculate when to generate checkpoint onions (when forming onion)
+- Client: calculate how many checkpoint onions each node on path should expect
+- Client calculate time window for when onion should arrive at each hop
+- Node: calculate expected number of nonces for each layer
+- Node: check if onion is late or the nonce is not in expected set, add bruises if so
+- 
+
 ## Introduction
 
 This project focuses on implementing &Pi;<sub>t</sub>, a differentially anonymous mixnet architecture, to explore its performance under
