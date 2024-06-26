@@ -162,23 +162,50 @@
 
             const roundTbody = document.getElementById(`round${round}-tbody`);
 
-            Object.entries(onionsPerRound[round]).forEach(([node, onions]) => {
+            Object.entries(data.Nodes).forEach(([nodeAddress, status]) => {
+                let node = status.Node.ID
+                let onions = onionsPerRound[round][node] || [];
 
                 if (onions.length > 0) {
                     const firstOnion = onions[0];
                     const firstRow = document.createElement('tr');
                     firstRow.innerHTML = `<td rowspan="${onions.length}">Node${node}</td><td>from ${getName(data, firstOnion.LastHop).name}, to ${getName(data, firstOnion.NextHop).name}</td>`;
                     firstRow.cells.item(0).classList.add(`Node${node}`);
+                    firstRow.classList.add(`Node${node}--${getName(data, firstOnion.NextHop).short}`.replace(' ', ''));
+                    roundTbody.appendChild(firstRow);
+
+                    onions.slice(1).forEach(onion => {
+                        const row = document.createElement('tr');
+                        row.classList.add(`Node${node}--${getName(data, onion.NextHop).short}`.replace(' ', ''));
+                        row.innerHTML = `<td>from ${getName(data, onion.LastHop).name}, to ${getName(data, onion.NextHop).name}</td>`;
+                        roundTbody.appendChild(row);
+                    });
+                } else {
+                    const firstRow = document.createElement('tr');
+                    firstRow.innerHTML = `<td rowspan="1">Node${node}</td><td> </td>`;
+                    firstRow.cells.item(0).classList.add(`Node${node}`);
                     roundTbody.appendChild(firstRow);
                 }
-                onions.slice(1).forEach(onion => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `<td>from ${getName(data, onion.LastHop).name}, to ${getName(data, onion.NextHop).name}</td>`;
-                    roundTbody.appendChild(row);
-                });
-
 
             });
+
+            // Object.entries(onionsPerRound[round]).forEach(([node, onions]) => {
+            //
+            //     if (onions.length > 0) {
+            //         const firstOnion = onions[0];
+            //         const firstRow = document.createElement('tr');
+            //         firstRow.innerHTML = `<td rowspan="${onions.length}">Node${node}</td><td>from ${getName(data, firstOnion.LastHop).name}, to ${getName(data, firstOnion.NextHop).name}</td>`;
+            //         firstRow.cells.item(0).classList.add(`Node${node}`);
+            //         roundTbody.appendChild(firstRow);
+            //     }
+            //     onions.slice(1).forEach(onion => {
+            //         const row = document.createElement('tr');
+            //         row.innerHTML = `<td>from ${getName(data, onion.LastHop).name}, to ${getName(data, onion.NextHop).name}</td>`;
+            //         roundTbody.appendChild(row);
+            //     });
+            //
+            //
+            // });
 
 
         }
@@ -190,9 +217,6 @@
         canvas.width = container.scrollWidth;
         canvas.height = container.scrollHeight;
 
-        drawArrow(ctx, 10, 10, 100, 100, 'red');
-        drawArrow(ctx, 100, 10, 140, 140, 'black');
-
         document.getElementById(`initialization-tbody`).querySelectorAll('tr').forEach(row => {
             row.classList.forEach(className => {
                 if (className.includes('--')) {
@@ -203,7 +227,7 @@
                     const fromCell = Array.from(row.cells).at(-1);
 
                     if (toCell) {
-                        console.log('Found cell:', toCell.textContent);
+                       // console.log('Found cell:', toCell.textContent);
                         // Perform your desired action with the target cell
                         // toCell.style.backgroundColor = 'yellow'; // Example: highlight the cell
                         // fromCell.style.backgroundColor = 'yellow'; // Example: highlight the cell
@@ -216,21 +240,42 @@
                             toRect.left - canvas.getBoundingClientRect().left,
                             toRect.top + toRect.height / 2 - canvas.getBoundingClientRect().top, 'black');
                     } else {
-                        console.log('Cell not found');
+                        //console.log('Cell not found');
                     }
-
-                    //
-                    // if (toCell) {
-                    //     console.log(toCell);
-                    //     const fromRect = row.getBoundingClientRect();
-                    //     const toRect = toCell.getBoundingClientRect();
-                    //     drawArrow(fromRect.right, fromRect.top + fromRect.height / 2, toRect.left, toRect.top + toRect.height / 2, 'black');
-                    // } else {
-                    //     console.log('Could not find cells:', from, to)
-                    // }
                 }
             })
         });
+
+        for (let round = 0; round <= numRounds; round++) {
+            document.getElementById(`round${round}-tbody`).querySelectorAll('tr').forEach(row => {
+                row.classList.forEach(className => {
+                    if (className.includes('--')) {
+                        const [from, to] = className.split('--');
+                        const cells = document.getElementById(`round${round + 1}-tbody`).querySelectorAll('td');
+
+                        const toCell = Array.from(cells).find(cell => Array.from(cell.classList).includes(to));
+                        const fromCell = Array.from(row.cells).at(-1);
+
+                        if (toCell) {
+                            //console.log('Found cell:', toCell.textContent);
+                            // Perform your desired action with the target cell
+                            // toCell.style.backgroundColor = 'yellow'; // Example: highlight the cell
+                            // fromCell.style.backgroundColor = 'yellow'; // Example: highlight the cell
+
+                            const fromRect = fromCell.getBoundingClientRect();
+                            const toRect = toCell.getBoundingClientRect();
+                            //drawArrow(ctx, fromRect.right, fromRect.top + fromRect.height / 2, toRect.left, toRect.top + toRect.height / 2, 'black');
+                            drawArrow(ctx, fromRect.right - canvas.getBoundingClientRect().left,
+                                fromRect.top + fromRect.height / 2 - canvas.getBoundingClientRect().top,
+                                toRect.left - canvas.getBoundingClientRect().left,
+                                toRect.top + toRect.height / 2 - canvas.getBoundingClientRect().top, 'black');
+                        } else {
+                            //console.log('Cell not found');
+                        }
+                    }
+                })
+            });
+        }
 
         //
         //
