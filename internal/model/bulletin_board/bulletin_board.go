@@ -75,7 +75,7 @@ func (bb *BulletinBoard) RegisterIntentToSend(its api.IntentToSend) error {
 func (bb *BulletinBoard) signalNodesToStart() error {
 	slog.Info("Signaling nodes to start")
 	activeNodes := utils.MapEntries(utils.FilterMap(bb.Network, func(_ int, node *NodeView) bool {
-		return node.IsActive()
+		return node.IsActive() && node.Address != ""
 	}), func(_ int, nv *NodeView) api.PublicNodeApi {
 		return api.PublicNodeApi{
 			ID:        nv.ID,
@@ -87,7 +87,7 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 	})
 
 	activeClients := utils.MapEntries(utils.FilterMap(bb.Clients, func(_ int, cl *ClientView) bool {
-		return cl.IsActive()
+		return cl.IsActive() && cl.Address != ""
 	}), func(_ int, cv *ClientView) api.PublicNodeApi {
 		return api.PublicNodeApi{
 			ID:        cv.ID,

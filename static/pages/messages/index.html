@@ -71,7 +71,27 @@
         } else if (a.Msg !== checkpoint && b.Msg === checkpoint) {
             return -1; // a should come before b
         } else if (a.Msg === checkpoint && b.Msg === checkpoint) {
-            a.TimeSent.localeCompare(b.TimeSent); // sort by time sent
+            const timecmpr = a.TimeSent.localeCompare(b.TimeSent); // sort by time sent
+            if (timecmpr === 0) {
+                const fromcmpr = a.From.localeCompare(b.From); // if same time, sort by sender
+                if (fromcmpr === 0) {
+                    const tocmpr = a.To.localeCompare(b.To); // if same sender, sort by recipient
+                    if (tocmpr === 0) {
+                        // if same recipient, sort by routing path
+                        return a.RoutingPath.map((node, index) => {
+                            return `${node.ID}`
+                        }).join('').localeCompare(b.RoutingPath.map((node, index) => {
+                            return `${node.ID}`
+                        }).join(''));
+                    } else {
+                        return tocmpr;
+                    }
+                } else {
+                    return fromcmpr;
+                }
+            } else {
+                return timecmpr;
+            }
         } else {
             return a.Msg.localeCompare(b.Msg); // normal alphabetical order
         }

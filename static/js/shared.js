@@ -33,6 +33,7 @@ async function fetchDataAndDisplay() {
         updateClientNodeNames(data)
     } catch (error) {
         document.getElementById('data').textContent = ('Error loading data: ' + error.message);
+        console.error('Error loading data:', error);
     }
 }
 
@@ -73,13 +74,17 @@ function getName(data, url) {
     if (names[url]) {
         return names[url];
     }
+    if (url === '') {
+        return { ID: '', type: '', name: '', class: '', short: '' };
+    }
     for (const [node, status] of Object.entries(data.Nodes)) {
         if (url.includes(node) || node.includes(url)) {
             const info = {
                 ID: status.Node.ID,
                 type: 'Node',
                 name: `Node${status.Node.ID} (${status.Node.IsMixer ? 'mixer' : 'gatekeeper'})`,
-                class: status.Node.IsMixer ? 'mixer' : 'gatekeeper'
+                class: status.Node.IsMixer ? 'mixer' : 'gatekeeper',
+                short: `Node ${status.Node.ID}`
             };
             names[url] = info;
             return info;
@@ -91,7 +96,8 @@ function getName(data, url) {
                 ID: status.Client.ID,
                 type: 'Client',
                 name: `Client${status.Client.ID}`,
-                class: 'client'
+                class: 'client',
+                short: `Client ${status.Client.ID}`
             };
             names[url] = info;
             return info;

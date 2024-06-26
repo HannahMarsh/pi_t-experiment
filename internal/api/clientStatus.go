@@ -27,6 +27,20 @@ type Received struct {
 	TimeReceived time.Time
 }
 
+func NewClientStatus(id int, address, publicKey string) *ClientStatus {
+	return &ClientStatus{
+		MessagesSent:     make([]Sent, 0),
+		MessagesReceived: make([]Received, 0),
+		Client: PublicNodeApi{
+			ID:        id,
+			Address:   address,
+			PublicKey: publicKey,
+			Time:      time.Now(),
+			IsMixer:   false,
+		},
+	}
+}
+
 func (cs *ClientStatus) AddSent(clientReceiver PublicNodeApi, routingPath []PublicNodeApi, message Message) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()

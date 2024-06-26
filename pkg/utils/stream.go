@@ -346,7 +346,7 @@ func CopyMap[K comparable, V any](m map[K]V) map[K]V {
 	return result
 }
 
-func Swap[T any](items []*T, i, j int) {
+func Swap[T any](items []T, i, j int) {
 	items[i], items[j] = items[j], items[i]
 }
 
