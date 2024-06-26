@@ -135,6 +135,8 @@ func (n *Node) Receive(o string) error {
 			if err3 := sendToNode(peeled.NextHop, addedHeader); err != nil {
 				return pl.WrapError(err3, "node.Receive(): failed to send to next node")
 			}
+		} else {
+			n.status.AddOnion(peeled.LastHop, fmt.Sprintf("http://%s:%d", n.Host, n.Port), peeled.NextHop, peeled.Layer, peeled.IsCheckpointOnion, bruises, false, nonceVerification, expectCheckpoint)
 		}
 	}
 	return nil

@@ -239,7 +239,7 @@ func PeelOnion(onion string, privateKeyPEM string) (*OnionPayload, int, bool, bo
 		return nil, -1, nonceVerification, expectCheckpoint, err
 	}
 
-	return peeled, bruises, nonceVerification, expectCheckpoint, nil
+	return peeled, bruises, nonceVerification, !peeled.IsCheckpointOnion && expectCheckpoint, nil
 }
 
 // peelOnionAfterRemovingPayload removes the outermost layer of the onion after removing the header.

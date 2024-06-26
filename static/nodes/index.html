@@ -23,7 +23,13 @@
         th {
             background-color: #f2f2f2;
         }
-        .node {
+        .true {
+            background-color: #eaffe0;
+        }
+        .false {
+            background-color: #ffe0eb;
+        }
+        .gatekeeper {
             color: green;
         }
         .mixer {
@@ -67,6 +73,9 @@
 
 
 <script>
+
+    const names = {}
+
     async function fetchData() {
         try {
             const response = await fetch('/data');
@@ -113,17 +122,37 @@
                     <td>${onion.LastHop}</td>
                     <td>${onion.NextHop}</td>
                     <td>${onion.TimeReceived}</td>
-                    <td>${onion.Bruises}</td>
-                    <td>${onion.Dropped}</td>
-                    <td>${onion.IsCheckPointOnion}</td>
-                    <td>${onion.NonceVerification}</td>
-                    <td>${onion.ExpectCheckPoint}</td>
+                    <td class="${onion.Bruises == 0 ? 'true' : 'false'}">${onion.Bruises}</td>
+                    <td class="${onion.Dropped ? 'true' : 'false'}">${onion.Dropped}</td>
+                    <td class="${onion.IsCheckPointOnion ? 'true' : 'false'}">${onion.IsCheckPointOnion}</td>
+                    <td class="${onion.NonceVerification ? 'true' : 'false'}">${onion.NonceVerification}</td>
+                    <td class="${onion.ExpectCheckPoint ? 'true' : 'false'}">${onion.ExpectCheckPoint}</td>
                     <td>${onion.Layer}</td>
+
                 `;
             });
 
             nodeDiv.appendChild(onionTable);
             dataDiv.appendChild(nodeDiv);
+        }
+    }
+
+    function getName(data, url) {
+        if (names[url]) {
+            return names[url]
+        }
+        const nodes = {}
+        for (const [node, status] of Object.entries(data.Nodes)) {
+            if (url.includes(node) || node.includes(url)) {
+                names[url] = status.Node.IsMixer ? `<span class="mixer">Node${status.Node.ID} (mixer)</span>` : `<span class="gatekeeper">Node${status.Node.ID} (gatekeeper)</span>`;
+                return names[url]
+            }
+        }
+        for (const [client, status] of Object.entries(data.Clients)) {
+            if (url.includes(client) || client.includes(url)) {
+                names[url] = `<span class="client">Client${status.Client.ID}</span>`;
+                return names[url]
+            }
         }
     }
 
