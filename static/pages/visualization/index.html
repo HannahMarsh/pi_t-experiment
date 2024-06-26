@@ -168,7 +168,7 @@
                     const firstOnion = onions[0];
                     const firstRow = document.createElement('tr');
                     firstRow.innerHTML = `<td rowspan="${onions.length}">Node${node}</td><td>from ${getName(data, firstOnion.LastHop).name}, to ${getName(data, firstOnion.NextHop).name}</td>`;
-                    firstRow.cells.item(0).classList.add(`Node${node}`)
+                    firstRow.cells.item(0).classList.add(`Node${node}`);
                     roundTbody.appendChild(firstRow);
                 }
                 onions.slice(1).forEach(onion => {
@@ -183,8 +183,8 @@
 
         }
 
-        var canvas=document.getElementById('arrows');
-        var ctx=canvas.getContext('2d');
+        var canvas = document.getElementById('arrows');
+        var ctx = canvas.getContext('2d');
 
         const container = document.getElementById('visualization-container');
         canvas.width = container.scrollWidth;
@@ -197,20 +197,24 @@
             row.classList.forEach(className => {
                 if (className.includes('--')) {
                     const [from, to] = className.split('--');
-                    const cells = document.getElementById(`round0-tbody`).querySelectorAll('td')
+                    const cells = document.getElementById(`round0-tbody`).querySelectorAll('td');
 
                     const toCell = Array.from(cells).find(cell => Array.from(cell.classList).includes(to));
-                    const fromCell = Array.from(row.cells).at(-1)
+                    const fromCell = Array.from(row.cells).at(-1);
 
                     if (toCell) {
                         console.log('Found cell:', toCell.textContent);
                         // Perform your desired action with the target cell
-                        toCell.style.backgroundColor = 'yellow'; // Example: highlight the cell
-                        fromCell.style.backgroundColor = 'yellow'; // Example: highlight the cell
+                        // toCell.style.backgroundColor = 'yellow'; // Example: highlight the cell
+                        // fromCell.style.backgroundColor = 'yellow'; // Example: highlight the cell
 
                         const fromRect = fromCell.getBoundingClientRect();
                         const toRect = toCell.getBoundingClientRect();
-                        drawArrow(ctx, fromRect.right, fromRect.top + fromRect.height / 2, toRect.left, toRect.top + toRect.height / 2, 'black');
+                        //drawArrow(ctx, fromRect.right, fromRect.top + fromRect.height / 2, toRect.left, toRect.top + toRect.height / 2, 'black');
+                        drawArrow(ctx, fromRect.right - canvas.getBoundingClientRect().left,
+                            fromRect.top + fromRect.height / 2 - canvas.getBoundingClientRect().top,
+                            toRect.left - canvas.getBoundingClientRect().left,
+                            toRect.top + toRect.height / 2 - canvas.getBoundingClientRect().top, 'black');
                     } else {
                         console.log('Cell not found');
                     }
