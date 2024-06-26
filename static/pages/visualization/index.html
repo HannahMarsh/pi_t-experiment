@@ -62,6 +62,9 @@
     document.addEventListener('DOMContentLoaded', () => {
         loadHeader('../../components/header.html');
         startFetchingData();
+        // Add hover event listeners to the initialization table after the data is loaded
+        document.getElementById('initialization-tbody').addEventListener('mouseover', handleHover);
+        document.getElementById('initialization-tbody').addEventListener('mouseout', handleHoverOut);
     });
 
     function displayData(data) {
@@ -85,14 +88,16 @@
                 const from = getName(data, status.Client.Address).short;
                 const className = `${getName(data, client).short}--${getName(data, firstSent.RoutingPath[0].Address).short}`.replaceAll(' ', '');
                 firstRow.classList.add(className);
-                firstRow.innerHTML = `<td rowspan="${status.MessagesSent.length}">Client${status.Client.ID}</td><td>${firstSent.Message.Msg}</td>`;
+
+                const additional_details = formatAdditionalDetails(data, firstSent);
+                firstRow.innerHTML = `<td rowspan="${status.MessagesSent.length}">Client${status.Client.ID}</td><td data-info="${additional_details}">${firstSent.Message.Msg}</td>`;
                 initTbody.appendChild(firstRow);
 
                 status.MessagesSent.slice(1).forEach(sent => {
                     const row = document.createElement('tr');
-
+                    const additional_details2 =formatAdditionalDetails(data, firstSent);
                     row.classList.add(`${getName(data, client).short}--${getName(data, sent.RoutingPath[0].Address).short}`.replaceAll(' ', ''));
-                    row.innerHTML = `<td>${sent.Message.Msg}</td>`;
+                    row.innerHTML = `<td data-info="${additional_details2}">${sent.Message.Msg}</td>`;
                     initTbody.appendChild(row);
                 });
             }
@@ -189,24 +194,6 @@
 
             });
 
-            // Object.entries(onionsPerRound[round]).forEach(([node, onions]) => {
-            //
-            //     if (onions.length > 0) {
-            //         const firstOnion = onions[0];
-            //         const firstRow = document.createElement('tr');
-            //         firstRow.innerHTML = `<td rowspan="${onions.length}">Node${node}</td><td>from ${getName(data, firstOnion.LastHop).name}, to ${getName(data, firstOnion.NextHop).name}</td>`;
-            //         firstRow.cells.item(0).classList.add(`Node${node}`);
-            //         roundTbody.appendChild(firstRow);
-            //     }
-            //     onions.slice(1).forEach(onion => {
-            //         const row = document.createElement('tr');
-            //         row.innerHTML = `<td>from ${getName(data, onion.LastHop).name}, to ${getName(data, onion.NextHop).name}</td>`;
-            //         roundTbody.appendChild(row);
-            //     });
-            //
-            //
-            // });
-
 
         }
 
@@ -251,51 +238,49 @@
                 row.classList.forEach(className => {
                     if (className.includes('--')) {
                         const [from, to] = className.split('--');
-                        const cells = document.getElementById(`round${round + 1}-tbody`).querySelectorAll('td');
+                        if (document.getElementById(`round${round + 1}-tbody`)) {
+                            const cells = document.getElementById(`round${round + 1}-tbody`).querySelectorAll('td');
 
-                        const toCell = Array.from(cells).find(cell => Array.from(cell.classList).includes(to));
-                        const fromCell = Array.from(row.cells).at(-1);
+                            const toCell = Array.from(cells).find(cell => Array.from(cell.classList).includes(to));
+                            const fromCell = Array.from(row.cells).at(-1);
 
-                        if (toCell) {
-                            //console.log('Found cell:', toCell.textContent);
-                            // Perform your desired action with the target cell
-                            // toCell.style.backgroundColor = 'yellow'; // Example: highlight the cell
-                            // fromCell.style.backgroundColor = 'yellow'; // Example: highlight the cell
+                            if (toCell) {
+                                //console.log('Found cell:', toCell.textContent);
+                                // Perform your desired action with the target cell
+                                // toCell.style.backgroundColor = 'yellow'; // Example: highlight the cell
+                                // fromCell.style.backgroundColor = 'yellow'; // Example: highlight the cell
 
-                            const fromRect = fromCell.getBoundingClientRect();
-                            const toRect = toCell.getBoundingClientRect();
-                            //drawArrow(ctx, fromRect.right, fromRect.top + fromRect.height / 2, toRect.left, toRect.top + toRect.height / 2, 'black');
-                            drawArrow(ctx, fromRect.right - canvas.getBoundingClientRect().left,
-                                fromRect.top + fromRect.height / 2 - canvas.getBoundingClientRect().top,
-                                toRect.left - canvas.getBoundingClientRect().left,
-                                toRect.top + toRect.height / 2 - canvas.getBoundingClientRect().top, 'black');
-                        } else {
-                            //console.log('Cell not found');
+                                const fromRect = fromCell.getBoundingClientRect();
+                                const toRect = toCell.getBoundingClientRect();
+                                //drawArrow(ctx, fromRect.right, fromRect.top + fromRect.height / 2, toRect.left, toRect.top + toRect.height / 2, 'black');
+                                drawArrow(ctx, fromRect.right - canvas.getBoundingClientRect().left,
+                                    fromRect.top + fromRect.height / 2 - canvas.getBoundingClientRect().top,
+                                    toRect.left - canvas.getBoundingClientRect().left,
+                                    toRect.top + toRect.height / 2 - canvas.getBoundingClientRect().top, 'black');
+                            } else {
+                                //console.log('Cell not found');
+                            }
                         }
                     }
                 })
             });
         }
+    }
 
-        //
-        //
-        // // Drawing arrows between tables, e.g., from initialization to Round 1
-        // Object.entries(data.Clients).forEach(([client, status]) => {
-        //     status.MessagesSent.forEach(sent => {
-        //         let clioentName = `Client ${status.Client.ID}`;
-        //         let receiver = `Node ${sent.Receiver.ID}`;
-        //         const fromCell = document.querySelector(`#initialization-tbody tr:contains('${clientName}') td:contains('${sent.Message.Msg}')`);
-        //         const toCell = document.querySelector(`#round1-tbody tr:contains('${receiver}')`);
-        //
-        //         if (fromCell && toCell) {
-        //             const fromRect = fromCell.getBoundingClientRect();
-        //             const toRect = toCell.getBoundingClientRect();
-        //
-        //             drawArrow(fromRect.right, fromRect.top + fromRect.height / 2, toRect.left, toRect.top + toRect.height / 2, 'black');
-        //         }
-        //     });
-        // });
-        //drawArrows(data);
+    function formatAdditionalDetails(data, sent) {
+        const to = sent.Message.To;
+        const from = sent.Message.From;
+        const routingPath = sent.RoutingPath.map(node => getName(data, node.Address).name).join(' → ');
+        const messageContents = sent.Message.Msg;
+        const timeSent = sent.TimeSent;
+
+        return `
+        <strong>To:</strong> ${to}<br>
+        <strong>From:</strong> ${from}<br>
+        <strong>Routing Path:</strong> ${routingPath}<br>
+        <strong>Message:</strong> ${messageContents}<br>
+        <strong>Time Sent:</strong> ${timeSent}
+    `;
     }
 
     function drawArrow(ctx, fromx, fromy, tox, toy, color){
@@ -340,46 +325,6 @@
         ctx.stroke();
         ctx.restore();
     }
-    //
-    // function drawArrows(data, onionsPerRound) {
-    //     const canvas = document.getElementById('arrows');
-    //     const ctx = canvas.getContext('2d');
-    //     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    //
-    //     // Resize canvas to fit visualization
-    //     const container = document.getElementById('visualization-container');
-    //     canvas.width = container.scrollWidth;
-    //     canvas.height = container.scrollHeight;
-    //
-    //     // Drawing arrows between tables, e.g., from initialization to Round 1
-    //     Object.entries(data.Clients).forEach(([client, status]) => {
-    //         status.MessagesSent.forEach(sent => {
-    //             let clioentName = `Client ${status.Client.ID}`;
-    //             let receiver = `Node ${sent.Receiver}`;
-    //             const fromCell = document.querySelector(`#initialization-tbody tr:contains('${clientName}') td:contains('${sent.Message.Msg}')`);
-    //             const toCell = document.querySelector(`#round1-tbody tr:contains('${receiver}')`);
-    //
-    //             if (fromCell && toCell) {
-    //                 const fromRect = fromCell.getBoundingClientRect();
-    //                 const toRect = toCell.getBoundingClientRect();
-    //
-    //                 drawArrow(ctx, fromRect.right, fromRect.top + fromRect.height / 2, toRect.left, toRect.top + toRect.height / 2);
-    //             }
-    //         });
-    //     });
-    // }
-    //
-    // function drawArrow(ctx, fromx, fromy, tox, toy) {
-    //     const headlen = 10;
-    //     const angle = Math.atan2(toy - fromy, tox - fromx);
-    //     ctx.beginPath();
-    //     ctx.moveTo(fromx, fromy);
-    //     ctx.lineTo(tox, toy);
-    //     ctx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
-    //     ctx.moveTo(tox, toy);
-    //     ctx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
-    //     ctx.stroke();
-    // }
 
 
     function sortMessages(a, b) {
@@ -392,6 +337,50 @@
             return a.TimeSent.localeCompare(b.TimeSent); // sort by time sent
         } else {
             return a.Message.Msg.localeCompare(b.Message.Msg); // normal alphabetical order
+        }
+    }
+
+
+    function handleHover(event) {
+        const target = event.target;
+        if (target.tagName === 'TD' && target.dataset.info) {
+            // Remove any existing popup
+            const existingPopup = document.getElementById('info-popup');
+            if (existingPopup) {
+                document.body.removeChild(existingPopup);
+            }
+
+            const popup = document.createElement('div');
+            popup.classList.add('popup');
+            popup.innerHTML = target.dataset.info; // Use the data-info attribute for additional details
+
+            // Position the popup
+            const rect = target.getBoundingClientRect();
+            popup.style.top = `${rect.top + window.scrollY + target.offsetHeight}px`;
+            popup.style.left = `${rect.left + window.scrollX}px`;
+
+            // Assign a unique identifier to the popup for later reference
+            popup.id = 'info-popup';
+
+            document.body.appendChild(popup);
+            popup.classList.add('visible');
+
+            // Store the popup element in the target for later removal
+            target._popup = popup;
+        }
+    }
+
+
+    function handleHoverOut(event) {
+        const target = event.target;
+        if (target.tagName === 'TD' && target._popup) {
+            console.log('Popup exists before removal:', document.body.contains(target._popup));
+            document.body.removeChild(target._popup);
+            console.log('Popup removed:', !document.body.contains(target._popup));
+            target._popup = null;
+            console.log('Popup reference cleared:', target._popup === null);
+        } else {
+            console.log('No popup to remove');
         }
     }
 

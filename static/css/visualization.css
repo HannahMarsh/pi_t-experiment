@@ -94,3 +94,25 @@ th {
 .nav-buttons a:hover {
     background-color: #0056b3;
 }
+
+.round-table td:hover {
+    background-color: #f0f0f0; /* Change background color on hover */
+    position: relative; /* Required for the popup positioning */
+}
+
+.popup {
+    position: absolute;
+    background-color: rgba(222, 220, 239, 0.93);
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    transition: opacity 0.3s ease;
+    opacity: 0;
+    pointer-events: none; /* Make the popup non-interactive */
+}
+
+.popup.visible {
+    opacity: 1;
+    pointer-events: auto; /* Make the popup interactive */
+}

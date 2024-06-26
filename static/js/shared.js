@@ -71,6 +71,7 @@ function updateClientNodeNames(data) {
 }
 
 function getName(data, url) {
+
     if (names[url]) {
         return names[url];
     }
