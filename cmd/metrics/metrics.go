@@ -16,6 +16,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -48,11 +49,12 @@ func main() {
 
 	slog.Info("⚡ init metrics", "host", cfg.Metrics.Host, "port", cfg.Metrics.Port)
 
+	time.Sleep(1 * time.Second)
 	http.HandleFunc("/data", serveData)
 	http.Handle("/", http.FileServer(http.Dir("./static")))
-	http.Handle("/clients", http.FileServer(http.Dir("./static/client")))
-	http.Handle("/nodes", http.FileServer(http.Dir("./static/nodes")))
-	http.Handle("/nodes/rounds", http.FileServer(http.Dir("./static/nodes/rounds")))
+	//http.Handle("/clients", http.FileServer(http.Dir("./static/client")))
+	//http.Handle("/nodes", http.FileServer(http.Dir("./static/nodes")))
+	//http.Handle("/nodes/rounds", http.FileServer(http.Dir("./static/nodes/rounds")))
 
 	go func() {
 		if err := http.ListenAndServe(fmt.Sprintf(":%d", cfg.Metrics.Port), nil); err != nil {

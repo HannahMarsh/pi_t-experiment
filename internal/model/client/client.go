@@ -197,27 +197,6 @@ func (c *Client) formOnions(start api.StartRunApi) (map[string][]api.OnionApi, e
 		return node.Address != c.Adddress && node.Address != ""
 	})
 
-	//numMessagesToSend := make(map[string]int)
-	//
-	//for _, msg := range c.Messages {
-	//	if _, found := numMessagesToSend[msg.To]; !found {
-	//		numMessagesToSend[msg.To] = 0
-	//	}
-	//	numMessagesToSend[msg.To]++
-	//}
-	//
-	//dummyNum := 0
-	//
-	//for addr, numMessages := range numMessagesToSend {
-	//	if numMessages < start.NumMessagesPerClient {
-	//		numDummyNeeded := start.NumMessagesPerClient - numMessages
-	//		for i := 0; i < numDummyNeeded; i++ {
-	//			c.Messages = append(c.Messages, api.NewMessage(c.Adddress, addr, fmt.Sprintf("dummy%d", dummyNum)))
-	//			dummyNum++
-	//		}
-	//	}
-	//}
-
 	for _, msg := range c.Messages {
 		if destination, found := utils.Find(start.ParticipatingClients, api.PublicNodeApi{}, func(client api.PublicNodeApi) bool {
 			return client.Address == msg.To
@@ -237,7 +216,7 @@ func (c *Client) formOnions(start api.StartRunApi) (map[string][]api.OnionApi, e
 				addresses := utils.Map(routingPath, func(node api.PublicNodeApi) string {
 					return node.Address
 				})
-				slog.Info("routing path", "path", addresses)
+				//slog.Info("routing path", "path", addresses)
 				if addr, onion, checkpoints, err3 := pi_t.FormOnion(c.PrivateKey, c.PublicKey, msgString, publicKeys, addresses, -1); err3 != nil {
 					return nil, pl.WrapError(err3, "failed to create onion")
 				} else {

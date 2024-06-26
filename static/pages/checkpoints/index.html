@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi_t</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+</head>
+
+<body>
+<h1>Pi_t</h1>
+
+<div id="header">Loading header...</div>
+<div id="data">Loading data...</div>
+
+<script src="../../js/shared.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        loadHeader('../../components/header.html');
+        startFetchingData();
+    });
+
+    function displayData(data) {
+        const dataDiv = document.getElementById('data');
+        dataDiv.innerHTML = '';
+
+        const layers = {};
+
+        if (!data.Nodes) {
+            dataDiv.textContent = 'No data available';
+            return;
+        }
+
+        // Organize onions by layer
+        for (const [node, status] of Object.entries(data.Nodes)) {
+            if (status.Received && Array.isArray(status.Received)) {
+                status.Received.forEach(onion => {
+                    if (!layers[onion.Layer]) {
+                        layers[onion.Layer] = [];
+                    }
+                    layers[onion.Layer].push(onion);
+                });
+            }
+        }
+
+        const maxLayer = Math.max(...Object.keys(layers).map(layer => parseInt(layer)));
+        for (let round = 0; round <= maxLayer; round++) {
+            const layerDiv = document.createElement('div');
+            layerDiv.innerHTML = `<h2>Round ${round}</h2>`;
+
+            const onionTable = document.createElement('table');
+            onionTable.innerHTML = `
+                <tr>
+                    <th>Node</th>
+                    <th>Number of Checkpoints Expected</th>
+                    <th>Number of Checkpoints Received</th>
+                    <th>Total Number of Onions Processed</th>
+                </tr>
+            `;
+            for (const [node, status] of Object.entries(data.Nodes)) {
+                const row = onionTable.insertRow();
+                const checkPointsExpected = status.ExpectedCheckpoints[round] || 0;
+                const checkPointsReceived = status.CheckpointOnionsReceived[round] || 0;
+                if (checkPointsExpected > checkPointsReceived) {
+                    row.innerHTML = `
+                        <td>${node}</td>
+                        <td class = "false">${status.ExpectedCheckpoints[round] || 0}</td>
+                        <td class = "false">${status.CheckpointOnionsReceived[round] || 0}</td>
+                        <td class = ${(status.TotalOnionsReceived[round] || 0) > 0 ? "purple" : "white"}>${status.TotalOnionsReceived[round] || 0}</td>
+                    `;
+                } else if (checkPointsExpected > 0 || checkPointsReceived > 0) {
+                    row.innerHTML = `
+                        <td>${node}</td>
+                        <td class = "true">${status.ExpectedCheckpoints[round] || 0}</td>
+                        <td class = "true">${status.CheckpointOnionsReceived[round] || 0}</td>
+                        <td class = ${(status.TotalOnionsReceived[round] || 0) > 0 ? "purple" : "white"}>${status.TotalOnionsReceived[round] || 0}</td>
+                    `;
+                } else {
+                    row.innerHTML = `
+                        <td>${node}</td>
+                        <td>${status.ExpectedCheckpoints[round] || 0}</td>
+                        <td>${status.CheckpointOnionsReceived[round] || 0}</td>
+                        <td class = ${(status.TotalOnionsReceived[round] || 0) > 0 ? "purple" : "white"}>${status.TotalOnionsReceived[round] || 0}</td>
+                    `;
+                }
+            }
+            layerDiv.appendChild(onionTable);
+            dataDiv.appendChild(layerDiv);
+        }
+    }
+</script>
+</body>
+</html>

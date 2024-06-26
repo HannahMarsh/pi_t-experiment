@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi_t</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+</head>
+
+<body>
+<h1>Pi_t</h1>
+
+<div id="header">Loading header...</div>
+<div id="data">Loading data...</div>
+
+<script src="../../js/shared.js"></script>
+
+<script>
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadHeader('../../components/header.html');
+        startFetchingData();
+    });
+
+    function displayData(data) {
+        const dataDiv = document.getElementById('data');
+        dataDiv.innerHTML = '';
+
+        const clientDiv = document.createElement('div');
+        clientDiv.innerHTML = `<h2>Messages</h2>`;
+
+        const messageTable = document.createElement('table');
+        messageTable.innerHTML = `
+            <tr>
+                <th>From</th>
+                <th>To</th>
+                <th>Routing Path</th>
+                <th>Message</th>
+                <th>Time Sent</th>
+                <th>Time Received</th>
+            </tr>
+        `;
+
+        // Sort messages by the concatenation of From and To strings
+        data.Messages.sort((a, b) => {
+            return sortMessages(a, b);
+        });
+
+        data.Messages.forEach((message) => {
+
+            const row = messageTable.insertRow();
+            row.innerHTML = `
+                <td>${message.From}</td>
+                <td>${message.To}</td>
+                <td>${formatRoutingPath(message.RoutingPath)}</td>
+                <td>${message.Msg}</td>
+                <td>${message.TimeSent}</td>
+                <td>${message.TimeReceived}</td>
+            `;
+        });
+
+
+        clientDiv.appendChild(messageTable);
+        dataDiv.appendChild(clientDiv);
+    }
+
+    function sortMessages(a, b) {
+        const checkpoint = "checkpoint onion";
+        if (a.Msg === checkpoint && b.Msg !== checkpoint) {
+            return 1; // a should come after b
+        } else if (a.Msg !== checkpoint && b.Msg === checkpoint) {
+            return -1; // a should come before b
+        } else if (a.Msg === checkpoint && b.Msg === checkpoint) {
+            a.TimeSent.localeCompare(b.TimeSent); // sort by time sent
+        } else {
+            return a.Msg.localeCompare(b.Msg); // normal alphabetical order
+        }
+    }
+</script>
+</body>
+</html>

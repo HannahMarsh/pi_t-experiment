@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi_t</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+</head>
+
+<body>
+<h1>Pi_t</h1>
+
+<div id="header">Loading header...</div>
+<div id="data">Loading data...</div>
+
+<script src="../../js/shared.js"></script>
+
+<script>
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadHeader('../../components/header.html');
+        startFetchingData();
+    });
+
+    function displayData(data) {
+        const dataDiv = document.getElementById('data');
+        dataDiv.innerHTML = '';
+
+        for (const [client, status] of Object.entries(data.Clients)) {
+            const clientDiv = document.createElement('div');
+            clientDiv.innerHTML = `<h2>Client: ${client}</h2>`;
+
+            // Sort sent messages alphabetically by message content
+            status.MessagesSent.sort((a, b) => sortMessages(a, b));
+
+
+            const sentTable = document.createElement('table');
+            sentTable.innerHTML = `
+                <tr>
+                    <th colspan="4">Sent Messages</th>
+                </tr>
+                <tr>
+                    <th>To</th>
+                    <th>Routing Path</th>
+                    <th>Message</th>
+                    <th>Time Sent</th>
+                </tr>
+            `;
+
+            status.MessagesSent.forEach(sent => {
+                const row = sentTable.insertRow();
+                row.innerHTML = `
+                    <td>${sent.Message.To}</td>
+                    <td>${formatRoutingPath(sent.RoutingPath)}</td>
+                    <td>${sent.Message.Msg}</td>
+                    <td>${sent.TimeSent}</td>
+                `;
+            });
+
+            const receivedTable = document.createElement('table');
+            receivedTable.innerHTML = `
+                <tr>
+                    <th colspan="2">Received Messages</th>
+                </tr>
+                <tr>
+                    <th>From</th>
+                    <th>Message</th>
+                    <th>Time Received</th>
+                </tr>
+            `;
+
+            status.MessagesReceived.forEach(received => {
+                const row = receivedTable.insertRow();
+                row.innerHTML = `
+                    <td>${received.Message.From}</td>
+                    <td>${received.Message.Msg}</td>
+                    <td>${received.TimeReceived}</td>
+                `;
+            });
+
+            clientDiv.appendChild(sentTable);
+            clientDiv.appendChild(receivedTable);
+            dataDiv.appendChild(clientDiv);
+        }
+    }
+
+    function sortMessages(a, b) {
+        const checkpoint = "checkpoint onion";
+        if (a.Message.Msg === checkpoint && b.Message.Msg !== checkpoint) {
+            return 1; // a should come after b
+        } else if (a.Message.Msg !== checkpoint && b.Message.Msg === checkpoint) {
+            return -1; // a should come before b
+        } else if (a.Message.Msg === checkpoint && b.Message.Msg === checkpoint) {
+            a.TimeSent.localeCompare(b.TimeSent); // sort by time sent
+        } else {
+            return a.Message.Msg.localeCompare(b.Message.Msg); // normal alphabetical order
+        }
+    }
+
+
+</script>
+</body>
+</html>

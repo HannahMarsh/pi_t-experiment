@@ -1,0 +1,56 @@
+body {
+    font-family: Arial, sans-serif;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+table, th, td {
+    border: 1px solid black;
+}
+th, td {
+    padding: 10px;
+    text-align: left;
+}
+th {
+    background-color: #f2f2f2;
+}
+.true {
+    background-color: #eaffe0;
+}
+.false {
+    background-color: #ffe0eb;
+}
+.gatekeeper {
+    color: green;
+}
+.mixer {
+    color: blue;
+}
+.client {
+    color: black;
+}
+.nav-buttons {
+    margin-bottom: 20px;
+}
+.purple {
+    background-color: #e0cffc;
+}
+.white {
+
+}
+.nav-buttons a {
+    text-decoration: none;
+    margin-right: 10px;
+    padding: 10px 20px;
+    font-size: 16px;
+    background-color: #007BFF;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    display: inline-block;
+}
+.nav-buttons a:hover {
+    background-color: #0056b3;
+}

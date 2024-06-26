@@ -12,6 +12,7 @@ type NodeStatus struct {
 	Node                     PublicNodeApi
 	CheckpointOnionsReceived map[int]int
 	ExpectedCheckpoints      map[int]int
+	TotalOnionsReceived      map[int]int
 	mu                       sync.RWMutex
 }
 
@@ -40,6 +41,7 @@ func NewNodeStatus(id int, address, publicKey string, isMixer bool) *NodeStatus 
 		},
 		CheckpointOnionsReceived: make(map[int]int),
 		ExpectedCheckpoints:      make(map[int]int),
+		TotalOnionsReceived:      make(map[int]int),
 	}
 }
 
@@ -70,6 +72,7 @@ func (ns *NodeStatus) AddOnion(lastHop, thisAddress, nextHop string, layer int, 
 		NonceVerification: nonceVerification,
 		ExpectCheckPoint:  expectCheckPoint,
 	})
+	ns.TotalOnionsReceived[layer]++
 }
 
 func (ns *NodeStatus) GetStatus() string {

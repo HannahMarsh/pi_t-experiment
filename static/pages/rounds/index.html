@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi_t</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+</head>
+
+<body>
+<h1>Pi_t</h1>
+
+<div id="header">Loading header...</div>
+<div id="data">Loading data...</div>
+
+<script src="../../js/shared.js"></script>
+
+<script>
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadHeader('../../components/header.html');
+        startFetchingData();
+    });
+
+    function displayData(data) {
+        const dataDiv = document.getElementById('data');
+        dataDiv.innerHTML = '';
+
+        const layers = {};
+
+        // Organize onions by layer
+        for (const [node, status] of Object.entries(data.Nodes)) {
+            status.Received.forEach(onion => {
+                if (!layers[onion.Layer]) {
+                    layers[onion.Layer] = [];
+                }
+                layers[onion.Layer].push(onion);
+            });
+        }
+
+        for (const [layer, onions] of Object.entries(layers)) {
+            const layerDiv = document.createElement('div');
+            layerDiv.innerHTML = `<h2>Round ${layer}</h2>`;
+
+            const onionTable = document.createElement('table');
+            onionTable.innerHTML = `
+                <tr>
+                    <th>Last Hop</th>
+                    <th>Current Hop</th>
+                    <th>Next Hop</th>
+                    <th>Time</th>
+                    <th>Bruise Counter</th>
+                    <th>Was Dropped?</th>
+                    <th>Is Checkpoint Onion?</th>
+                    <th>Was Nonce Verified?</th>
+                    <th>Expect a Checkpoint onion?</th>
+                </tr>
+            `;
+
+            onions.forEach(onion => {
+                const row = onionTable.insertRow();
+                row.innerHTML = `
+                    <td>${onion.LastHop}</td>
+                    <td>${onion.ThisAddress}</td>
+                    <td>${onion.NextHop}</td>
+                    <td>${onion.TimeReceived}</td>
+                    <td>${onion.Bruises}</td>
+                    <td>${onion.Dropped}</td>
+                    <td>${onion.IsCheckPointOnion}</td>
+                    <td>${onion.NonceVerification}</td>
+                    <td>${onion.ExpectCheckPoint}</td>
+                `;
+            });
+
+            layerDiv.appendChild(onionTable);
+            dataDiv.appendChild(layerDiv);
+        }
+    }
+</script>
+</body>
+</html>
