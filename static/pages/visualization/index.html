@@ -185,11 +185,13 @@
                         firstRow.cells.item(0).classList.add('gatekeeper');
                     }
                     firstRow.classList.add((`${getName(data, firstOnion.LastHop).short}--${getName(data, firstOnion.NextHop).short}`).replaceAll(' ', ''));
+                    firstRow.classList.add((`${getName(data, status.Node.Address).short}`).replaceAll(' ', ''));
                     roundTbody.appendChild(firstRow);
 
                     onions.slice(1).forEach(onion => {
                         const row = document.createElement('tr');
                         row.classList.add((`${getName(data, onion.LastHop).short}--${getName(data, onion.NextHop).short}`).replaceAll(' ', ''));
+                        row.classList.add((`${getName(data, status.Node.Address).short}`).replaceAll(' ', ''));
                         row.innerHTML = `<td class="onion">from ${getName(data, onion.LastHop).name}, to ${getName(data, onion.NextHop).name}</td>`;
                         roundTbody.appendChild(row);
                     });
@@ -197,6 +199,7 @@
                     const firstRow = document.createElement('tr');
                     firstRow.innerHTML = `<td rowspan="1">Node${node}</td><td class="onion"> </td>`;
                     firstRow.cells.item(0).classList.add(`Node${node}`);
+                    firstRow.classList.add(`Node${node}`);
                     if (status.Node.IsMixer) {
                         firstRow.cells.item(0).classList.add('mixer');
                     } else {
@@ -398,7 +401,7 @@
                     // thisNode.style.backgroundColor = 'yellow';
 
                     const rows = document.getElementById(`round${i - 1}-tbody`).querySelectorAll('tr');
-                    const thisMessageRow = Array.from(rows).find(row => Array.from(row.classList).includes(`${prevNodeClass}--${nextNodeClass}`));
+                    const thisMessageRow = Array.from(rows).find(row => Array.from(row.classList).includes(`${prevNodeClass}--${nextNodeClass}`) && Array.from(row.classList).includes(thisNodeClass));
                     if (thisMessageRow) {
                         const thisMessageCell = Array.from(thisMessageRow.cells).findLast(_ => true);
                         thisMessageCell.classList.add("temp-yellow"); //style.backgroundColor = 'yellow';
