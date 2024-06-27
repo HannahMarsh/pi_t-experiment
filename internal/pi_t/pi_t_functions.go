@@ -53,7 +53,7 @@ type Header struct {
 // - The destination node identifier.
 // - The base64-encoded onion with the added header.
 // - An error object if an error occurred, otherwise nil.
-func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, publicKeys []string, routingPath []string, checkpoint int) (string, string, []bool, error) {
+func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, publicKeys []string, routingPath []string, checkpoint int, clientAddr string) (string, string, []bool, error) {
 	var sendCheckPoints []bool
 	if checkpoint <= 0 {
 		sendCheckPoints = make([]bool, len(publicKeys))
@@ -69,7 +69,7 @@ func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, public
 		if i == len(publicKeys)-1 {
 			layerBytes = payload
 		} else {
-			lastHop := ""
+			lastHop := clientAddr
 			if i > 0 {
 				lastHop = routingPath[i-1]
 			}

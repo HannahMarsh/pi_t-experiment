@@ -230,7 +230,7 @@ func (c *Client) processMessage(onions map[string][]queuedOnion, msg structs.Mes
 		return node.Address
 	})
 
-	addr, onion, checkpoints, err := pi_t.FormOnion(c.PrivateKey, c.PublicKey, msgString, publicKeys, addresses, -1)
+	addr, onion, checkpoints, err := pi_t.FormOnion(c.PrivateKey, c.PublicKey, msgString, publicKeys, addresses, -1, c.Address)
 	if err != nil {
 		return pl.WrapError(err, "failed to create onion")
 	}
@@ -280,7 +280,7 @@ func (c *Client) createCheckpointOnions(onions map[string][]queuedOnion, routing
 				return pl.WrapError(err, "failed to marshal dummy message")
 			}
 
-			firstHop, checkpointOnion, _, err := pi_t.FormOnion(c.PrivateKey, c.PublicKey, dummyPayload, checkpointPublicKeys, checkpointAddresses, i)
+			firstHop, checkpointOnion, _, err := pi_t.FormOnion(c.PrivateKey, c.PublicKey, dummyPayload, checkpointPublicKeys, checkpointAddresses, i, c.Address)
 			if err != nil {
 				return pl.WrapError(err, "failed to create checkpoint onion")
 			}

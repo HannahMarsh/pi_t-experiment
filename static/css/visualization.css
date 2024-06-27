@@ -1,12 +1,22 @@
 body {
     font-family: Arial, sans-serif;
+
 }
 
 #visualization-container {
     width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
     position: relative;
+}
+
+#scroll-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: 160px;
+    overflow-x: scroll;
+    overflow-y: scroll;
+    background-color: #f2f2f2;
 }
 
 #arrows {
@@ -34,6 +44,9 @@ body {
     display: flex;
     flex-wrap: nowrap;
     z-index: 0;
+    /*overflow-x: auto;*/
+    /*overflow-y: hidden;*/
+    /*white-space: nowrap;*/
 }
 
 #rounds {
@@ -43,14 +56,16 @@ body {
 
 .round-table {
     display: inline-block;
-    margin: 20px;
+    margin-top: 0;
+    margin-bottom: 20px;
+    margin-left: 20px;
+    margin-right: 20px;
     vertical-align: top;
 }
 
 table {
-    width: 300px;
+    /*width: 300px;*/
     border-collapse: collapse;
-    margin: 20px 0;
 }
 
 table, th, td {
@@ -58,12 +73,33 @@ table, th, td {
 }
 
 th, td {
-    padding: 10px;
+    padding: 5px;
     text-align: left;
 }
 
 th {
-    background-color: #f2f2f2;
+    background-color: #e7e7e7;
+}
+
+td {
+    background-color: #ffffff;
+    max-width: 160px;
+    font-size: smaller;
+    word-break: break-word;
+}
+
+td.mixer {
+    background-color: #e4ffec;
+}
+
+td.gatekeeper {
+    background-color: rgba(196, 255, 255, 0.76);
+
+}
+
+.onion, .message {
+    min-width: 100px;
+    font-size: x-small;
 }
 
 /*.arrow {*/
@@ -96,7 +132,7 @@ th {
 }
 
 .round-table td:hover {
-    background-color: #f0f0f0; /* Change background color on hover */
+    background-color: #dadada; /* Change background color on hover */
     position: relative; /* Required for the popup positioning */
 }
 
@@ -115,4 +151,8 @@ th {
 .popup.visible {
     opacity: 1;
     pointer-events: auto; /* Make the popup interactive */
+}
+
+.temp-yellow {
+    background-color: #ffff61;
 }

@@ -113,7 +113,7 @@ func (n *Node) Receive(o string) error {
 			n.checkpoints[peeled.Layer]++
 			n.status.AddCheckpointOnion(peeled.Layer)
 		}
-		slog.Info("Received onion", "layer", peeled.Layer, "destination", peeled.NextHop, "nonceVerification", nonceVerification, "expectCheckpoint", expectCheckpoint)
+		slog.Info("Received onion", "ischeckpoint?", peeled.IsCheckpointOnion, "layer", peeled.Layer, "nextHop", config.AddressToName(peeled.NextHop), "lastHop", config.AddressToName(peeled.LastHop), "nonceVerification", nonceVerification, "expectCheckpoint", expectCheckpoint)
 
 		if !nonceVerification {
 			bruises += 1

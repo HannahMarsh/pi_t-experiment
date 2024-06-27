@@ -119,7 +119,7 @@ func TestReceiveOnion(t *testing.T) {
 	publicKeys := []string{publicKeyPEM, publicKeyPEM}
 	routingPath := []string{fmt.Sprintf("http://localhost:%d", receiverPort), "node2"}
 
-	addr, onion, _, err := pi_t.FormOnion(privateKeyPEM, publicKeyPEM, payload, publicKeys, routingPath, -1)
+	addr, onion, _, err := pi_t.FormOnion(privateKeyPEM, publicKeyPEM, payload, publicKeys, routingPath, -1, "")
 
 	if err != nil {
 		slog.Error("FormOnion() error", err)
@@ -192,7 +192,7 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 	publicKeys := []string{publicKeyPEM1, publicKeyPEM2}
 	routingPath := []string{fmt.Sprintf("http://localhost:%d", receiverPort1), fmt.Sprintf("http://localhost:%d", receiverPort2)}
 
-	addr, onion, _, err := pi_t.FormOnion(privateKeyPEM, publicKeyPEM, payload, publicKeys, routingPath, -1)
+	addr, onion, _, err := pi_t.FormOnion(privateKeyPEM, publicKeyPEM, payload, publicKeys, routingPath, -1, "")
 
 	if err != nil {
 		slog.Error("FormOnion() error", err)
@@ -303,7 +303,7 @@ func TestReceiveCheckpointOnions(t *testing.T) {
 	publicKeys := []string{publicKeyPEM1, publicKeyPEM2}
 	routingPath := []string{fmt.Sprintf("http://localhost:%d", receiverPort1), fmt.Sprintf("http://localhost:%d", receiverPort2)}
 
-	addr, onion, _, err := pi_t.FormOnion(privateKeyPEM, publicKeyPEM, payload, publicKeys, routingPath, 0)
+	addr, onion, _, err := pi_t.FormOnion(privateKeyPEM, publicKeyPEM, payload, publicKeys, routingPath, 0, "")
 
 	if err != nil {
 		slog.Error("FormOnion() error", err)

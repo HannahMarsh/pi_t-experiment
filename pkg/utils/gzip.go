@@ -7,18 +7,18 @@ import (
 )
 
 // compress compresses data using gzip
-func Compress(data []byte) ([]byte, error) {
+func Compress(data []byte) (bytes.Buffer, error) {
 	var b bytes.Buffer
 	w := gzip.NewWriter(&b)
 	_, err := w.Write(data)
 	if err != nil {
-		return nil, err
+		return b, err
 	}
 	err = w.Close()
 	if err != nil {
-		return nil, err
+		return b, err
 	}
-	return b.Bytes(), nil
+	return b, nil
 }
 
 // decompress decompresses gzip data

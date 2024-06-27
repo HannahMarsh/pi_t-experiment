@@ -49,7 +49,7 @@ func TestPeelOnion(t *testing.T) {
 	publicKeys := []string{publicKeyPEM1, publicKeyPEM2}
 	routingPath := []string{"node1", "node2"}
 
-	destination, onion, _, err := FormOnion(privateKeyPEM, publicKeyPEM, payload, publicKeys, routingPath, -1)
+	destination, onion, _, err := FormOnion(privateKeyPEM, publicKeyPEM, payload, publicKeys, routingPath, -1, "")
 	if err != nil {
 		t.Fatalf("FormOnion() error: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestNonceVerification(t *testing.T) {
 		publicKeys := []string{publicKeyPEM1, publicKeyPEM2}
 		routingPath := []string{"node1", "node2"}
 
-		destination, onion, _, err := FormOnion(privateKeyPEM, publicKeyPEM, payload, publicKeys, routingPath, -1)
+		destination, onion, _, err := FormOnion(privateKeyPEM, publicKeyPEM, payload, publicKeys, routingPath, -1, "")
 		if err != nil {
 			t.Fatalf("FormOnion() error: %v", err)
 		}
