@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/HannahMarsh/pi_t-experiment/config"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/HannahMarsh/PrettyLogger"
-	"github.com/HannahMarsh/pi_t-experiment/internal/api"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"golang.org/x/exp/slog"
 )
@@ -37,7 +37,7 @@ func NewBulletinBoard(config *config.Config) *BulletinBoard {
 }
 
 // UpdateNode adds a node to the active nodes list
-func (bb *BulletinBoard) UpdateNode(node api.PublicNodeApi) error {
+func (bb *BulletinBoard) UpdateNode(node structs.PublicNodeApi) error {
 	bb.mu.Lock()
 	defer bb.mu.Unlock()
 	if _, present := bb.Network[node.ID]; !present {
@@ -47,7 +47,7 @@ func (bb *BulletinBoard) UpdateNode(node api.PublicNodeApi) error {
 	return nil
 }
 
-func (bb *BulletinBoard) RegisterClient(client api.PublicNodeApi) error {
+func (bb *BulletinBoard) RegisterClient(client structs.PublicNodeApi) error {
 	bb.mu.Lock()
 	defer bb.mu.Unlock()
 	if _, present := bb.Clients[client.ID]; !present {
@@ -56,7 +56,7 @@ func (bb *BulletinBoard) RegisterClient(client api.PublicNodeApi) error {
 	return nil
 }
 
-func (bb *BulletinBoard) RegisterIntentToSend(its api.IntentToSend) error {
+func (bb *BulletinBoard) RegisterIntentToSend(its structs.IntentToSend) error {
 	bb.mu.Lock()
 	defer bb.mu.Unlock()
 	if _, present := bb.Clients[its.From.ID]; !present {
@@ -76,8 +76,8 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 	slog.Info("Signaling nodes to start")
 	activeNodes := utils.MapEntries(utils.FilterMap(bb.Network, func(_ int, node *NodeView) bool {
 		return node.IsActive() && node.Address != ""
-	}), func(_ int, nv *NodeView) api.PublicNodeApi {
-		return api.PublicNodeApi{
+	}), func(_ int, nv *NodeView) structs.PublicNodeApi {
+		return structs.PublicNodeApi{
 			ID:        nv.ID,
 			Address:   nv.Address,
 			PublicKey: nv.PublicKey,
@@ -88,8 +88,8 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 
 	activeClients := utils.MapEntries(utils.FilterMap(bb.Clients, func(_ int, cl *ClientView) bool {
 		return cl.IsActive() && cl.Address != ""
-	}), func(_ int, cv *ClientView) api.PublicNodeApi {
-		return api.PublicNodeApi{
+	}), func(_ int, cv *ClientView) structs.PublicNodeApi {
+		return structs.PublicNodeApi{
 			ID:        cv.ID,
 			Address:   cv.Address,
 			PublicKey: cv.PublicKey,
@@ -100,15 +100,15 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 		return len(client.MessageQueue)
 	})) + 2
 
-	mixers := utils.Filter(activeNodes, func(n api.PublicNodeApi) bool {
+	mixers := utils.Filter(activeNodes, func(n structs.PublicNodeApi) bool {
 		return n.Address != "" && n.IsMixer
 	})
 
-	gatekeepers := utils.Filter(activeNodes, func(n api.PublicNodeApi) bool {
+	gatekeepers := utils.Filter(activeNodes, func(n structs.PublicNodeApi) bool {
 		return n.Address != "" && !n.IsMixer
 	})
 
-	vs := api.StartRunApi{
+	vs := structs.StartRunApi{
 		ParticipatingClients: activeClients,
 		Mixers:               mixers,
 		Gatekeepers:          gatekeepers,
@@ -121,7 +121,7 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 		var wg sync.WaitGroup
 		all := utils.Copy(activeNodes)
 		all = append(all, activeClients...)
-		all = utils.Filter(all, func(n api.PublicNodeApi) bool {
+		all = utils.Filter(all, func(n structs.PublicNodeApi) bool {
 			return n.Address != ""
 		})
 		for _, n := range all {

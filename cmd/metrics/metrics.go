@@ -7,7 +7,7 @@ import (
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
-	"github.com/HannahMarsh/pi_t-experiment/internal/api"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	_ "github.com/lib/pq"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/exp/slog"
@@ -82,16 +82,16 @@ func main() {
 }
 
 type Data struct {
-	Clients  map[string]api.ClientStatus
+	Clients  map[string]structs.ClientStatus
 	Messages []Message
-	Nodes    map[string]api.NodeStatus
+	Nodes    map[string]structs.NodeStatus
 	mu       sync.RWMutex
 }
 
 type Message struct {
 	From         string
 	To           string
-	RoutingPath  []api.PublicNodeApi
+	RoutingPath  []structs.PublicNodeApi
 	Msg          string
 	TimeSent     string
 	TimeReceived string
@@ -100,9 +100,9 @@ type Message struct {
 
 var (
 	data Data = Data{
-		Clients:  make(map[string]api.ClientStatus),
+		Clients:  make(map[string]structs.ClientStatus),
 		Messages: make([]Message, 0),
-		Nodes:    make(map[string]api.NodeStatus),
+		Nodes:    make(map[string]structs.NodeStatus),
 	}
 )
 
@@ -120,7 +120,7 @@ func serveData(w http.ResponseWriter, r *http.Request) {
 			slog.Error("failed to get client status", err)
 		} else {
 			defer resp.Body.Close()
-			var status api.ClientStatus
+			var status structs.ClientStatus
 			if err = json.NewDecoder(resp.Body).Decode(&status); err != nil {
 				slog.Error("failed to decode client status", err)
 			} else {
@@ -136,7 +136,7 @@ func serveData(w http.ResponseWriter, r *http.Request) {
 			slog.Error("failed to get client status", err)
 		} else {
 			defer resp.Body.Close()
-			var status api.NodeStatus
+			var status structs.NodeStatus
 			if err = json.NewDecoder(resp.Body).Decode(&status); err != nil {
 				slog.Error("failed to decode client status", err)
 			} else {
@@ -214,7 +214,7 @@ func serveData(w http.ResponseWriter, r *http.Request) {
 				m[mstr] = Message{
 					From:         received.Message.From,
 					To:           received.Message.To,
-					RoutingPath:  make([]api.PublicNodeApi, 0),
+					RoutingPath:  make([]structs.PublicNodeApi, 0),
 					Msg:          received.Message.Msg,
 					TimeSent:     "not sent",
 					TimeReceived: received.TimeReceived.Format("2006-01-02 15:04:05"),

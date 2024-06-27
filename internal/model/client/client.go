@@ -6,7 +6,8 @@ import (
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
-	"github.com/HannahMarsh/pi_t-experiment/internal/api"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api/api_functions"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/keys"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
@@ -26,12 +27,12 @@ type Client struct {
 	PrivateKey       string
 	PublicKey        string
 	SessionKeys      map[string][]byte
-	ActiveNodes      []api.PublicNodeApi
-	OtherClients     []api.PublicNodeApi
-	Messages         []api.Message
+	ActiveNodes      []structs.PublicNodeApi
+	OtherClients     []structs.PublicNodeApi
+	Messages         []structs.Message
 	mu               sync.RWMutex
 	BulletinBoardUrl string
-	status           *api.ClientStatus
+	status           *structs.ClientStatus
 }
 
 // NewNode creates a new client instance
@@ -47,11 +48,11 @@ func NewClient(id int, host string, port int, bulletinBoardUrl string) (*Client,
 			PublicKey:        publicKey,
 			PrivateKey:       privateKey,
 			SessionKeys:      make(map[string][]byte),
-			ActiveNodes:      make([]api.PublicNodeApi, 0),
+			ActiveNodes:      make([]structs.PublicNodeApi, 0),
 			BulletinBoardUrl: bulletinBoardUrl,
-			Messages:         make([]api.Message, 0),
-			OtherClients:     make([]api.PublicNodeApi, 0),
-			status:           api.NewClientStatus(id, fmt.Sprintf("http://%s:%d", host, port), publicKey),
+			Messages:         make([]structs.Message, 0),
+			OtherClients:     make([]structs.PublicNodeApi, 0),
+			status:           structs.NewClientStatus(id, fmt.Sprintf("http://%s:%d", host, port), publicKey),
 		}
 
 		if err2 := c.RegisterWithBulletinBoard(); err2 != nil {
@@ -66,7 +67,7 @@ func NewClient(id int, host string, port int, bulletinBoardUrl string) (*Client,
 func (c *Client) RegisterWithBulletinBoard() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if data, err := json.Marshal(api.PublicNodeApi{
+	if data, err := json.Marshal(structs.PublicNodeApi{
 		ID:        c.ID,
 		Address:   c.Address,
 		PublicKey: c.PublicKey,
@@ -96,7 +97,7 @@ func (c *Client) RegisterWithBulletinBoard() error {
 func (c *Client) StartGeneratingMessages(client_addresses []string) {
 	slog.Info("Client starting to generate messages", "id", c.ID)
 	msgNum := 0
-	numMessages := 5
+	numMessages := 2
 	for i := 0; i < numMessages; i++ {
 		select {
 		case <-config.GlobalCtx.Done():
@@ -120,11 +121,11 @@ func (c *Client) StartGeneratingMessages(client_addresses []string) {
 }
 
 // generateMessages creates messages to be sent to other clients
-func (c *Client) generateMessages(client_addresses []string, msgNum int) []api.Message {
-	messages := make([]api.Message, 0)
+func (c *Client) generateMessages(client_addresses []string, msgNum int) []structs.Message {
+	messages := make([]structs.Message, 0)
 	for _, addr := range client_addresses {
 		if addr != c.Address && addr != "" {
-			messages = append(messages, api.NewMessage(c.Address, addr, fmt.Sprintf("Msg#%d from client(id=%d)", msgNum, c.ID)))
+			messages = append(messages, structs.NewMessage(c.Address, addr, fmt.Sprintf("Msg#%d from client(id=%d)", msgNum, c.ID)))
 			msgNum = msgNum + 1
 		}
 	}
@@ -134,12 +135,12 @@ func (c *Client) generateMessages(client_addresses []string, msgNum int) []api.M
 var rand = rng.New(rng.NewSource(time.Now().UnixNano()))
 
 // DetermineRoutingPath determines a random routing path of a given length
-func DetermineRoutingPath(pathLength int, participants []api.PublicNodeApi) ([]api.PublicNodeApi, error) {
+func DetermineRoutingPath(pathLength int, participants []structs.PublicNodeApi) ([]structs.PublicNodeApi, error) {
 	if len(participants) < pathLength {
 		return nil, pl.NewError("not enough participants to form routing path")
 	}
 
-	selectedNodes := make([]api.PublicNodeApi, pathLength)
+	selectedNodes := make([]structs.PublicNodeApi, pathLength)
 	perm := rand.Perm(len(participants))
 
 	for i := 0; i < pathLength; i++ {
@@ -151,7 +152,7 @@ func DetermineRoutingPath(pathLength int, participants []api.PublicNodeApi) ([]a
 }
 
 // adjustPathNodes adjusts the routing path to ensure the first node is a Mixer and the last is a gatekeeper
-func adjustPathNodes(selectedNodes []api.PublicNodeApi) {
+func adjustPathNodes(selectedNodes []structs.PublicNodeApi) {
 	for i, node := range selectedNodes {
 		if node.IsMixer {
 			if i != 0 {
@@ -171,10 +172,10 @@ func adjustPathNodes(selectedNodes []api.PublicNodeApi) {
 }
 
 // DetermineCheckpointRoutingPath determines a routing path with a checkpoint
-func DetermineCheckpointRoutingPath(pathLength int, nodes []api.PublicNodeApi, participatingClients []api.PublicNodeApi,
-	checkpointReceiver api.PublicNodeApi, round int) ([]api.PublicNodeApi, error) {
+func DetermineCheckpointRoutingPath(pathLength int, nodes []structs.PublicNodeApi, participatingClients []structs.PublicNodeApi,
+	checkpointReceiver structs.PublicNodeApi, round int) ([]structs.PublicNodeApi, error) {
 
-	path, err := DetermineRoutingPath(pathLength-1, utils.Remove(nodes, func(p api.PublicNodeApi) bool {
+	path, err := DetermineRoutingPath(pathLength-1, utils.Remove(nodes, func(p structs.PublicNodeApi) bool {
 		return p.Address == checkpointReceiver.Address
 	}))
 	if err != nil {
@@ -184,15 +185,15 @@ func DetermineCheckpointRoutingPath(pathLength int, nodes []api.PublicNodeApi, p
 }
 
 // formOnions forms the onions for the messages to be sent
-func (c *Client) formOnions(start api.StartRunApi) (map[string][]api.OnionApi, error) {
-	onions := make(map[string][]api.OnionApi)
+func (c *Client) formOnions(start structs.StartRunApi) (map[string][]queuedOnion, error) {
+	onions := make(map[string][]queuedOnion)
 
-	nodes := utils.Filter(append(utils.Copy(start.Mixers), utils.Copy(start.Gatekeepers)...), func(node api.PublicNodeApi) bool {
+	nodes := utils.Filter(append(utils.Copy(start.Mixers), utils.Copy(start.Gatekeepers)...), func(node structs.PublicNodeApi) bool {
 		return node.Address != c.Address && node.Address != ""
 	})
 
 	for _, msg := range c.Messages {
-		if destination, found := utils.Find(start.ParticipatingClients, api.PublicNodeApi{}, func(client api.PublicNodeApi) bool {
+		if destination, found := utils.Find(start.ParticipatingClients, structs.PublicNodeApi{}, func(client structs.PublicNodeApi) bool {
 			return client.Address == msg.To
 		}); found {
 			if err := c.processMessage(onions, msg, destination, nodes, start); err != nil {
@@ -204,8 +205,13 @@ func (c *Client) formOnions(start api.StartRunApi) (map[string][]api.OnionApi, e
 	return onions, nil
 }
 
+type queuedOnion struct {
+	to    string
+	onion string
+}
+
 // processMessage processes a single message to form its onion
-func (c *Client) processMessage(onions map[string][]api.OnionApi, msg api.Message, destination api.PublicNodeApi, nodes []api.PublicNodeApi, start api.StartRunApi) error {
+func (c *Client) processMessage(onions map[string][]queuedOnion, msg structs.Message, destination structs.PublicNodeApi, nodes []structs.PublicNodeApi, start structs.StartRunApi) error {
 	msgString, err := json.Marshal(msg)
 	if err != nil {
 		return pl.WrapError(err, "failed to marshal message")
@@ -217,10 +223,10 @@ func (c *Client) processMessage(onions map[string][]api.OnionApi, msg api.Messag
 	}
 
 	routingPath = append(routingPath, destination)
-	publicKeys := utils.Map(routingPath, func(node api.PublicNodeApi) string {
+	publicKeys := utils.Map(routingPath, func(node structs.PublicNodeApi) string {
 		return node.PublicKey
 	})
-	addresses := utils.Map(routingPath, func(node api.PublicNodeApi) string {
+	addresses := utils.Map(routingPath, func(node structs.PublicNodeApi) string {
 		return node.Address
 	})
 
@@ -234,12 +240,11 @@ func (c *Client) processMessage(onions map[string][]api.OnionApi, msg api.Messag
 	}
 
 	if _, present := onions[addr]; !present {
-		onions[addr] = make([]api.OnionApi, 0)
+		onions[addr] = make([]queuedOnion, 0)
 	}
-	onions[addr] = append(onions[addr], api.OnionApi{
-		Onion: onion,
-		From:  c.Address,
-		To:    addr,
+	onions[addr] = append(onions[addr], queuedOnion{
+		onion: onion,
+		to:    addr,
 	})
 	c.status.AddSent(destination, routingPath, msg)
 
@@ -247,24 +252,24 @@ func (c *Client) processMessage(onions map[string][]api.OnionApi, msg api.Messag
 }
 
 // createCheckpointOnions creates checkpoint onions for the routing path
-func (c *Client) createCheckpointOnions(onions map[string][]api.OnionApi, routingPath []api.PublicNodeApi, checkpoints []bool, nodes []api.PublicNodeApi, start api.StartRunApi) error {
+func (c *Client) createCheckpointOnions(onions map[string][]queuedOnion, routingPath []structs.PublicNodeApi, checkpoints []bool, nodes []structs.PublicNodeApi, start structs.StartRunApi) error {
 	for i, node := range routingPath {
 		if checkpoints[i] {
-			path, err := DetermineCheckpointRoutingPath(config.GlobalConfig.Rounds, nodes, utils.Filter(start.ParticipatingClients, func(publicNodeApi api.PublicNodeApi) bool {
+			path, err := DetermineCheckpointRoutingPath(config.GlobalConfig.Rounds, nodes, utils.Filter(start.ParticipatingClients, func(publicNodeApi structs.PublicNodeApi) bool {
 				return publicNodeApi.Address != c.Address && publicNodeApi.Address != ""
 			}), node, i)
 			if err != nil {
 				return pl.WrapError(err, "failed to determine checkpoint routing path")
 			}
 
-			checkpointPublicKeys := utils.Map(path, func(node api.PublicNodeApi) string {
+			checkpointPublicKeys := utils.Map(path, func(node structs.PublicNodeApi) string {
 				return node.PublicKey
 			})
-			checkpointAddresses := utils.Map(path, func(node api.PublicNodeApi) string {
+			checkpointAddresses := utils.Map(path, func(node structs.PublicNodeApi) string {
 				return node.Address
 			})
 
-			dummyMsg := api.Message{
+			dummyMsg := structs.Message{
 				From: c.Address,
 				To:   utils.GetLast(path).Address,
 				Msg:  "checkpoint onion",
@@ -275,18 +280,17 @@ func (c *Client) createCheckpointOnions(onions map[string][]api.OnionApi, routin
 				return pl.WrapError(err, "failed to marshal dummy message")
 			}
 
-			firstHop, checkpointOnion, _, err := pi_t.FormOnion(c.PrivateKey, c.PublicKey, dummyPayload, checkpointPublicKeys, checkpointAddresses, -i)
+			firstHop, checkpointOnion, _, err := pi_t.FormOnion(c.PrivateKey, c.PublicKey, dummyPayload, checkpointPublicKeys, checkpointAddresses, i)
 			if err != nil {
 				return pl.WrapError(err, "failed to create checkpoint onion")
 			}
 
 			if _, present := onions[firstHop]; !present {
-				onions[firstHop] = make([]api.OnionApi, 0)
+				onions[firstHop] = make([]queuedOnion, 0)
 			}
-			onions[firstHop] = append(onions[firstHop], api.OnionApi{
-				Onion: checkpointOnion,
-				From:  c.Address,
-				To:    firstHop,
+			onions[firstHop] = append(onions[firstHop], queuedOnion{
+				onion: checkpointOnion,
+				to:    firstHop,
 			})
 			c.status.AddSent(utils.GetLast(path), routingPath, dummyMsg)
 		}
@@ -294,7 +298,7 @@ func (c *Client) createCheckpointOnions(onions map[string][]api.OnionApi, routin
 	return nil
 }
 
-func (c *Client) startRun(start api.StartRunApi) error {
+func (c *Client) startRun(start structs.StartRunApi) error {
 
 	slog.Info("Client starting run", "num clients", len(start.ParticipatingClients), "num mixers", len(start.Mixers), "num gatekeepers", len(start.Gatekeepers))
 	c.mu.Lock()
@@ -309,7 +313,7 @@ func (c *Client) startRun(start api.StartRunApi) error {
 		return pl.NewError("%s: no participating clients", pl.GetFuncName())
 	}
 
-	if !utils.Contains(start.ParticipatingClients, func(client api.PublicNodeApi) bool {
+	if !utils.Contains(start.ParticipatingClients, func(client structs.PublicNodeApi) bool {
 		return client.ID == c.ID
 	}) {
 		return nil
@@ -318,41 +322,57 @@ func (c *Client) startRun(start api.StartRunApi) error {
 	if toSend, err := c.formOnions(start); err != nil {
 		return pl.WrapError(err, "failed to form toSend")
 	} else {
+		numToSend := 0
+
+		for _, onions := range toSend {
+			numToSend += len(onions)
+		}
+		slog.Info("Client sending onions", "num_onions", numToSend)
+
+		var wg sync.WaitGroup
+		wg.Add(numToSend)
 		for addr, onions := range toSend {
 			for _, onion := range onions {
-				if err = c.sendOnion(addr, onion); err != nil {
-					return pl.WrapError(err, "failed to send onions")
-				}
+				onion := onion
+				go func() {
+					defer wg.Done()
+					if err = api_functions.SendOnion(addr, c.Address, onion.onion); err != nil {
+						slog.Error("failed to send onions", err)
+					}
+				}()
 			}
 		}
 
-		c.Messages = make([]api.Message, 0)
+		wg.Wait()
+
+		c.Messages = make([]structs.Message, 0)
 		return nil
 	}
 }
 
-func (c *Client) sendOnion(addr string, onion api.OnionApi) error {
-	slog.Info("Client sending onion", "from", onion.From, "to", onion.To)
-	url := fmt.Sprintf("%s/receive", addr)
-
-	if data, err2 := json.Marshal(onion); err2 != nil {
-		slog.Error("failed to marshal msgs", err2)
-	} else if resp, err3 := http.Post(url, "application/json", bytes.NewBuffer(data)); err3 != nil {
-		return pl.WrapError(err3, "failed to send POST request with onion to first mixer")
-	} else {
-		defer func(Body io.ReadCloser) {
-			if err4 := Body.Close(); err4 != nil {
-				slog.Error(pl.GetFuncName()+": Error closing response body", err4)
-			}
-		}(resp.Body)
-		if resp.StatusCode != http.StatusOK {
-			return pl.NewError("%s: Failed to send to first node(url=%s), status code: %d, status: %s", pl.GetFuncName(), url, resp.StatusCode, resp.Status)
-		} else {
-			slog.Info("Client sent onion to first mixer", "mixer_address", addr)
-		}
-	}
-	return nil
-}
+//
+//func (c *Client) sendOnion(addr string, onion api.OnionApi) error {
+//	slog.Info("Client sending onion", "from", onion.From, "to", onion.To)
+//	url := fmt.Sprintf("%s/receive", addr)
+//
+//	if data, err2 := json.Marshal(onion); err2 != nil {
+//		slog.Error("failed to marshal msgs", err2)
+//	} else if resp, err3 := http.Post(url, "application/json", bytes.NewBuffer(data)); err3 != nil {
+//		return pl.WrapError(err3, "failed to send POST request with onion to first mixer")
+//	} else {
+//		defer func(Body io.ReadCloser) {
+//			if err4 := Body.Close(); err4 != nil {
+//				slog.Error(pl.GetFuncName()+": Error closing response body", err4)
+//			}
+//		}(resp.Body)
+//		if resp.StatusCode != http.StatusOK {
+//			return pl.NewError("%s: Failed to send to first node(url=%s), status code: %d, status: %s", pl.GetFuncName(), url, resp.StatusCode, resp.Status)
+//		} else {
+//			slog.Info("Client sent onion to first mixer", "mixer_address", addr)
+//		}
+//	}
+//	return nil
+//}
 
 func (c *Client) Receive(o string) error {
 	if peeled, bruises, _, _, err := pi_t.PeelOnion(o, c.PrivateKey); err != nil {
@@ -360,7 +380,7 @@ func (c *Client) Receive(o string) error {
 	} else {
 		slog.Info("Client received onion", "bruises", bruises, "from", peeled.LastHop, "to", peeled.NextHop, "layer", peeled.Layer, "is_checkpoint_onion", peeled.IsCheckpointOnion)
 		if peeled.NextHop == "" {
-			var msg api.Message
+			var msg structs.Message
 			if err2 := json.Unmarshal([]byte(peeled.Payload), &msg); err2 != nil {
 				return pl.WrapError(err2, "node.Receive(): failed to unmarshal message")
 			}
@@ -379,12 +399,12 @@ func (c *Client) GetStatus() string {
 	return c.status.GetStatus()
 }
 
-func (c *Client) RegisterIntentToSend(messages []api.Message) error {
+func (c *Client) RegisterIntentToSend(messages []structs.Message) error {
 
 	//	slog.Info("Client registering intent to send", "id", c.ID, "num_messages", len(messages))
 
-	to := utils.Map(messages, func(m api.Message) api.PublicNodeApi {
-		if f, found := utils.Find(c.OtherClients, api.PublicNodeApi{}, func(c api.PublicNodeApi) bool {
+	to := utils.Map(messages, func(m structs.Message) structs.PublicNodeApi {
+		if f, found := utils.Find(c.OtherClients, structs.PublicNodeApi{}, func(c structs.PublicNodeApi) bool {
 			return c.Address == m.To
 		}); found {
 			return f
@@ -392,8 +412,8 @@ func (c *Client) RegisterIntentToSend(messages []api.Message) error {
 			return f
 		}
 	})
-	if data, err := json.Marshal(api.IntentToSend{
-		From: api.PublicNodeApi{
+	if data, err := json.Marshal(structs.IntentToSend{
+		From: structs.PublicNodeApi{
 			ID:        c.ID,
 			Address:   c.Address,
 			PublicKey: c.PublicKey,

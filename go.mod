@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.21.2
 
 require (
-	github.com/HannahMarsh/PrettyLogger v0.0.0-20240624195816-fafd56cd6e16
+	github.com/HannahMarsh/PrettyLogger v0.0.0-20240627161104-d84de9582a09
 	github.com/emirpasic/gods v1.18.1
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.12.0
 	github.com/ilyakaznacheev/cleanenv v1.3.0

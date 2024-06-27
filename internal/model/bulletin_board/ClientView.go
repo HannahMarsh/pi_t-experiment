@@ -1,7 +1,7 @@
 package bulletin_board
 
 import (
-	"github.com/HannahMarsh/pi_t-experiment/internal/api"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"time"
 )
 
@@ -9,23 +9,23 @@ type ClientView struct {
 	ID                       int
 	Address                  string
 	PublicKey                string
-	MessageQueue             []api.PublicNodeApi
+	MessageQueue             []structs.PublicNodeApi
 	LastHeartbeat            time.Time
 	MaxTimeBetweenHeartbeats time.Duration
 }
 
-func NewClientView(c api.PublicNodeApi, maxTimeBetweenHeartbeats time.Duration) *ClientView {
+func NewClientView(c structs.PublicNodeApi, maxTimeBetweenHeartbeats time.Duration) *ClientView {
 	return &ClientView{
 		ID:                       c.ID,
 		Address:                  c.Address,
 		PublicKey:                c.PublicKey,
-		MessageQueue:             make([]api.PublicNodeApi, 0),
+		MessageQueue:             make([]structs.PublicNodeApi, 0),
 		LastHeartbeat:            time.Now(),
 		MaxTimeBetweenHeartbeats: maxTimeBetweenHeartbeats,
 	}
 }
 
-func (nv *ClientView) UpdateClient(c api.IntentToSend) {
+func (nv *ClientView) UpdateClient(c structs.IntentToSend) {
 	//if nv.LastHeartbeat.After(c.Time) {
 	//	slog.Warn("ClientView.UpdateClient(): received heartbeat from client that is older than the last heartbeat")
 	//	return

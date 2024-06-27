@@ -4,25 +4,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/HannahMarsh/PrettyLogger"
-	"github.com/HannahMarsh/pi_t-experiment/internal/api"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api/api_functions"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"golang.org/x/exp/slog"
 	"io"
 	"net/http"
 )
 
 func (c *Client) HandleReceive(w http.ResponseWriter, r *http.Request) {
-	var o api.OnionApi
-	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
-		slog.Error("Error decoding onion", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if err := c.Receive(o.Onion); err != nil {
-		slog.Error("Error receiving onion", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
+	api_functions.HandleReceiveOnion(w, r, c.Receive)
+	//var o structs.OnionApi
+	//if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
+	//	slog.Error("Error decoding onion", err)
+	//	http.Error(w, err.Error(), http.StatusBadRequest)
+	//	return
+	//}
+	//decompressed, err := api.Receive(o.Onion)
+	//if err != nil {
+	//	slog.Error("Error decompressing onion", err)
+	//	http.Error(w, err.Error(), http.StatusInternalServerError)
+	//	return
+	//}
+	//if err = c.Receive(decompressed); err != nil {
+	//	slog.Error("Error receiving onion", err)
+	//	http.Error(w, err.Error(), http.StatusInternalServerError)
+	//	return
+	//}
+	//w.WriteHeader(http.StatusOK)
 }
 
 func (c *Client) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +42,7 @@ func (c *Client) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 
 func (c *Client) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Starting run")
-	var start api.StartRunApi
+	var start structs.StartRunApi
 	if err := json.NewDecoder(r.Body).Decode(&start); err != nil {
 		slog.Error("Error decoding active nodes", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -51,7 +59,7 @@ func (c *Client) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (c *Client) GetActiveNodes() ([]api.PublicNodeApi, error) {
+func (c *Client) GetActiveNodes() ([]structs.PublicNodeApi, error) {
 	url := fmt.Sprintf("%s/Clients", c.BulletinBoardUrl)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -67,7 +75,7 @@ func (c *Client) GetActiveNodes() ([]api.PublicNodeApi, error) {
 		return nil, PrettyLogger.NewError("unexpected status code: %d", resp.StatusCode)
 	}
 
-	var activeClients []api.PublicNodeApi
+	var activeClients []structs.PublicNodeApi
 	if err = json.NewDecoder(resp.Body).Decode(&activeClients); err != nil {
 		return nil, PrettyLogger.WrapError(err, "error decoding response body")
 	}

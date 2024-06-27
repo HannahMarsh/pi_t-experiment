@@ -3,14 +3,14 @@ package bulletin_board
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/HannahMarsh/pi_t-experiment/internal/api"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"golang.org/x/exp/slog"
 	"net/http"
 )
 
 func (bb *BulletinBoard) HandleRegisterNode(w http.ResponseWriter, r *http.Request) {
 	//	slog.Info("Received node registration request")
-	var node api.PublicNodeApi
+	var node structs.PublicNodeApi
 	if err := json.NewDecoder(r.Body).Decode(&node); err != nil {
 		slog.Error("Error decoding node registration request", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -27,7 +27,7 @@ func (bb *BulletinBoard) HandleRegisterNode(w http.ResponseWriter, r *http.Reque
 
 func (bb *BulletinBoard) HandleRegisterClient(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Received client registration request")
-	var client api.PublicNodeApi
+	var client structs.PublicNodeApi
 	if err := json.NewDecoder(r.Body).Decode(&client); err != nil {
 		slog.Error("Error decoding client registration request", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -44,7 +44,7 @@ func (bb *BulletinBoard) HandleRegisterClient(w http.ResponseWriter, r *http.Req
 
 func (bb *BulletinBoard) HandleRegisterIntentToSend(w http.ResponseWriter, r *http.Request) {
 	//	slog.Info("Received intent-to-send request")
-	var its api.IntentToSend
+	var its structs.IntentToSend
 	if err := json.NewDecoder(r.Body).Decode(&its); err != nil {
 		slog.Error("Error decoding intent-to-send registration request", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -60,7 +60,7 @@ func (bb *BulletinBoard) HandleRegisterIntentToSend(w http.ResponseWriter, r *ht
 
 func (bb *BulletinBoard) HandleUpdateNodeInfo(w http.ResponseWriter, r *http.Request) {
 	//slog.Info("Received node info update request")
-	var nodeInfo api.PublicNodeApi
+	var nodeInfo structs.PublicNodeApi
 	if err := json.NewDecoder(r.Body).Decode(&nodeInfo); err != nil {
 		slog.Error("Error decoding node info update request", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)

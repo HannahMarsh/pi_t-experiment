@@ -1,7 +1,7 @@
 package bulletin_board
 
 import (
-	"github.com/HannahMarsh/pi_t-experiment/internal/api"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"sync"
 	"time"
 )
@@ -16,7 +16,7 @@ type NodeView struct {
 	IsMixer                  bool
 }
 
-func NewNodeView(n api.PublicNodeApi, maxTimeBetweenHeartbeats time.Duration) *NodeView {
+func NewNodeView(n structs.PublicNodeApi, maxTimeBetweenHeartbeats time.Duration) *NodeView {
 	return &NodeView{
 		ID:                       n.ID,
 		Address:                  n.Address,
@@ -27,7 +27,7 @@ func NewNodeView(n api.PublicNodeApi, maxTimeBetweenHeartbeats time.Duration) *N
 	}
 }
 
-func (nv *NodeView) UpdateNode(c api.PublicNodeApi) {
+func (nv *NodeView) UpdateNode(c structs.PublicNodeApi) {
 	nv.mu.Lock()
 	defer nv.mu.Unlock()
 	if nv.LastHeartbeat.After(c.Time) {

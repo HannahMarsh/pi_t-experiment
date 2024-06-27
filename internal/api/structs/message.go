@@ -1,4 +1,4 @@
-package api
+package structs
 
 import (
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"

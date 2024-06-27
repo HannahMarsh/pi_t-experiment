@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/HannahMarsh/pi_t-experiment/config"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api/api_functions"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/keys"
 	"io"
 	"net/http"
@@ -12,7 +14,6 @@ import (
 	"time"
 
 	pl "github.com/HannahMarsh/PrettyLogger"
-	"github.com/HannahMarsh/pi_t-experiment/internal/api"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t"
 	"golang.org/x/exp/slog"
 )
@@ -28,7 +29,7 @@ type Node struct {
 	mu                  sync.RWMutex
 	BulletinBoardUrl    string
 	lastUpdate          time.Time
-	status              *api.NodeStatus
+	status              *structs.NodeStatus
 	checkpoints         map[int]int
 	expectedCheckpoints map[int]int
 }
@@ -46,7 +47,7 @@ func NewNode(id int, host string, port int, bulletinBoardUrl string, isMixer boo
 			PrivateKey:          privateKey,
 			BulletinBoardUrl:    bulletinBoardUrl,
 			isMixer:             isMixer,
-			status:              api.NewNodeStatus(id, fmt.Sprintf("http://%s:%d", host, port), publicKey, isMixer),
+			status:              structs.NewNodeStatus(id, fmt.Sprintf("http://%s:%d", host, port), publicKey, isMixer),
 			checkpoints:         make(map[int]int),
 			expectedCheckpoints: make(map[int]int),
 		}
@@ -64,8 +65,8 @@ func (n *Node) GetStatus() string {
 	return n.status.GetStatus()
 }
 
-func (n *Node) getPublicNodeInfo() api.PublicNodeApi {
-	return api.PublicNodeApi{
+func (n *Node) getPublicNodeInfo() structs.PublicNodeApi {
+	return structs.PublicNodeApi{
 		ID:        n.ID,
 		Address:   fmt.Sprintf("http://%s:%d", n.Host, n.Port),
 		PublicKey: n.PublicKey,
@@ -87,7 +88,7 @@ func (n *Node) StartPeriodicUpdates(interval time.Duration) {
 	}()
 }
 
-func (n *Node) startRun(start api.StartRunApi) (didParticipate bool, e error) {
+func (n *Node) startRun(start structs.StartRunApi) (didParticipate bool, e error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -124,7 +125,7 @@ func (n *Node) Receive(o string) error {
 			slog.Info("Dropping onion", "layer", peeled.Layer, "destination", peeled.NextHop)
 			return nil
 
-		} else if !peeled.IsCheckpointOnion {
+		} else {
 
 			n.status.AddOnion(peeled.LastHop, fmt.Sprintf("http://%s:%d", n.Host, n.Port), peeled.NextHop, peeled.Layer, peeled.IsCheckpointOnion, bruises, false, nonceVerification, expectCheckpoint)
 
@@ -132,34 +133,18 @@ func (n *Node) Receive(o string) error {
 			if err4 != nil {
 				return pl.WrapError(err4, "node.Receive(): failed to add header")
 			}
-			if err3 := sendToNode(peeled.NextHop, addedHeader); err != nil {
+			if err3 := n.sendToNode(peeled.NextHop, addedHeader); err != nil {
 				return pl.WrapError(err3, "node.Receive(): failed to send to next node")
 			}
-		} else {
-			n.status.AddOnion(peeled.LastHop, fmt.Sprintf("http://%s:%d", n.Host, n.Port), peeled.NextHop, peeled.Layer, peeled.IsCheckpointOnion, bruises, false, nonceVerification, expectCheckpoint)
 		}
 	}
 	return nil
 }
 
-func sendToNode(addr string, constructedOnion string) error {
-	url := fmt.Sprintf("%s/receive", addr)
-	o := api.OnionApi{
-		Onion: constructedOnion,
-	}
-	if data, err := json.Marshal(o); err != nil {
-		slog.Error("failed to marshal msgs", err)
-	} else if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
-		return pl.WrapError(err2, "failed to send POST request with onion to next node")
-	} else {
-		defer func(Body io.ReadCloser) {
-			if err3 := Body.Close(); err3 != nil {
-				slog.Error("sendToNode(): Error closing response body", err3)
-			}
-		}(resp.Body)
-		if resp.StatusCode != http.StatusOK {
-			return pl.NewError("sendToNode(): Failed to send to next node, status code: %d, status: %s", resp.StatusCode, resp.Status)
-		}
+func (n *Node) sendToNode(addr string, constructedOnion string) error {
+	err := api_functions.SendOnion(addr, fmt.Sprintf("http://%s:%d", n.Host, n.Port), constructedOnion)
+	if err != nil {
+		return pl.WrapError(err, "failed to send onion")
 	}
 	return nil
 }
@@ -169,7 +154,7 @@ func (n *Node) RegisterWithBulletinBoard() error {
 	return n.updateBulletinBoard("/registerNode", http.StatusCreated)
 }
 
-func (n *Node) GetActiveNodes() ([]api.PublicNodeApi, error) {
+func (n *Node) GetActiveNodes() ([]structs.PublicNodeApi, error) {
 	url := fmt.Sprintf("%s/nodes", n.BulletinBoardUrl)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -185,7 +170,7 @@ func (n *Node) GetActiveNodes() ([]api.PublicNodeApi, error) {
 		return nil, pl.NewError("unexpected status code: %d", resp.StatusCode)
 	}
 
-	var activeNodes []api.PublicNodeApi
+	var activeNodes []structs.PublicNodeApi
 	if err = json.NewDecoder(resp.Body).Decode(&activeNodes); err != nil {
 		return nil, pl.WrapError(err, "error decoding response body")
 	}
@@ -197,7 +182,7 @@ func (n *Node) updateBulletinBoard(endpoint string, expectedStatusCode int) erro
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	t := time.Now()
-	if data, err := json.Marshal(api.PublicNodeApi{
+	if data, err := json.Marshal(structs.PublicNodeApi{
 		ID:        n.ID,
 		Address:   fmt.Sprintf("http://%s:%d", n.Host, n.Port),
 		PublicKey: n.PublicKey,

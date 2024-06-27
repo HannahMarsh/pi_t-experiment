@@ -1,4 +1,4 @@
-package api
+package structs
 
 type StartRunApi struct {
 	ParticipatingClients []PublicNodeApi

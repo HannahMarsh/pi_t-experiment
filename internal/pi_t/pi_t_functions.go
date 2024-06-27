@@ -73,11 +73,15 @@ func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, public
 			if i > 0 {
 				lastHop = routingPath[i-1]
 			}
+			nextHop := ""
+			if len(routingPath) >= i+2 {
+				nextHop = routingPath[i+1]
+			}
 			layer := OnionPayload{
 				IsCheckpointOnion: checkpoint == i,
 				Layer:             i,
 				LastHop:           lastHop,
-				NextHop:           routingPath[i+1],
+				NextHop:           nextHop,
 				Payload:           base64.StdEncoding.EncodeToString(payload),
 				NextHopPubKey:     publicKeys[i+1],
 			}
@@ -175,11 +179,11 @@ func AddHeader(peeledOnion *OnionPayload, bruiseCounter int, privateKeyPEM strin
 func addHeaderAfterPeeling(payload string, privateKeyPEM string, senderPubicKey string, receiverPublicKey string, bruiseCounter int) (string, error) {
 	payloadbytes, err := base64.StdEncoding.DecodeString(payload)
 	if err != nil {
-		return "", err
+		return "", pl.WrapError(err, "failed to decode payload")
 	}
 	encryptedSharedKey, encryptedPayload, err := keys.Enc(payloadbytes, privateKeyPEM, receiverPublicKey)
 	if err != nil {
-		return "", err
+		return "", pl.WrapError(err, "failed to encrypt payload")
 	}
 	header := Header{
 		BruiseCounter:            bruiseCounter,
@@ -189,7 +193,7 @@ func addHeaderAfterPeeling(payload string, privateKeyPEM string, senderPubicKey 
 	}
 	headerBytes, err := json.Marshal(header)
 	if err != nil {
-		return "", err
+		return "", pl.WrapError(err, "failed to marshal header")
 	}
 	return base64.StdEncoding.EncodeToString(headerBytes), nil
 }
@@ -205,15 +209,15 @@ func addHeaderAfterPeeling(payload string, privateKeyPEM string, senderPubicKey 
 func removeHeader(onion string, privateKeyPEM string) (string, int, error) {
 	onionBytes, err := base64.StdEncoding.DecodeString(onion)
 	if err != nil {
-		return "", 0, err
+		return "", 0, pl.WrapError(err, "failed to decode onion")
 	}
 	var header Header
 	if err = json.Unmarshal(onionBytes, &header); err != nil {
-		return "", 0, err
+		return "", 0, pl.WrapError(err, "failed to unmarshal header")
 	}
 	decryptedPayload, err := keys.Dec(header.EncryptedSharedKey, header.CombinedEncryptedPayload, privateKeyPEM, header.SenderPubKey)
 	if err != nil {
-		return "", 0, err
+		return "", 0, pl.WrapError(err, "failed to decrypt payload")
 	}
 	return base64.StdEncoding.EncodeToString(decryptedPayload), header.BruiseCounter, nil
 }
@@ -231,12 +235,12 @@ func removeHeader(onion string, privateKeyPEM string) (string, int, error) {
 func PeelOnion(onion string, privateKeyPEM string) (*OnionPayload, int, bool, bool, error) {
 	headerRemoved, bruises, err := removeHeader(onion, privateKeyPEM)
 	if err != nil {
-		return nil, -1, true, false, err
+		return nil, -1, true, false, pl.WrapError(err, "failed to remove header")
 	}
 
 	peeled, nonceVerification, expectCheckpoint, err := peelOnionAfterRemovingPayload(headerRemoved, privateKeyPEM)
 	if err != nil {
-		return nil, -1, nonceVerification, expectCheckpoint, err
+		return nil, -1, nonceVerification, expectCheckpoint, pl.WrapError(err, "failed to peel onion")
 	}
 
 	return peeled, bruises, nonceVerification, !peeled.IsCheckpointOnion && expectCheckpoint, nil
@@ -254,32 +258,32 @@ func peelOnionAfterRemovingPayload(onion string, privateKeyPEM string) (*OnionPa
 
 	onionBytes, err := base64.StdEncoding.DecodeString(onion)
 	if err != nil {
-		return nil, true, false, err
+		return nil, true, false, pl.WrapError(err, "failed to decode onion")
 	}
 
 	var combinedPayload CombinedPayload
 	if err = json.Unmarshal(onionBytes, &combinedPayload); err != nil {
-		return nil, true, false, err
+		return nil, true, false, pl.WrapError(err, "failed to unmarshal combined payload")
 	}
 
 	encryptedKey, err := base64.StdEncoding.DecodeString(combinedPayload.EncryptedSharedKey)
 	if err != nil {
-		return nil, true, false, err
+		return nil, true, false, pl.WrapError(err, "failed to decode encrypted key")
 	}
 
 	sharedKey, err := keys.ComputeSharedKey(privateKeyPEM, combinedPayload.OriginalSenderPubKey)
 	if err != nil {
-		return nil, true, false, err
+		return nil, true, false, pl.WrapError(err, "failed to compute shared key")
 	}
 
 	symmetricKey, err := keys.DecryptWithAES(sharedKey, string(encryptedKey))
 	if err != nil {
-		return nil, true, false, err
+		return nil, true, false, pl.WrapError(err, "failed to decrypt key")
 	}
 
 	decryptedBytes, err := keys.DecryptWithAES(symmetricKey, combinedPayload.EncryptedPayload)
 	if err != nil {
-		return nil, true, false, err
+		return nil, true, false, pl.WrapError(err, "failed to decrypt payload")
 	}
 
 	if !strings.HasPrefix(string(decryptedBytes), "{\"IsCheckpointOnion\":") {
@@ -295,7 +299,7 @@ func peelOnionAfterRemovingPayload(onion string, privateKeyPEM string) (*OnionPa
 	var layer OnionPayload
 	err = json.Unmarshal(decryptedBytes, &layer)
 	if err != nil {
-		return nil, true, false, err
+		return nil, true, false, pl.WrapError(err, "failed to unmarshal onion layer")
 	}
 
 	nonce, err := base64.StdEncoding.DecodeString(layer.Nonce)

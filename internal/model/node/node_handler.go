@@ -2,24 +2,32 @@ package node
 
 import (
 	"encoding/json"
-	"github.com/HannahMarsh/pi_t-experiment/internal/api"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api/api_functions"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"golang.org/x/exp/slog"
 	"net/http"
 )
 
 func (n *Node) HandleReceiveOnion(w http.ResponseWriter, r *http.Request) {
-	var o api.OnionApi
-	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
-		slog.Error("Error decoding onion", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if err := n.Receive(o.Onion); err != nil {
-		slog.Error("Error receiving onion", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
+	api_functions.HandleReceiveOnion(w, r, n.Receive)
+	//var o structs.OnionApi
+	//if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
+	//	slog.Error("Error decoding onion", err)
+	//	http.Error(w, err.Error(), http.StatusBadRequest)
+	//	return
+	//}
+	//decompressed, err := api.Receive(o.Onion)
+	//if err != nil {
+	//	slog.Error("Error decompressing onion", err)
+	//	http.Error(w, err.Error(), http.StatusInternalServerError)
+	//	return
+	//}
+	//if err = n.Receive(decompressed); err != nil {
+	//	slog.Error("Error receiving onion", err)
+	//	http.Error(w, err.Error(), http.StatusInternalServerError)
+	//	return
+	//}
+	//w.WriteHeader(http.StatusOK)
 }
 
 func (n *Node) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +39,7 @@ func (n *Node) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 
 func (n *Node) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Starting run")
-	var start api.StartRunApi
+	var start structs.StartRunApi
 	if err := json.NewDecoder(r.Body).Decode(&start); err != nil {
 		slog.Error("Error decoding active nodes", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
