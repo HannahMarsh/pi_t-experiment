@@ -235,6 +235,10 @@ func (c *Client) processMessage(onions map[string][]queuedOnion, msg structs.Mes
 		return pl.WrapError(err, "failed to create onion")
 	}
 
+	if err = api_functions.SendOnion(addr, c.Address, onion); err != nil {
+		slog.Error("failed to send onions", err)
+	}
+
 	if err := c.createCheckpointOnions(onions, routingPath, checkpoints, nodes, start); err != nil {
 		return err
 	}
@@ -285,6 +289,10 @@ func (c *Client) createCheckpointOnions(onions map[string][]queuedOnion, routing
 				return pl.WrapError(err, "failed to create checkpoint onion")
 			}
 
+			if err = api_functions.SendOnion(firstHop, c.Address, checkpointOnion); err != nil {
+				slog.Error("failed to send onions", err)
+			}
+
 			if _, present := onions[firstHop]; !present {
 				onions[firstHop] = make([]queuedOnion, 0)
 			}
@@ -329,21 +337,21 @@ func (c *Client) startRun(start structs.StartRunApi) error {
 		}
 		slog.Info("Client sending onions", "num_onions", numToSend)
 
-		var wg sync.WaitGroup
-		wg.Add(numToSend)
-		for addr, onions := range toSend {
-			for _, onion := range onions {
-				onion := onion
-				go func() {
-					defer wg.Done()
-					if err = api_functions.SendOnion(addr, c.Address, onion.onion); err != nil {
-						slog.Error("failed to send onions", err)
-					}
-				}()
-			}
-		}
-
-		wg.Wait()
+		//var wg sync.WaitGroup
+		//wg.Add(numToSend)
+		//for addr, onions := range toSend {
+		//	for _, onion := range onions {
+		//		onion := onion
+		//		go func() {
+		//			defer wg.Done()
+		//			if err = api_functions.SendOnion(addr, c.Address, onion.onion); err != nil {
+		//				slog.Error("failed to send onions", err)
+		//			}
+		//		}()
+		//	}
+		//}
+		//
+		//wg.Wait()
 
 		c.Messages = make([]structs.Message, 0)
 		return nil

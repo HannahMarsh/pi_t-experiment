@@ -1,7 +1,13 @@
 package pi_t
 
 import (
+	"encoding/json"
+	"fmt"
+	pl "github.com/HannahMarsh/PrettyLogger"
+	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/keys"
+	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
+	"golang.org/x/exp/slog"
 	"testing"
 )
 
@@ -15,7 +21,7 @@ func TestFormOnion(t *testing.T) {
 	publicKeys := []string{publicKeyPEM, publicKeyPEM}
 	routingPath := []string{"node1", "node2"}
 
-	addr, onion, _, err := FormOnion(privateKeyPEM, publicKeyPEM, payload, publicKeys, routingPath, -1)
+	addr, onion, _, err := FormOnion(privateKeyPEM, publicKeyPEM, payload, publicKeys, routingPath, -1, "")
 	if err != nil {
 		t.Fatalf("FormOnion() error: %v", err)
 	}
@@ -90,6 +96,103 @@ func TestPeelOnion(t *testing.T) {
 
 	if peeled2.Payload != string(payload) {
 		t.Fatalf("PeelOnion() expected payload %s, got %s", string(payload), peeled.Payload)
+	}
+}
+
+func TestPeelOnion2(t *testing.T) {
+
+	pl.SetUpLogrusAndSlog("debug")
+
+	var err error
+
+	numNodes := 10
+
+	type node struct {
+		privateKeyPEM string
+		publicKeyPEM  string
+		address       string
+	}
+
+	nodes := make([]node, numNodes)
+
+	for i := 0; i < numNodes; i++ {
+		privateKeyPEM, publicKeyPEM, err := keys.KeyGen()
+		if err != nil {
+			t.Fatalf("KeyGen() error: %v", err)
+		}
+		nodes[i] = node{privateKeyPEM, publicKeyPEM, fmt.Sprintf("node%d", i)}
+	}
+
+	secretMessage := "secret message"
+
+	payload, err := json.Marshal(structs.Message{
+		Msg:  secretMessage,
+		To:   nodes[numNodes-1].address,
+		From: nodes[0].address,
+	})
+	if err != nil {
+		slog.Error("json.Marshal() error", err)
+		t.Fatalf("json.Marshal() error: %v", err)
+	}
+
+	publicKeys := utils.Map(nodes, func(n node) string { return n.publicKeyPEM })
+	routingPath := utils.Map(nodes, func(n node) string { return n.address })
+
+	_, onionStr, _, err := FormOnion(nodes[0].privateKeyPEM, nodes[0].publicKeyPEM, payload, publicKeys[1:], routingPath[1:], -1, nodes[0].address)
+	if err != nil {
+		t.Fatalf("FormOnion() error: %v", err)
+	}
+
+	slog.Info("Done forming onion")
+
+	for i := 1; i < numNodes-1; i++ {
+		slog.Info("Peeling onion", "i", i)
+
+		onion, _, _, _, err := PeelOnion(onionStr, nodes[i].privateKeyPEM)
+		if err != nil {
+			slog.Error("PeelOnion() error", err)
+			t.Fatalf("PeelOnion() error: %v", err)
+		} else {
+			slog.Info("PeelOnion() success", "i", i)
+		}
+		if onion.NextHop != nodes[i+1].address {
+			pl.LogNewError("PeelOnion() expected next hop '%s', got %s", nodes[i+1].address, onion.NextHop)
+			t.Fatalf("PeelOnion() expected next hop '', got %s", onion.NextHop)
+		}
+		if onion.LastHop != nodes[i-1].address {
+			pl.LogNewError("PeelOnion() expected last hop '%s', got %s", nodes[i-1].address, onion.LastHop)
+			t.Fatalf("PeelOnion() expected last hop '', got %s", onion.LastHop)
+		}
+
+		onionStr, err = AddHeader(onion, 1, nodes[i].privateKeyPEM, nodes[i].publicKeyPEM)
+		if err != nil {
+			slog.Error("AddHeader() error", err)
+			t.Fatalf("AddHeader() error: %v", err)
+		}
+	}
+
+	onion, _, _, _, err := PeelOnion(onionStr, nodes[numNodes-1].privateKeyPEM)
+	if err != nil {
+		t.Fatalf("PeelOnion() error: %v", err)
+	}
+	if onion.NextHop != "" {
+		t.Fatalf("PeelOnion() expected next hop '', got %s", onion.NextHop)
+	}
+
+	var Msg structs.Message
+	err = json.Unmarshal([]byte(onion.Payload), &Msg)
+	if err != nil {
+		slog.Error("json.Unmarshal() error", err)
+		t.Fatalf("json.Unmarshal() error: %v", err)
+	}
+	if Msg.Msg != secretMessage {
+		t.Fatalf("PeelOnion() expected payload %s, got %s", string(payload), onion.Payload)
+	}
+	if Msg.To != nodes[numNodes-1].address {
+		t.Fatalf("PeelOnion() expected to address %s, got %s", nodes[numNodes-1].address, Msg.To)
+	}
+	if Msg.From != nodes[0].address {
+		t.Fatalf("PeelOnion() expected from address %s, got %s", nodes[0].address, Msg.From)
 	}
 }
 
