@@ -13,7 +13,7 @@ body {
     bottom: 0;
     left: 0;
     right: 0;
-    top: 160px;
+    top: 300px;
     overflow-x: scroll;
     overflow-y: scroll;
     background-color: #f2f2f2;
@@ -88,11 +88,11 @@ td {
     word-break: break-word;
 }
 
-td.mixer {
+td.mixer:not(.temp-yellow):not(.temp-yellow *) {
     background-color: #e4ffec;
 }
 
-td.gatekeeper {
+td.gatekeeper:not(.temp-yellow):not(.temp-yellow *) {
     background-color: rgba(196, 255, 255, 0.76);
 
 }
@@ -137,7 +137,9 @@ td.gatekeeper {
 }
 
 .popup {
-    position: absolute;
+    position: fixed;
+    top: 160px;
+    left: 10px;
     background-color: rgba(222, 220, 239, 0.93);
     padding: 10px;
     border-radius: 5px;

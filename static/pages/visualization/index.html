@@ -127,7 +127,7 @@
         });
 
         // Get number of rounds
-        const numRounds = Math.max(...Object.entries(data.Nodes).flatMap(([node, status]) => status.Received.map(onion => onion.Layer)));
+        numRounds = Math.max(...Object.entries(data.Nodes).flatMap(([node, status]) => status.Received.map(onion => onion.Layer)));
 
 
         const onionsPerRound = {};
@@ -210,6 +210,16 @@
 
         }
 
+
+        drawArrows();
+
+
+    }
+
+    let numRounds = 0;
+
+    function drawArrows() {
+
         var canvas = document.getElementById('arrows');
         var ctx = canvas.getContext('2d');
 
@@ -238,13 +248,14 @@
                         drawArrow(ctx, fromRect.right - canvas.getBoundingClientRect().left,
                             fromRect.top + fromRect.height / 2 - canvas.getBoundingClientRect().top,
                             toRect.left - canvas.getBoundingClientRect().left,
-                            toRect.top + toRect.height / 2 - canvas.getBoundingClientRect().top, 'black');
+                            toRect.top + toRect.height / 2 - canvas.getBoundingClientRect().top, 'grey', 2.5);
                     } else {
                         //console.log('Cell not found');
                     }
                 }
             })
         });
+
 
         for (let round = 0; round <= numRounds; round++) {
             document.getElementById(`round${round}-tbody`).querySelectorAll('tr').forEach(row => {
@@ -269,7 +280,7 @@
                                 drawArrow(ctx, fromRect.right - canvas.getBoundingClientRect().left,
                                     fromRect.top + fromRect.height / 2 - canvas.getBoundingClientRect().top,
                                     toRect.left - canvas.getBoundingClientRect().left,
-                                    toRect.top + toRect.height / 2 - canvas.getBoundingClientRect().top, 'black');
+                                    toRect.top + toRect.height / 2 - canvas.getBoundingClientRect().top, 'grey', 2.5);
                             } else {
                                 //console.log('Cell not found');
                             }
@@ -296,10 +307,7 @@
     `;
     }
 
-    function drawArrow(ctx, fromx, fromy, tox, toy, color) {
-
-        const arrowWidth = 3;
-
+    async function drawArrow(ctx, fromx, fromy, tox, toy, color, arrowWidth) {
 
         //variables to be used when creating the arrow
         var headlen = 10;
@@ -393,7 +401,7 @@
                     const thisMessageRow = Array.from(rows).find(row => Array.from(row.classList).includes(`${prevNodeClass}--${nextNodeClass}`));
                     if (thisMessageRow) {
                         const thisMessageCell = Array.from(thisMessageRow.cells).findLast(_ => true);
-                        thisMessageCell.style.backgroundColor = 'yellow';
+                        thisMessageCell.classList.add("temp-yellow"); //style.backgroundColor = 'yellow';
 
                         if (document.getElementById(`round${i}-tbody`)) {
                             const nextCells = document.getElementById(`round${i}-tbody`).querySelectorAll('td');
@@ -406,7 +414,11 @@
                             drawArrow(ctx, fromRect.right - canvas.getBoundingClientRect().left,
                                 fromRect.top + fromRect.height / 2 - canvas.getBoundingClientRect().top,
                                 toRect.left - canvas.getBoundingClientRect().left,
-                                toRect.top + toRect.height / 2 - canvas.getBoundingClientRect().top, 'yellow');
+                                toRect.top + toRect.height / 2 - canvas.getBoundingClientRect().top, 'black', 5);
+                            drawArrow(ctx, fromRect.right - canvas.getBoundingClientRect().left,
+                                fromRect.top + fromRect.height / 2 - canvas.getBoundingClientRect().top,
+                                toRect.left - canvas.getBoundingClientRect().left,
+                                toRect.top + toRect.height / 2 - canvas.getBoundingClientRect().top, 'yellow', 3);
                         }
                     }
                 }
@@ -421,15 +433,15 @@
                     if (document.getElementById(`round${index}-tbody`)) {
                         const cells = document.getElementById(`round${index}-tbody`).querySelectorAll('td');
                         const targetCell = Array.from(cells).find(cell => Array.from(cell.classList).includes(nodeClass));
-                        targetCell.style.backgroundColor = 'yellow'; // Example: highlight the cell
+                        targetCell.classList.add("temp-yellow"); //style.backgroundColor = 'yellow';
                     }
                 }
                 index++;
             });
             // Position the popup
             const rect = target.getBoundingClientRect();
-            popup.style.top = `${rect.top + window.scrollY + target.offsetHeight}px`;
-            popup.style.left = `${rect.left + window.scrollX}px`;
+            // popup.style.top = `${rect.top + window.scrollY + target.offsetHeight}px`;
+            // popup.style.left = `${rect.left + window.scrollX}px`;
 
             // Assign a unique identifier to the popup for later reference
             popup.id = 'info-popup';
@@ -444,6 +456,7 @@
 
 
     function handleHoverOut(event) {
+        drawArrows();
         const target = event.target;
         if (target.tagName === 'TD' && target._popup) {
             console.log('Popup exists before removal:', document.body.contains(target._popup));
@@ -454,6 +467,11 @@
         } else {
             console.log('No popup to remove');
         }
+
+        // remove all classes with temp-yello
+        document.querySelectorAll('.temp-yellow').forEach(cell => {
+            cell.classList.remove('temp-yellow');
+        });
     }
 
 </script>
