@@ -54,6 +54,7 @@ body {
     flex-wrap: nowrap;
 }
 
+
 .round-table {
     display: inline-block;
     margin-top: 0;
@@ -96,6 +97,8 @@ td.gatekeeper:not(.temp-yellow):not(.temp-yellow *) {
     background-color: rgba(196, 255, 255, 0.76);
 
 }
+
+
 
 .onion, .message {
     min-width: 100px;
