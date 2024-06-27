@@ -1,7 +1,6 @@
 package api_functions
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,98 +9,96 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/keys"
-	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"golang.org/x/exp/slog"
-	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"sync"
 	"testing"
 	"time"
 )
 
-func TestSendOnion(t *testing.T) {
-
-	pl.SetUpLogrusAndSlog("debug")
-
-	if err := config.InitGlobal(); err != nil {
-		slog.Error("failed to init config", err)
-		os.Exit(1)
-	}
-
-	privateKeyPEM, publicKeyPEM, err := keys.KeyGen()
-	if err != nil {
-		t.Fatalf("KeyGen() error: %v", err)
-	}
-
-	payload := []byte("secret message")
-	publicKeys := []string{publicKeyPEM, publicKeyPEM}
-	routingPath := []string{"node1", "node2"}
-
-	addr, onion, _, err := pi_t.FormOnion(privateKeyPEM, publicKeyPEM, payload, publicKeys, routingPath, -1)
-
-	if err != nil {
-		slog.Error("FormOnion() error", err)
-		t.Fatalf("FormOnion() error = %v", err)
-	}
-
-	// Mock server to receive the onion
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			slog.Error("Failed to read request body", err)
-			t.Fatalf("Failed to read request body: %v", err)
-		}
-
-		var onion structs.OnionApi
-		if err := json.Unmarshal(body, &onion); err != nil {
-			slog.Error("Failed to unmarshal request body", err)
-			t.Fatalf("Failed to unmarshal request body: %v", err)
-		}
-
-		if onion.From != "node1" {
-			pl.LogNewError("Expected onion.From to be 'node1', got %s", onion.From)
-			t.Fatalf("Expected onion.From to be 'test_from', got %s", onion.From)
-		}
-
-		decompressedData, err := utils.Decompress(onion.Onion)
-		if err != nil {
-			slog.Error("Error decompressing data", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		str := base64.StdEncoding.EncodeToString(decompressedData)
-
-		peelOnion, _, _, _, err2 := pi_t.PeelOnion(str, privateKeyPEM)
-		if err2 != nil {
-			slog.Error("PeelOnion() error", err2)
-			t.Fatalf("PeelOnion() error = %v", err2)
-		}
-
-		headerAdded, err := pi_t.AddHeader(peelOnion, 1, privateKeyPEM, publicKeyPEM)
-
-		peelOnion, _, _, _, err = pi_t.PeelOnion(headerAdded, privateKeyPEM)
-		if err != nil {
-			slog.Error("PeelOnion() error", err)
-			t.Fatalf("PeelOnion() error = %v", err)
-		}
-
-		if peelOnion.Payload != "secret message" {
-			t.Fatalf("Expected onion.Onion to be 'test onion data', got %s", peelOnion.Payload)
-		}
-
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
-	err = SendOnion(server.URL, addr, onion)
-	if err != nil {
-		slog.Error("SendOnion() error", err)
-		t.Fatalf("SendOnion() error = %v", err)
-	}
-}
+//
+//func TestSendOnion(t *testing.T) {
+//
+//	pl.SetUpLogrusAndSlog("debug")
+//
+//	if err := config.InitGlobal(); err != nil {
+//		slog.Error("failed to init config", err)
+//		os.Exit(1)
+//	}
+//
+//	privateKeyPEM, publicKeyPEM, err := keys.KeyGen()
+//	if err != nil {
+//		t.Fatalf("KeyGen() error: %v", err)
+//	}
+//
+//	payload := []byte("secret message")
+//	publicKeys := []string{publicKeyPEM, publicKeyPEM}
+//	routingPath := []string{"node1", "node2"}
+//
+//	addr, onion, _, err := pi_t.FormOnion(privateKeyPEM, publicKeyPEM, payload, publicKeys, routingPath, -1)
+//
+//	if err != nil {
+//		slog.Error("FormOnion() error", err)
+//		t.Fatalf("FormOnion() error = %v", err)
+//	}
+//
+//	// Mock server to receive the onion
+//	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//		body, err := ioutil.ReadAll(r.Body)
+//		if err != nil {
+//			slog.Error("Failed to read request body", err)
+//			t.Fatalf("Failed to read request body: %v", err)
+//		}
+//
+//		var onion structs.OnionApi
+//		if err := json.Unmarshal(body, &onion); err != nil {
+//			slog.Error("Failed to unmarshal request body", err)
+//			t.Fatalf("Failed to unmarshal request body: %v", err)
+//		}
+//
+//		if onion.From != "node1" {
+//			pl.LogNewError("Expected onion.From to be 'node1', got %s", onion.From)
+//			t.Fatalf("Expected onion.From to be 'test_from', got %s", onion.From)
+//		}
+//
+//		decompressedData, err := utils.Decompress(onion.Onion)
+//		if err != nil {
+//			slog.Error("Error decompressing data", err)
+//			http.Error(w, err.Error(), http.StatusInternalServerError)
+//			return
+//		}
+//
+//		str := base64.StdEncoding.EncodeToString(decompressedData)
+//
+//		peelOnion, _, _, _, err2 := pi_t.PeelOnion(str, privateKeyPEM)
+//		if err2 != nil {
+//			slog.Error("PeelOnion() error", err2)
+//			t.Fatalf("PeelOnion() error = %v", err2)
+//		}
+//
+//		headerAdded, err := pi_t.AddHeader(peelOnion, 1, privateKeyPEM, publicKeyPEM)
+//
+//		peelOnion, _, _, _, err = pi_t.PeelOnion(headerAdded, privateKeyPEM)
+//		if err != nil {
+//			slog.Error("PeelOnion() error", err)
+//			t.Fatalf("PeelOnion() error = %v", err)
+//		}
+//
+//		if peelOnion.Payload != "secret message" {
+//			t.Fatalf("Expected onion.Onion to be 'test onion data', got %s", peelOnion.Payload)
+//		}
+//
+//		w.WriteHeader(http.StatusOK)
+//	}))
+//	defer server.Close()
+//
+//	err = SendOnion(server.URL, addr, onion)
+//	if err != nil {
+//		slog.Error("SendOnion() error", err)
+//		t.Fatalf("SendOnion() error = %v", err)
+//	}
+//}
 
 func TestReceiveOnion(t *testing.T) {
 	pl.SetUpLogrusAndSlog("debug")

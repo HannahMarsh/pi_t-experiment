@@ -113,28 +113,10 @@ func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, public
 			}
 		}
 
-		symmetricKey, err := keys.GenerateSymmetricKey()
-		if err != nil {
-			return "", "", nil, pl.WrapError(err, "failed to generate symmetric key")
-		}
-
-		encryptedPayload, err := keys.EncryptWithAES(symmetricKey, layerBytes)
-		if err != nil {
-			return "", "", nil, pl.WrapError(err, "failed to encrypt payload")
-		}
-
-		sharedKey, err := keys.ComputeSharedKey(privateKeyPEM, publicKeys[i])
-		if err != nil {
-			return "", "", nil, pl.WrapError(err, "failed to compute shared key")
-		}
-
-		encryptedKey, err := keys.EncryptWithAES(sharedKey, symmetricKey)
-		if err != nil {
-			return "", "", nil, pl.WrapError(err, "failed to encrypt key")
-		}
+		encryptedSharedKey, encryptedPayload, err := keys.Enc(layerBytes, privateKeyPEM, publicKeys[i])
 
 		combinedPayload := CombinedPayload{
-			EncryptedSharedKey:   base64.StdEncoding.EncodeToString([]byte(encryptedKey)),
+			EncryptedSharedKey:   encryptedSharedKey, //base64.StdEncoding.EncodeToString([]byte(encryptedKey)),
 			EncryptedPayload:     encryptedPayload,
 			OriginalSenderPubKey: publicKeyPEM,
 		}
@@ -266,33 +248,17 @@ func peelOnionAfterRemovingPayload(onion string, privateKeyPEM string) (*OnionPa
 		return nil, true, false, pl.WrapError(err, "failed to unmarshal combined payload")
 	}
 
-	encryptedKey, err := base64.StdEncoding.DecodeString(combinedPayload.EncryptedSharedKey)
-	if err != nil {
-		return nil, true, false, pl.WrapError(err, "failed to decode encrypted key")
-	}
+	decryptedBytes, err := keys.Dec(combinedPayload.EncryptedSharedKey, combinedPayload.EncryptedPayload, privateKeyPEM, combinedPayload.OriginalSenderPubKey)
 
-	sharedKey, err := keys.ComputeSharedKey(privateKeyPEM, combinedPayload.OriginalSenderPubKey)
-	if err != nil {
-		return nil, true, false, pl.WrapError(err, "failed to compute shared key")
-	}
+	decryptedPayload := string(decryptedBytes)
 
-	symmetricKey, err := keys.DecryptWithAES(sharedKey, string(encryptedKey))
-	if err != nil {
-		return nil, true, false, pl.WrapError(err, "failed to decrypt key")
-	}
-
-	decryptedBytes, err := keys.DecryptWithAES(symmetricKey, combinedPayload.EncryptedPayload)
-	if err != nil {
-		return nil, true, false, pl.WrapError(err, "failed to decrypt payload")
-	}
-
-	if !strings.HasPrefix(string(decryptedBytes), "{\"IsCheckpointOnion\":") {
+	if !strings.HasPrefix(decryptedPayload, "{\"IsCheckpointOnion\":") {
 		return &OnionPayload{
 			IsCheckpointOnion: false,
 			Layer:             0,
 			NextHop:           "",
 			LastHop:           "",
-			Payload:           string(decryptedBytes),
+			Payload:           decryptedPayload,
 		}, true, false, nil
 	}
 
