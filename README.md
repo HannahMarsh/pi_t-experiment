@@ -48,70 +48,73 @@ its local clock until it receives a sufficient number of checkpoint onions for t
 
 ### Session Keys:
 
-- A client _k_ shares session keys _sk<sub>i,k</sub>_ with each intermediary node _P<sub>i</sub>_ using the Diffie-Hellman key exchange.
-- These keys are used by the client and nodes with pseudorandom functions _F1_(_sk<sub>i,k</sub>_, _j_) and _F2_(_sk<sub>i,k</sub>_, _j_).
+- Nodes publish part of a Diffie-Hellman exchange as part of their public keys.
+  - See [internal/pi_t/keys/ecdh.go](internal/pi_t/keys/ecdh.go) for this project's ECDH usage.
+- Clients generate a random scalar r for each onion to compute the shared secret with the server.
+- The client's part of the exchange is included in the onion header.
+- These shared keys are used by the client and nodes with pseudorandom functions _F1_(_sk<sub>i,k</sub>_, _j_) and _F2_(_sk<sub>i,k</sub>_, _j_).
   - **_F1_(_sk<sub>i,k</sub>_, _j_)**: If the result is 0, then a checkpoint onion is expected to be received by _P<sub>i</sub>_ at hop _j_ and _y_ = **_F2_(_sk<sub>i,k</sub>_, _j_)** is used to calculate the expected nonce of that checkpoint onion.
+    - See [internal/pi_t/prf/prf.go](/internal/pi_t/prf/prf.go) for `PRF_F1` and `PRF_F2` implementations.
 - **Checkpoints (_Y<sub>k</sub>_)**: The set of expected nonces (calculated by _F2_) for the _k_-th layer checkpoint onions.
 
 ### Node / Client Registration:
 
 - Nodes publish their existence and public keys to the bulletin board.
-  - Nodes send periodic heartbeat messages so that the bulletin board can maintain a count of all active nodes in the network.
+  - See [internal/model/node/node.go](internal/model/node/node.go)
+  - Nodes send periodic heartbeat messages so that the bulletin board can maintain a list of all active nodes in the network.
 - Clients register their intent to send messages with the bulletin board.
+  - See [internal/model/client/client.go](internal/model/client/client.go)
 - When a sufficient number of nodes have registered, the bulletin board broadcasts a start signal
+  - See [internal/model/bulletin_board/bulletin_board.go](internal/model/bulletin_board/bulletin_board.go)
 
 ### 1. Initialization:
 
 
-- When a client _k_ is notified of the start of a run, it receives a list of active nodes that the bulletin board sees in the network.
-- For each active node _P<sub>i</sub>_, the client performs a Diffie-Hellman key exchange to establish a session key _sk<sub>i,k</sub>_.
-  - The client generates a Diffie-Hellman key pair and sends the public key to _P<sub>i</sub>_.
-  - _P<sub>i</sub>_ generates its own Diffie-Hellman key pair, computes the shared session key, and sends its public key back to the client.
-- For each message to be sent, the client constructs a routing path by selecting a random subset of 
-[Mixers](#3-mixing-and-bruising) and [Gatekeepers](#5-gatekeeping) in the network.
-    - The first node in the path is always a Mixer.
-    - The last node before the final destination is always a Gatekeeper.
-- This routing path is used to construct the onion.
-- ([FormOnion](https://github.com/HannahMarsh/&Pi;<sub>t</sub>-experiment/blob/main/internal/&Pi;<sub>t</sub>/&Pi;<sub>t</sub>_functions.go#:~:text=func%20FormOnion)):
-  The onion is constructed in layers, with the innermost layer containing the message encrypted with the recipient's public key.
+- When a client _k_ is notified of the start of a run, it receives a list of active nodes from the bulletin board.
+- For each message to be sent, the client constructs a routing path by selecting a random subset of [Mixers](#3-mixing-and-bruising) and [Gatekeepers](#5-gatekeeping) in the network.
+  - The first node in the path is always a Mixer.
+  - The last node before the final destination is always a Gatekeeper.
+- The onion is constructed in layers, with the innermost layer containing the message encrypted with the recipient's public key.
   - Each subsequent layer _j_ contains encrypted metadata that includes:
-    - A pseudorandom nonce that is unique to each onion (used to detect tampering).
+    - A pseudorandom nonce that is unique to each onion (used to detect replay attacks).
     - The window of expected arrival time for the onion (used to detect delayed arrival).
     - The next hop in the routing path.
-- For each participant in the routing path, the client uses its corresponding session key and pseudorandom function F1 
-to determine if it should create a checkpoint onion for that layer. It then uses F2 to generate a nonce for each 
-checkpoint onion with its own random routing path.
-  - The construction of checkpoint onions follows the same layer-by-layer encryption process as the regular onions. The 
-  only difference is that checkpoint onions (a.k.a. dummy onions) don't carry a payload, and instead their purpose is to 
-  provide cover for the "real" payload-carrying onions.
+  - For each participant in the routing path, the client uses its corresponding session key and pseudorandom function F1 
+    to determine if it should create a checkpoint onion for that layer. It then uses F2 to generate a nonce for each 
+    checkpoint onion with its own random routing path.
+     - The construction of checkpoint onions follows the same layer-by-layer encryption process as the regular onions. 
+       The only difference is that checkpoint onions (a.k.a. dummy onions) don't carry a payload and instead provide cover for the "real" payload-carrying onions.
+     - Each layer of the onion contains the encrypted shared key which is used by the next node in the path to decrypt the layer. This shared key is encrypted with the public key of the respective node and included in the header of each layer.
 - All onions are sent to their first hop (a Mixer).
 
 ### 3. Mixing and Bruising:
 
-- When a Mixer receives an onion and decrypts its outer layer, it reveals the following data:
-  - A bruise counter that tracks the number of times the onion has been detected by Mixers to be delayed or tampered with.
+- When a Mixer receives an onion and decrypts its outer layer (header), it reveals the following data:
+  - Multiple key slots that contain copies of the decryption key. If an onion is bruised, one of these key slots is invalidated.
   - The nonce (decrypted using the session key shared with the original sender).
   - The window of expected arrival time for the onion.
   - The next hop in the path (another Mixer or a Gatekeeper).
 - The Mixer checks for delays or signs of tampering.
-  - To detect a delay, the mixer compares the received time with an expected time window. If an onion arrives outside this window, it is considered delayed.
+  - To detect a delay, the mixer compares the received "time" (see [local time](#no-global-clock)) with an expected time window. If an onion arrives outside this window, it is considered delayed.
   - To check for tampering, the mixer verifies the nonce against its expected set _Y<sub>k</sub>_ (calculated with session key).
     - If the nonce is valid, the node removes the nonce from _Y<sub>k</sub>_.
     - Otherwise, the onion is considered tampered with.
-- If the onion is delayed or tampered with, the Mixer increments a "bruise" counter on the onion, which is encrypted with the public key of the next hop.
+- If the onion is delayed or tampered with, the Mixer invalidates one of the key slots in the onion.
 - The onion is then forwarded to the next node in the path.
+- The number of protection layers is managed in a way that does not reveal any positional information. For instance, 
+  additional dummy layers might be used to mask the actual number of active layers.
 
 ### 4. Intermediate Nodes:
 
 - The onion continues to travel through the network of Mixers:
-  - Each Mixer decrypts its layer, possibly adds bruises, and forwards the onion.
+  - Each Mixer decrypts its layer, possibly adds bruises (invalidates key slots), and forwards the onion.
   - This process continues until the onion reaches a Gatekeeper.
 
 ### 5. Gatekeeping:
 
-- The Gatekeeper receives the onion and checks the bruise counter. 
-- If the bruise counter exceeds a predefined threshold, the Gatekeeper discards the onion.
-  - A threshold is determined based on the network's tolerance for delays and tampering
+- The Gatekeeper receives the onion and checks the number of valid key slots.
+- If the number of valid key slots is below a predefined threshold, the Gatekeeper discards the onion.
+  - A threshold is determined based on the network's tolerance for delays and replay attacks
 - If the onion is acceptable, the Gatekeeper forwards it to the next node (which can be another Mixer or a Gatekeeper, depending on the path).
 
 ### 6. Final Destination
@@ -125,9 +128,9 @@ checkpoint onion with its own random routing path.
 ### Potential Adversarial Functions:
 
 - Observe all received onions and their metadata. 
-- Modify the bruise counter or other metadata.
-- Selectively drop onions to cause disruption, such as making onions appear delayed or tampered with when they reach the next hop.
-- Inject their own onions to create noise or mislead other nodes.
+- Bruise or delay onions that pass through their layer (but cannot modify bruise count).
+- Selectively drop onions to cause disruption, such as making onions appear delayed when they reach the next hop.
+- Inject their own onions, replicate onions (replay attack) to create noise or mislead other nodes.
 
 ### Verifying Differential Privacy:
 
