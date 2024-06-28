@@ -14,20 +14,14 @@ Implementing $\Pi_t$
 
 ## Introduction
 
-This project focuses on implementing [$\Pi_t$](https://eprint.iacr.org/2024/885), a differentially anonymous mixnet architecture, 
+This project focuses on implementing [ $`\Pi_t`$ ](https://eprint.iacr.org/2024/885), a differentially anonymous mixnet architecture, 
 to explore its performance under  
 various conditions. We will conduct experiments to determine the minimum number of rounds required for a given server load  
 and desired parameters $\epsilon$ and $\delta$.
 
 ## Background
-
-An anonymous communication channel allows parties to communicate over the Internet while concealing their identities.  
-Onion routing is a widely used technique where messages are encapsulated in layers of encryption and sent through a series  
-of intermediary nodes (relays). This project implements $\Pi_t$, an advanced mixnet architecture that ensures differential   
-privacy, which means the adversary's view when Alice sends a message to Bob is statistically close to the view when Alice sends a   
-message to Carol instead. This is significant because it provides privacy guarantees even if the adversary can observe a fraction   
-of the network nodes and network traffic. While $\Pi_t$ has been described in https://eprint.iacr.org/2024/885, this project aims to   
-implement it as a service model (the clients know all the servers, but the servers do not know all the clients).
+$`\Pi_t`$, s
+An anonymous communication channel allows parties to communicate over the Internet while concealing their identities. Onion routing is a widely used technique where messages are encapsulated in layers of encryption and sent through a series of intermediary nodes (relays). This project implements $`\Pi_t`$, an advanced mixnet architecture that ensures differential privacy, which means the adversary's view when Alice sends a message to Bob is statistically close to the view when Alice sends a message to Carol instead. This is significant because it provides privacy guarantees even if the adversary can observe a fraction of the network nodes and network traffic. While $\Pi_t$ has been described in https://eprint.iacr.org/2024/885, this project aims to implement it as a service model (the clients know all the servers, but the servers do not know all the clients).
 
 
 ## $\Pi_t$ Implementation Overview
@@ -65,7 +59,7 @@ implement it as a service model (the clients know all the servers, but the serve
 ### Onion Structure:
 
 #### Header ($H$):
-- Consists of two parts: a ciphertext [$E_i$](#^Ei) and the rest of the header [$B_i$](#^Bi).
+- Consists of two parts: a [ ciphertext $`E_i`$ ](#Ei) and the [ rest of the header $`V_i`$ ](#Bi).
   - **$E_i$**: An encryption under the public key of the current processing party $P_i$ of the tuple <a name="Ei"></a>  
     $(i, y_i, k_i)$ where:
     - $i$&nbsp; is the position in the route.
@@ -78,7 +72,7 @@ implement it as a service model (the clients know all the servers, but the serve
 
 #### Content ($C$):
 - Contains the payload or the next layer of the onion.
-- Encrypted under the [layer key,  $k$](#layer-key).
+- Encrypted under the [ layer key, $`k`$ ](#layer-key).
 - For intermediate nodes, it contains the encrypted content of the next onion layer.
 - For the final recipient, it contains the actual message.
 
@@ -222,18 +216,33 @@ In the $\Pi_t$ protocol, nodes use local clocks to manage the timing and sequenc
 Installation
 ------------  
 
-1. Clone the repository:
+Clone the repository:
 
 ```bash  
-git clone https://github.com/HannahMarsh/pi_t-experiment.git;cd pi_t-experiment
-```  
-  
-2. Install dependencies:  
-  
+git clone https://github.com/HannahMarsh/pi_t-experiment.git;
+cd pi_t-experiment
 ```
-bash go mod tidy
-```  
   
+Install dependencies:  
+  
+```bash
+bash go mod tidy
+```
+
+Build the project:  
+  
+```bash
+go build -v ./...
+```  
+
+Development
+-----  
+
+Run tests:
+```bash
+go test -v ./...
+```
+
 Usage  
 -----  
   
