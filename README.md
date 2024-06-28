@@ -163,6 +163,14 @@
 - [ ] Verify differential privacy guarantees by comparing adversary views.
 - [ ] Calculate empirical probability of adversary’s view for dataset pairs.
 
+### Test in a Distributed Environment
+- [ ] Finish setting up docker containers for the client and node
+- [ ] Obtain access to remote servers
+- [ ] Update the config.yaml file with the urls of each server
+- [ ] Pull the docker images on these servers
+- [ ] Build and run the containers
+- [ ] Start the bulletin board and begin collecting metrics
+
 </details>
 
 <details>
@@ -374,20 +382,8 @@ this project aims to implement it in a service model environment (where the clie
   $P_i$ sends out these onions (but not the onions for future hops) in random order and advances its local clock $c_j$ by one.
 - Onions are batch-processed and sent out in random order at honest intermediaries when batch-processed.
 
-### Summary
 
-In the $\Pi_t$ protocol, nodes use local clocks to manage the timing and sequence of onion processing. This mechanism involves verifying nonces,
-detecting late onions, and advancing the clock based on a threshold of processed checkpoint onions. This approach ensures synchronized processing and
-robust detection of network disruptions without relying on a global clock.
-
-### Path Information
-
-- When the sender creates the onion, it includes time-related metadata in each layer.
-  - This metadata can specify expected delays or time windows for each hop based on the overall path length.
-  - Nodes may dynamically adjust their expectations based on real-time network conditions.
-    - For instance, if a node detects increased network latency, it can widen its expected time window temporarily.
-
-Installation
+Installation (for development)
 ------------  
 
 Clone the repository:
@@ -472,6 +468,8 @@ go run cmd/metrics/main.go -port 8200
 When implementing the onion routing protocol, it helps to run the metric collector locally which provides visualization 
 in real time of the messages and onions processes by each client and node. For a small number of clients/nodes, this makes 
 debugging the protocol easier.
+
+Obviously, it is not recommended to run the visualization program once we deploy the simulation in a distributed environment (with potentially hundreds of nodes and rounds). 
 
 ![](img/vis.png)
 
