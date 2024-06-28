@@ -3,34 +3,43 @@ Implementing &Pi;<sub>t</sub>
 
 
 **TODO**
-- Client: Encrypt nonces into header
-- Client: use prf to calculate when to generate checkpoint onions (when forming onion)
 - Client: calculate how many checkpoint onions each node on path should expect
 - Client calculate time window for when onion should arrive at each hop
 - Node: calculate expected number of nonces for each layer
 - Node: check if onion is late or the nonce is not in expected set, add bruises if so
-- 
+
 
 ## Introduction
 
 This project focuses on implementing &Pi;<sub>t</sub>, a differentially anonymous mixnet architecture, to explore its performance under
 various conditions. We will conduct experiments to determine the minimum number of rounds required for a given server load
-and desired parameters ϵ and δ. The experiment will be deployed on AWS with potentially hundreds of nodes, each acting as
-a relay, and will use a bulletin board to manage node communication.
+and desired parameters ϵ and δ. 
 
 ## Background
 
 An anonymous communication channel allows parties to communicate over the Internet while concealing their identities.
 Onion routing is a widely used technique where messages are encapsulated in layers of encryption and sent through a series
-of intermediary nodes (relays). This project implements &Pi;<sub>t</sub>, an advanced mixnet architecture that is designed to enhance 
-anonymity in asynchronous networks by introducing the concept of "bruising" onions. This protocol ensures secure and anonymous 
-communication while handling delays and tampering effectively.
+of intermediary nodes (relays). This project implements &Pi;<sub>t</sub>, an advanced mixnet architecture that ensures differential 
+privacy, which means the adversary's view when Alice sends a message to Bob is statistically close to the view when Alice sends a 
+message to Carol instead. This is significant because it provides privacy guarantees even if the adversary can observe a fraction 
+of the network nodes and network traffic.
+
+
+## &Pi;<sub>t</sub> Overview
+
+- Each layer of the onion can be "bruised" if it does not meet certain criteria, and too many bruises will lead to the onion being dropped.
+- Mixers are responsible for re-encrypting and forwarding onions to random next hops.
+- Gatekeepers validate and forward onions according to a predefined path. 
+- Checkpoint onions are special onions sent at various stages to verify the presence and correct operation of other nodes. 
+  This way nodes can detect that it has not received the expected number of checkpoint onions, and can infer that an attack may be in progress.
+
+  
 
 ## Components
 
-### Clients
-
 ### Bulletin Board
+
+### Clients
 
 ### Mixers
 
@@ -177,25 +186,6 @@ checkpoint onion with its own random routing path.
    _P<sub>i</sub>_ sends out these onions (but not the onions for future hops) in random order and advances its local clock _c<sub>j</sub>_ by one.
     - Onions are batch-processed and sent out in random order at honest intermediaries when batch-processed.
 
-### Example Workflow
-
-1. **Node Registration**:
-  - Nodes register with the bulletin board, indicating their willingness to participate in the protocol. The bulletin board keeps track of active nodes and sends a start signal when enough nodes have registered.
-
-2. **Sending and Receiving Onions**:
-  - A client sends both regular and checkpoint onions into the network.
-  - Nodes receive these onions and process them according to the local clock mechanism.
-
-3. **Detecting Late Onions**:
-  - A node determines if an onion is late by comparing its arrival time to the node's internal clock. Late onions are bruised and forwarded.
-
-4. **Verifying Nonces**:
-  - For each onion, the node verifies the included nonce against its expected set Y<sub>k</sub>.
-  - If the nonce is valid, the node increments its local clock counter c<sub>k</sub> and removes the nonce from Y<sub>k</sub>.
-
-5. **Clock Advancement**:
-  - Once the node processes enough onions for the current layer (meeting the threshold &tau;), it advances its local clock, prepares the onions for the next hop, and sends them out.
-
 ### Summary
 
 In the &Pi;<sub>t</sub> protocol, nodes use local clocks to manage the timing and sequence of onion processing. This mechanism involves verifying nonces, detecting late onions, and advancing the clock based on a threshold of processed checkpoint onions. This approach ensures synchronized processing and robust detection of network disruptions without relying on a global clock.
@@ -208,84 +198,14 @@ In the &Pi;<sub>t</sub> protocol, nodes use local clocks to manage the timing an
   - Nodes may dynamically adjust their expectations based on real-time network conditions.
     - For instance, if a node detects increased network latency, it can widen its expected time window temporarily.
 
-### Detailed Process
-
-1. **Onion Creation**:
-  - The sender estimates the total expected travel time based on the number of hops and typical latency.
-  - This estimation includes a margin to account for variability and is included in the onion's metadata.
-2. **Transmission**:
-  - The sender sends the onion to the first Mixer, starting the timing process.
-3. **Mixer Processing**:
-  - Each Mixer, upon receiving an onion, checks the timestamp or timing information included in the onion’s layer.
-  - The Mixer compares this timestamp with its synchronized clock to determine if the onion arrived within the expected time window.
-4. **Threshold Checking**:
-  - If the onion arrives within the expected time window, the Mixer processes and forwards it without adding bruises.
-  - If the onion arrives outside the expected time window, the Mixer considers it delayed and increments the bruise counter.
-5. **Forwarding**:
-  - The Mixer updates the timing information in the onion’s metadata to reflect the current time and any adjustments needed for the next hop.
-6. **Path Continuation**:
-  - The onion continues through the network, with each subsequent Mixer performing similar checks and adjustments based on the timing metadata.
-
-## Summary
-
-- **Configuration and Synchronization**: Mixers use predefined parameters and synchronized clocks to determine expected time windows.
-- **Metadata Inclusion**: Time-related metadata is included in each onion layer, guiding Mixers on expected arrival times.
-- **Dynamic Adjustments**: Real-time network conditions may lead to dynamic adjustments in expected time windows.
-- **Processing and Forwarding**: Each Mixer checks the onion's arrival time against the expected window and increments the bruise counter if necessary.
-
-By leveraging synchronized clocks, predefined parameters, and real-time adjustments, Mixers in the Bruisable Onion protocol can effectively manage expected time windows to detect delays and maintain the integrity of the routing process.
-
-## Objectives
-
-1. **Deploy &Pi;<sub>t</sub> on AWS**: Set up a network of nodes acting as relays.
-2. Implement a replicated bulletin board to list all participating nodes and their public keys.
-3. **Determine optimal parameters**: Run experiments to find the minimum number of rounds required for specific values of
-    \epsilon  and 
-   \delta , while considering server load and churn rates.
-
-## Experiment Design
-
-The experiment will involve the following steps:
-
-1. **Setup Nodes on AWS**:
-
-- Deploy hundreds of nodes on AWS, each configured to act as a relay.
-- Ensure nodes can communicate with the bulletin board to register their status.
-
-2. **Bulletin Board**:
-
-- Implement a fault-tolerant, replicated bulletin board that maintains a list of active nodes and their public keys.
-- The bulletin board will also broadcast start times and coordinate the rounds of message passing.
-
-3. **Message Passing and Rounds**:
-
-- Nodes will send messages in rounds, encapsulating each message in multiple layers of encryption (onions).
-- Each node will peel off one layer of encryption and forward the message to the next node.
-- The process will repeat for a specified number of rounds.
-
-4. **Parameter Selection**:
-
-- Choose appropriate values for  \epsilon  and  \delta  to ensure differential privacy.
-- Calculate the minimum number of rounds required for these values given the server load and churn rates.
-
-## Choosing Parameters
-
-To determine the optimal parameters for the experiment, we consider the following:
-
-- **Onion Size and Layers**: The size of each onion depends on the number of layers, which corresponds to the number of rounds.
-- **Server Load**: Given a server load  x  and desired  \epsilon  and  \delta  values, determine the minimum
-  number of rounds required.
-- **Churn Rate**: The rate at which nodes go offline (churn rate) affects the maximum number of rounds for maintaining the
-  desired message delivery rate.
-
 Installation
 ------------
 
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/HannahMarsh/&Pi;<sub>t</sub>-experiment.git;
-cd &Pi;<sub>t</sub>-experiment
+git clone https://github.com/HannahMarsh/pi_t-experiment.git;
+cd pi_t-experiment
 ```
 
 2. Install dependencies:
@@ -296,6 +216,8 @@ go mod tidy
 
 Usage
 -----
+
+All configurations are set in the [`config/config.yaml`](config/config/yaml) file.
 
 ### Running the Bulletin Board
 
@@ -309,18 +231,39 @@ go run cmd/bulletin-board/main.go
 go run cmd/node/main.go -id=1
 ```
 
-### Endpoints
+### Running a Client
 
-* **Register Node**: `POST /register`
-* **Get Active Nodes**: `GET /nodes`
-* **Receive Message**: `POST /receive`
-* **Start Run**: `POST /start`
+```bash
+go run cmd/client/main.go -id=1
+```
 
-Example Workflow
-----------------
+### Serving Metrics
 
-1. Start the bulletin board.
-2. Start multiple nodes.
-3. Nodes periodically report their queue lengths.
-4. Nodes receive messages from clients and build onions.
-5. The bulletin board signals nodes to start processing when conditions are met.
+```bash
+go run cmd/metrics/main.go -port 8200
+```
+
+## Endpoints
+
+### Bulletin Board
+- **Register Client**: `POST /register`
+- **Register Node**: `POST /register`
+- **Get Active Nodes**: `GET /nodes`
+
+### Node & Client
+- **Receive Onion**: `POST /receive`
+- **Get Status**: `GET /status`
+- **Start Run**: `POST /start`
+
+### Metrics
+- **Messages**: `GET /messages`
+- **Nodes**: `GET /nodes`
+- **Clients**: `GET /clients`
+- **Checkpoint Onion Counts**: `GET /checkpoints`
+- **Visualize Onion Paths**: `GET /visualization`
+
+
+For a small number of clients/nodes, this makes debugging easier.
+
+![](img/vis.png)
+
