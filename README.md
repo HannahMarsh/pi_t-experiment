@@ -191,6 +191,7 @@ this project aims to implement it as a service model (the clients know all the s
 
 <br>
 
+
 ## $\Pi_t$ Implementation Overview
 
 ### Parameters
@@ -471,9 +472,16 @@ go run cmd/metrics/main.go -port 8200
 - **Checkpoint Onion Counts**: `GET /checkpoints`
 - **Visualize Onion Paths**: `GET /visualization`
 
-For a small number of clients/nodes, this makes debugging easier.
+When implementing the onion routing protocol, it helps to run the metric collector locally which provides visualization 
+in real time of the messages and onions processes by each client and node. For a small number of clients/nodes, this makes 
+debugging the protocol easier.
 
 ![](img/vis.png)
+
+![](img/demo.gif)
+
+
+---
 
 ### References
 
