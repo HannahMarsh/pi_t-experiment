@@ -235,9 +235,13 @@ func (c *Client) processMessage(onions map[string][]queuedOnion, msg structs.Mes
 		return pl.WrapError(err, "failed to create onion")
 	}
 
-	if err = api_functions.SendOnion(addr, c.Address, onion); err != nil {
-		slog.Error("failed to send onions", err)
-	}
+	c.status.AddSent(destination, routingPath, msg)
+
+	go func() {
+		if err = api_functions.SendOnion(addr, c.Address, onion); err != nil {
+			slog.Error("failed to send onions", err)
+		}
+	}()
 
 	if err := c.createCheckpointOnions(onions, routingPath, checkpoints, nodes, start); err != nil {
 		return err
@@ -250,7 +254,7 @@ func (c *Client) processMessage(onions map[string][]queuedOnion, msg structs.Mes
 		onion: onion,
 		to:    addr,
 	})
-	c.status.AddSent(destination, routingPath, msg)
+	//c.status.AddSent(destination, routingPath, msg)
 
 	return nil
 }
@@ -289,9 +293,11 @@ func (c *Client) createCheckpointOnions(onions map[string][]queuedOnion, routing
 				return pl.WrapError(err, "failed to create checkpoint onion")
 			}
 
-			if err = api_functions.SendOnion(firstHop, c.Address, checkpointOnion); err != nil {
-				slog.Error("failed to send onions", err)
-			}
+			go func() {
+				if err = api_functions.SendOnion(firstHop, c.Address, checkpointOnion); err != nil {
+					slog.Error("failed to send onions", err)
+				}
+			}()
 
 			if _, present := onions[firstHop]; !present {
 				onions[firstHop] = make([]queuedOnion, 0)

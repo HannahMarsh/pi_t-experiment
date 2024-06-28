@@ -54,7 +54,7 @@ func SendOnion(to, from, onionStr string) error {
 	}
 
 	client := &http.Client{
-		Timeout: 10 * time.Second, // Set timeout
+		Timeout: 30 * time.Second, // Set timeout
 	}
 
 	req, err := http.NewRequestWithContext(context.Background(), "POST", url, &compressedBuffer)
