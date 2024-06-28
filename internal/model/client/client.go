@@ -153,22 +153,42 @@ func DetermineRoutingPath(pathLength int, participants []structs.PublicNodeApi) 
 
 // adjustPathNodes adjusts the routing path to ensure the first node is a Mixer and the last is a gatekeeper
 func adjustPathNodes(selectedNodes []structs.PublicNodeApi) {
-	for i, node := range selectedNodes {
-		if node.IsMixer {
-			if i != 0 {
-				utils.Swap(selectedNodes, i, 0)
-			}
-			break
-		}
+	mixers := utils.Filter(selectedNodes, func(node structs.PublicNodeApi) bool {
+		return node.IsMixer
+	})
+	gatekeepers := utils.Filter(selectedNodes, func(node structs.PublicNodeApi) bool {
+		return !node.IsMixer
+	})
+	mixer, indexM := utils.RandomElement(mixers)
+	mixers = utils.RemoveIndex(mixers, indexM)
+	gatekeeper, indexG := utils.RandomElement(gatekeepers)
+	gatekeepers = utils.RemoveIndex(gatekeepers, indexG)
+	selectedNodesNew := append(mixers, gatekeepers...)
+	utils.Shuffle(selectedNodesNew)
+	selectedNodesNew = append(selectedNodesNew, gatekeeper)
+	selectedNodesNew = append([]structs.PublicNodeApi{mixer}, selectedNodesNew...)
+
+	for i, _ := range selectedNodesNew {
+		selectedNodes[i] = selectedNodesNew[i]
 	}
-	for i, node := range selectedNodes {
-		if !node.IsMixer {
-			if i != len(selectedNodes)-1 {
-				utils.Swap(selectedNodes, i, len(selectedNodes)-1)
-			}
-			break
-		}
-	}
+
+	//
+	//for i, node := range selectedNodesNew {
+	//	if node.IsMixer {
+	//		if i != 0 {
+	//			utils.Swap(selectedNodesNew, i, 0)
+	//		}
+	//		break
+	//	}
+	//}
+	//for i, node := range selectedNodesNew {
+	//	if !node.IsMixer {
+	//		if i != len(selectedNodesNew)-1 {
+	//			utils.Swap(selectedNodesNew, i, len(selectedNodesNew)-1)
+	//		}
+	//		break
+	//	}
+	//}
 }
 
 // DetermineCheckpointRoutingPath determines a routing path with a checkpoint
@@ -181,7 +201,8 @@ func DetermineCheckpointRoutingPath(pathLength int, nodes []structs.PublicNodeAp
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to determine routing path")
 	}
-	return append(utils.InsertAtIndex(path, round, checkpointReceiver), utils.RandomElement(participatingClients)), nil
+	rel, _ := utils.RandomElement(participatingClients)
+	return append(utils.InsertAtIndex(path, round, checkpointReceiver), rel), nil
 }
 
 // formOnions forms the onions for the messages to be sent

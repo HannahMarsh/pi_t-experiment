@@ -198,6 +198,16 @@ func InsertAtIndex[T any](items []T, index int, value T) []T {
 	return items
 }
 
+func RemoveIndex[T any](items []T, index int) []T {
+	if index == 0 {
+		return items[1:]
+	}
+	if index == len(items)-1 {
+		return items[:len(items)-1]
+	}
+	return append(items[:index], items[index+1:]...)
+}
+
 func GetLast[T any](items []T) T {
 	return items[len(items)-1]
 }

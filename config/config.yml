@@ -40,3 +40,7 @@ nodes:
     host: 'localhost'
     port: 8085
     is_mixer: false
+  - id: 6
+    host: 'localhost'
+    port: 8086
+    is_mixer: false

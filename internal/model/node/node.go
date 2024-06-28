@@ -142,10 +142,12 @@ func (n *Node) Receive(o string) error {
 }
 
 func (n *Node) sendToNode(addr string, constructedOnion string) error {
-	err := api_functions.SendOnion(addr, fmt.Sprintf("http://%s:%d", n.Host, n.Port), constructedOnion)
-	if err != nil {
-		return pl.WrapError(err, "failed to send onion")
-	}
+	go func() {
+		err := api_functions.SendOnion(addr, fmt.Sprintf("http://%s:%d", n.Host, n.Port), constructedOnion)
+		if err != nil {
+			slog.Error("Error sending onion", err)
+		}
+	}()
 	return nil
 }
 

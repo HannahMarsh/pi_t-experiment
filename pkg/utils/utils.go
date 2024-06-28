@@ -47,6 +47,7 @@ func GenerateUniqueHash() string {
 
 var r = rng.New(rng.NewSource(time.Now().UnixNano()))
 
-func RandomElement[T any](elements []T) T {
-	return elements[r.Intn(len(elements))]
+func RandomElement[T any](elements []T) (element T, index int) {
+	index = r.Intn(len(elements))
+	return elements[index], index
 }
