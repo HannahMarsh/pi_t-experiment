@@ -8,10 +8,12 @@ Implementing &Pi;<sub>t</sub>
 - Node: calculate expected number of nonces for each layer
 - Node: check if onion is late or the nonce is not in expected set, add bruises if so
 
+### References
+- https://eprint.iacr.org/2024/885
 
 ## Introduction
 
-This project focuses on implementing &Pi;<sub>t</sub>, a differentially anonymous mixnet architecture, to explore its performance under
+This project focuses on implementing [&Pi;<sub>t</sub>](https://eprint.iacr.org/2024/885), a differentially anonymous mixnet architecture, to explore its performance under
 various conditions. We will conduct experiments to determine the minimum number of rounds required for a given server load
 and desired parameters ϵ and δ. 
 
@@ -25,33 +27,12 @@ message to Carol instead. This is significant because it provides privacy guaran
 of the network nodes and network traffic.
 
 
-## &Pi;<sub>t</sub> Overview
+## &Pi;<sub>t</sub> Implementation Overview
 
-- Each layer of the onion can be "bruised" if it does not meet certain criteria, and too many bruises will lead to the onion being dropped.
-- Mixers are responsible for re-encrypting and forwarding onions to random next hops.
-- Gatekeepers validate and forward onions according to a predefined path. 
-- Checkpoint onions are special onions sent at various stages to verify the presence and correct operation of other nodes. 
-  This way nodes can detect that it has not received the expected number of checkpoint onions, and can infer that an attack may be in progress.
-
-  
-
-## Components
-
-### Bulletin Board
-
-### Clients
-
-### Mixers
-
-### Gatekeepers
-
-
-
-## Protocol
 
 ### Parameters
 - **_x_**: The server load (number of onions each node receives per round).
-- **_L_**:The length of the routing path (number of hops).
+- **_L_**:The number of rounds (also the length of the routing path).
 - **_&tau;_**: The fraction of expected checkpoint onions needed for a node to progress its local clock.
 - **_h_**: The heartbeat interval in seconds
 - **_N_**: The minimum number of active nodes in the network at the start of the protocol.
