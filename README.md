@@ -2,7 +2,7 @@
 
 <!-- TOC -->
 <details>
-  <summary><h2>Table of Contents</h2></summary><br>
+  <summary><h4><i>Table of Contents</i></h4></summary><br>
   <details><summary>&nbsp;&nbsp;&nbsp;&nbsp;<a href="#roadmap">1. &nbsp;Roadmap</a></summary><br>
     <details><summary>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#completed-tasks">Completed Tasks:</a></summary><br>
       &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#crypto-functions-key">i. Crypto Functions</a><br><br>
@@ -165,15 +165,19 @@
 
 </details>
 
-
-## Introduction
+<details>
+  <summary><a name="introduction"></a><h2>Introduction</h2></summary>
 
 This project focuses on implementing [ $`\Pi_t`$ ](https://eprint.iacr.org/2024/885), a differentially anonymous mixnet architecture,
 to explore its performance under  
 various conditions. We will conduct experiments to determine the minimum number of rounds required for a given server load  
 and desired parameters $\epsilon$ and $\delta$.
 
-## Background
+</details>
+
+<details>
+  <summary><a name="background"></a><h2>Background</h2></summary>
+
 
 $`\Pi_t`$, s
 An anonymous communication channel allows parties to communicate over the Internet while concealing their identities. Onion routing is a widely used
@@ -182,6 +186,10 @@ implements $`\Pi_t`$, an advanced mixnet architecture that ensures differential 
 to Bob is statistically close to the view when Alice sends a message to Carol instead. This is significant because it provides privacy guarantees even
 if the adversary can observe a fraction of the network nodes and network traffic. While $\Pi_t$ has been described in https://eprint.iacr.org/2024/885,
 this project aims to implement it as a service model (the clients know all the servers, but the servers do not know all the clients).
+
+</details>
+
+<br>
 
 ## $\Pi_t$ Implementation Overview
 
