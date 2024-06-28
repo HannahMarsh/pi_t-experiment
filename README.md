@@ -1,18 +1,124 @@
 Implementing $\Pi_t$
 ================  
 
+# Roadmap
 
-**TODO**
+## Completed Tasks:
 
-- instead of a bruise counter,
-- Client: calculate how many checkpoint onions each node on path should expect
-- Client calculate time window for when onion should arrive at each hop
-- Node: calculate expected number of nonces for each layer
-- Node: check if onion is late or the nonce is not in expected set, add bruises if so
+### Crypto Functions: :key:
+- [x] ECDH key generation.
+  - See [internal/pi\_t/keys/ecdh.go](internal/pi_t/keys/ecdh.go)
+- [x] AES encryption/decryption functions.
+- [x] Pseudo-random functions `F1` and `F2`.
+  - See [internal/pi\_t/prf/prf.go](internal/pi_t/prf/prf.go)
+- [x] Onion `FormOnion`, `PeelOnion`, and related functions.
+  - See [internal/pi\_t/pi\_t\_functions.go](internal/pi_t/pi_t_functions.go)
 
-### References
+### Core Logic:
 
-- https://eprint.iacr.org/2024/885
+##### Define Data Structures and Methods: :open_file_folder:
+- [x] Configuration for global parameters.
+  - See [config/config.yaml](config/config.yaml), [config/config.go](config/config.go)
+- [x] **_Node_** model and server entrypoint
+  - See [internal/model/node/node.go](internal/model/node/node.go)
+  - See [cmd/node/main.go](cmd/node/main.go)
+- [x] **_Client_** model and server entrypoint
+  - See [internal/model/client/client.go](internal/model/client/client.go)
+- [x] **_Bulletin board_** model and server entrypoint
+  - See [internal/model/bulletin\_board/bulletin\_board.go](internal/model/bulletin_board/bulletin_board.go)
+  - See [cmd/bulletin_board/main.go](cmd/bulletin_board/main.go)
+
+
+##### API Handling (`application/json` with `gzip`): :globe_with_meridians:
+- [x] Implement http endpoints for bulletin board (`\register_node`, `\heartbeat`, `\register_intent_to_send`, `\status`)
+  - See [internal/model/bulletin\_board/bulletin\_board_handler.go](internal/model/bulletin_board/bulletin_board_handler.go)
+- [x] Implement http endpoints for nodes (`\receive_onion`, `\start_run`, `\status`)
+  - See [internal/model/node/node_handler.go](internal/model/node/node_handler.go)
+- [x] Implement http endpoints for clients (`\receive_onion`, `\start_run`, `\status`)
+  - See [internal/model/client/client_handler.go](internal/model/client/client_handler.go) 
+- [x] Define json data structures for API requests and responses.
+  - See [internal/api/structs (dir)](internal/api/structs)
+- [x] Use gzip content-encoding for sending and receiving onions.
+  - See [internal/api/api_functions/functions.go](internal/api/api_functions/functions.go)
+
+
+##### Initialization: :clapper:
+- [x] Node registration and heartbeat mechanism.
+  - See `registerWithBulletinBoard()`: [internal/model/node/node.go](internal/model/node/node.go)
+- [x] Client message generation, register intent-to-send.
+  - See `registerIntentToSend()`: [internal/model/client/client.go](internal/model/client/client.go)
+- [x] Broadcast start signal from bulletin board.
+  - See `signalStart()`: [internal/model/bulletin\_board/bulletin\_board.go](internal/model/bulletin_board/bulletin_board.go)
+- [x] Clients and nodes receive start signal and initiate the run.
+  - See `startRun()`: [internal/model/node/node.go](internal/model/node/node.go)
+  - See `startRun()`: [internal/model/client/client.go](internal/model/client/client.go)
+
+
+##### Onion Processing: :chestnut:
+- [x] Keep track of number of checkpoint onions received and expected for each layer.
+- [x] Mixers: Receive, process, bruise, and forward onions.
+  - See `receiveOnion()`: [internal/model/node/node.go](internal/model/node/node.go)
+- [x] Gatekeepers: Receive, process, check number of bruises, drop or forward onions.
+  - See `receiveOnion()`: [internal/model/node/node.go](internal/model/node/node.go)
+- [x] Clients: For each queued message, construct an onion and all checkpoint onions (returned as a bool array, `j -> true/fasle: create checkpoint for layer j` by `FormOnion`)
+  - See `formOnions()` and corresponding methods (`determineRoutingPath()`, etc.): [internal/model/node/node.go](internal/model/node/node.go)
+- [x] Clients: Send onions to the first hop in the routing path.
+- [x] Clients: Receive onions from the last hop in the routing path.
+  - See `receiveOnion()`: [internal/model/client/client.go](internal/model/client/client.go)
+
+### Metric Collection:
+
+##### Monitoring and Visualization: :bar_chart:
+- [x] Implement a program that periodically collects metrics from the `/status` endpoints of all nodes and clients.
+  - See [cmd/metrics/main.go](cmd/metrics/main.go)
+- [x] (used for debugging onion routing logic) Process and format data in tables, display in html
+  - See [static/pages/visualization/index.html](static/pages/visualization/index.html)
+  - See [static/pages/nodes/index.html](static/pages/nodes/index.html)
+  - See [static/pages/messages/index.html](static/pages/messages/index.html)
+  - See [static/pages/checkpoints/index.html](static/pages/checkpoints/index.html)
+  - See [static/pages/client/index.html](static/pages/client/index.html)
+  - See [static/pages/rounds/index.html](static/pages/rounds/index.html)
+
+
+### Testing :test_tube:
+  
+- [x] Write unit tests for key generation.
+- [x] Write unit tests for onion formation and peeling.
+  - See [internal/pi\_t/pi\_t\_functions\_test.go](internal/pi_t/pi_t_functions_test.go)
+- [x] Test nonce verification.
+- [x] Integrate tests with CI pipeline.
+
+### Documentation :blue_book:
+
+- [x] Update README with detailed descriptions of each module and function.
+- [x] Provide usage examples and setup instructions.
+- [x] Update roadmap with latest changes.
+
+
+## TODO (Pending Tasks)
+
+### Crypto / Onion Functions: :key:
+- [ ] Ensure that sepal block management does not reveal positional information.
+- [ ] Implement additional dummy layers to mask actual number of active layers.
+- [ ] Replace bruise counter with copies of shared key.
+- [ ] Bug: Why are ~15% of nonce validations failing throughout the run? This results in about 5% of all onions being dropped (with $`d = 3`$ )
+
+
+### Client-Side: :bust_in_silhouette:
+- [ ] Calculate time window for when onion should arrive at each hop.
+
+### Node-Side: :computer:
+- [ ] Mixers: Instead of incrementing a bruise counter, handle multiple key slots that contain copies of the decryption key.
+- [ ] Local clock handling and synchronization.
+- [ ] Check if onion is late or the nonce is not in expected set, and add bruises if so.
+
+### Adversary Simulation: :trollface:
+- [ ] Implement functions to simulate adversarial behaviors.
+- [ ] Add configuration parameters to control these actions.
+- [ ] Collect and analyze data on the adversary’s view.
+- [ ] Verify differential privacy guarantees by comparing adversary views.
+- [ ] Calculate empirical probability of adversary’s view for dataset pairs.
+
 
 ## Introduction
 
@@ -314,3 +420,7 @@ go run cmd/metrics/main.go -port 8200
 For a small number of clients/nodes, this makes debugging easier.
 
 ![](img/vis.png)
+
+### References
+
+- https://eprint.iacr.org/2024/885
