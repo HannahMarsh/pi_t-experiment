@@ -1,6 +1,7 @@
 package api_functions
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -399,171 +400,197 @@ func TestReceiveCheckpointOnions(t *testing.T) {
 }
 
 func TestReceiveOnionMultipleLayers2(t *testing.T) {
-	pl.SetUpLogrusAndSlog("debug")
+	for nnn := 0; nnn < 100; nnn++ {
+		pl.SetUpLogrusAndSlog("debug")
 
-	if err := config.InitGlobal(); err != nil {
-		slog.Error("failed to init config", err)
-		os.Exit(1)
-	}
-
-	var err error
-
-	numNodes := 7
-
-	type node struct {
-		privateKeyPEM string
-		publicKeyPEM  string
-		address       string
-		port          int
-	}
-
-	nodes := make([]node, numNodes)
-
-	for i := 0; i < numNodes; i++ {
-		privateKeyPEM, publicKeyPEM, err := keys.KeyGen()
-		if err != nil {
-			t.Fatalf("KeyGen() error: %v", err)
+		if err := config.InitGlobal(); err != nil {
+			slog.Error("failed to init config", err)
+			os.Exit(1)
 		}
-		port := 8080 + i
-		nodes[i] = node{privateKeyPEM, publicKeyPEM, fmt.Sprintf("http://localhost:%d", port), port}
-	}
 
-	nodes[0].port = 8101
-	nodes[0].address = fmt.Sprintf("http://localhost:%d", nodes[0].port)
+		var err error
 
-	nodes[numNodes-1].port = 8102
-	nodes[numNodes-1].address = fmt.Sprintf("http://localhost:%d", nodes[numNodes-1].port)
+		numNodes := 7
 
-	slog.Info(strings.Join(utils.Map(nodes, func(n node) string { return config.AddressToName(n.address) }), " -> "))
+		type node struct {
+			privateKeyPEM string
+			publicKeyPEM  string
+			address       string
+			port          int
+		}
 
-	secretMessage := "secret message"
+		nodes := make([]node, numNodes)
 
-	payload, err := json.Marshal(structs.Message{
-		Msg:  secretMessage,
-		To:   nodes[numNodes-1].address,
-		From: nodes[0].address,
-	})
-	if err != nil {
-		slog.Error("json.Marshal() error", err)
-		t.Fatalf("json.Marshal() error: %v", err)
-	}
+		for i := 0; i < numNodes; i++ {
+			privateKeyPEM, publicKeyPEM, err := keys.KeyGen()
+			if err != nil {
+				t.Fatalf("KeyGen() error: %v", err)
+			}
+			port := 8080 + i
+			nodes[i] = node{privateKeyPEM, publicKeyPEM, fmt.Sprintf("http://localhost:%d", port), port}
+		}
 
-	publicKeys := utils.Map(nodes, func(n node) string { return n.publicKeyPEM })
-	routingPath := utils.Map(nodes, func(n node) string { return n.address })
+		nodes[0].port = 8101
+		nodes[0].address = fmt.Sprintf("http://localhost:%d", nodes[0].port)
 
-	_, onionStr, _, err := pi_t.FormOnion(nodes[0].privateKeyPEM, nodes[0].publicKeyPEM, payload, publicKeys[1:], routingPath[1:], -1, nodes[0].address)
-	if err != nil {
-		t.Fatalf("FormOnion() error: %v", err)
-	}
+		nodes[numNodes-1].port = 8102
+		nodes[numNodes-1].address = fmt.Sprintf("http://localhost:%d", nodes[numNodes-1].port)
 
-	slog.Info("Done forming onion")
+		shuffled := utils.Copy(nodes[1 : numNodes-1])
+		utils.Shuffle(shuffled)
+		for i, node := range shuffled {
+			nodes[i+1] = node
+		}
 
-	var wg sync.WaitGroup
-	wg.Add(numNodes - 1)
+		slog.Info(strings.Join(utils.Map(nodes, func(n node) string { return config.AddressToName(n.address) }), " -> "))
 
-	for i := 1; i < numNodes-1; i++ {
-		i := i
+		secretMessage := "secret message"
+
+		payload, err := json.Marshal(structs.NewMessage(nodes[0].address, nodes[numNodes-1].address, secretMessage))
+		if err != nil {
+			slog.Error("json.Marshal() error", err)
+			t.Fatalf("json.Marshal() error: %v", err)
+		}
+
+		publicKeys := utils.Map(nodes, func(n node) string { return n.publicKeyPEM })
+		routingPath := utils.Map(nodes, func(n node) string { return n.address })
+
+		_, onionStr, _, err := pi_t.FormOnion(nodes[0].privateKeyPEM, nodes[0].publicKeyPEM, payload, publicKeys[1:], routingPath[1:], -1, nodes[0].address)
+		if err != nil {
+			t.Fatalf("FormOnion() error: %v", err)
+		}
+
+		//slog.Info("Done forming onion")
+
+		shutdownChans := make([]chan struct{}, numNodes-1)
+		for i := range shutdownChans {
+			shutdownChans[i] = make(chan struct{})
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(numNodes - 1)
+
+		for i := 1; i < numNodes-1; i++ {
+			i := i
+			go func() {
+				defer wg.Done()
+				mux := http.NewServeMux()
+				mux.HandleFunc("/receive", func(w http.ResponseWriter, r *http.Request) {
+					HandleReceiveOnion(w, r, func(onionStr string) error {
+						peelOnion, _, _, _, err2 := pi_t.PeelOnion(onionStr, nodes[i].privateKeyPEM)
+						if err2 != nil {
+							slog.Error("PeelOnion() error", err2)
+							t.Errorf("PeelOnion() error = %v", err2)
+							return err2
+						} else {
+							//slog.Info("PeelOnion() success", "i", i)
+						}
+
+						if peelOnion.NextHop != nodes[i+1].address {
+							pl.LogNewError("PeelOnion() expected next hop '%s', got %s", nodes[i+1].address, peelOnion.NextHop)
+							t.Errorf("PeelOnion() expected next hop '', got %s", peelOnion.NextHop)
+							return pl.NewError("PeelOnion() expected next hop '%s', got %s", nodes[i+1].address, peelOnion.NextHop)
+						}
+						if peelOnion.LastHop != nodes[i-1].address {
+							pl.LogNewError("PeelOnion() expected last hop '%s', got %s", nodes[i-1].address, peelOnion.LastHop)
+							t.Errorf("PeelOnion() expected last hop %s, got %s", nodes[i-1].address, peelOnion.LastHop)
+							return pl.NewError("PeelOnion() expected last hop '%s', got %s", nodes[i-1].address, peelOnion.LastHop)
+						}
+
+						headerAdded, err3 := pi_t.AddHeader(peelOnion, 1, nodes[i].privateKeyPEM, nodes[i].publicKeyPEM)
+						if err3 != nil {
+							slog.Error("AddHeader() error", err3)
+							t.Errorf("AddHeader() error = %v", err3)
+							return err3
+						}
+
+						err4 := SendOnion(peelOnion.NextHop, nodes[i].address, headerAdded)
+						if err4 != nil {
+							slog.Error("SendOnion() error", err4)
+							t.Errorf("SendOnion() error = %v", err4)
+							return err4
+						}
+
+						return nil
+					})
+				})
+				server := &http.Server{
+					Addr:    fmt.Sprintf(":%d", nodes[i].port),
+					Handler: mux,
+				}
+				go func() {
+					<-shutdownChans[i-1]
+					server.Shutdown(context.Background())
+				}()
+				if err2 := server.ListenAndServe(); err2 != nil && !errors.Is(err2, http.ErrServerClosed) {
+					slog.Error("failed to start HTTP server", err2)
+				}
+			}()
+		}
+
 		go func() {
-			defer wg.Done()
 			mux := http.NewServeMux()
 			mux.HandleFunc("/receive", func(w http.ResponseWriter, r *http.Request) {
 				HandleReceiveOnion(w, r, func(onionStr string) error {
-					peelOnion, _, _, _, err2 := pi_t.PeelOnion(onionStr, nodes[i].privateKeyPEM)
+
+					defer wg.Done()
+					peelOnion, _, _, _, err2 := pi_t.PeelOnion(onionStr, nodes[numNodes-1].privateKeyPEM)
 					if err2 != nil {
 						slog.Error("PeelOnion() error", err2)
 						t.Errorf("PeelOnion() error = %v", err2)
 						return err2
 					}
 
-					if peelOnion.NextHop != nodes[i+1].address {
-						pl.LogNewError("PeelOnion() expected next hop '%s', got %s", nodes[i+1].address, peelOnion.NextHop)
-						t.Errorf("PeelOnion() expected next hop '', got %s", peelOnion.NextHop)
-						return pl.NewError("PeelOnion() expected next hop '%s', got %s", nodes[i+1].address, peelOnion.NextHop)
+					var Msg structs.Message
+					err = json.Unmarshal([]byte(peelOnion.Payload), &Msg)
+					if err != nil {
+						slog.Error("json.Unmarshal() error", err)
+						t.Errorf("json.Unmarshal() error: %v", err)
+						return err
 					}
-					if peelOnion.LastHop != nodes[i-1].address {
-						pl.LogNewError("PeelOnion() expected last hop '%s', got %s", nodes[i-1].address, peelOnion.LastHop)
-						t.Errorf("PeelOnion() expected last hop %s, got %s", nodes[i-1].address, peelOnion.LastHop)
-						return pl.NewError("PeelOnion() expected last hop '%s', got %s", nodes[i-1].address, peelOnion.LastHop)
+					if Msg.Msg != secretMessage {
+						t.Errorf("PeelOnion() expected payload %s, got %s", string(payload), peelOnion.Payload)
+						return pl.NewError("PeelOnion() expected payload %s, got %s", string(payload), peelOnion.Payload)
+					}
+					if Msg.To != nodes[numNodes-1].address {
+						t.Errorf("PeelOnion() expected to address %s, got %s", nodes[numNodes-1].address, Msg.To)
+						return pl.NewError("PeelOnion() expected to address %s, got %s", nodes[numNodes-1].address, Msg.To)
+					}
+					if Msg.From != nodes[0].address {
+						t.Errorf("PeelOnion() expected from address %s, got %s", nodes[0].address, Msg.From)
+						return pl.NewError("PeelOnion() expected from address %s, got %s", nodes[0].address, Msg.From)
 					}
 
-					headerAdded, err3 := pi_t.AddHeader(peelOnion, 1, nodes[i].privateKeyPEM, nodes[i].publicKeyPEM)
-					if err3 != nil {
-						slog.Error("AddHeader() error", err3)
-						t.Errorf("AddHeader() error = %v", err3)
-						return err3
-					}
+					slog.Info("Successfully received message", "message", peelOnion.Payload)
 
-					err4 := SendOnion(peelOnion.NextHop, nodes[i].address, headerAdded)
-					if err4 != nil {
-						slog.Error("SendOnion() error", err4)
-						t.Errorf("SendOnion() error = %v", err4)
-						return err4
+					// Signal all servers to shut down
+					for _, ch := range shutdownChans {
+						close(ch)
 					}
 
 					return nil
 				})
 			})
 			server := &http.Server{
-				Addr:    fmt.Sprintf(":%d", nodes[i].port),
+				Addr:    fmt.Sprintf(":%d", nodes[numNodes-1].port),
 				Handler: mux,
 			}
+			go func() {
+				<-shutdownChans[numNodes-2]
+				server.Shutdown(context.Background())
+			}()
 			if err2 := server.ListenAndServe(); err2 != nil && !errors.Is(err2, http.ErrServerClosed) {
 				slog.Error("failed to start HTTP server", err2)
+				t.Errorf("failed to start HTTP server: %v", err2)
 			}
 		}()
-	}
 
-	go func() {
-		mux := http.NewServeMux()
-		mux.HandleFunc("/receive", func(w http.ResponseWriter, r *http.Request) {
-			HandleReceiveOnion(w, r, func(onionStr string) error {
-				peelOnion, _, _, _, err2 := pi_t.PeelOnion(onionStr, nodes[numNodes-1].privateKeyPEM)
-				if err2 != nil {
-					slog.Error("PeelOnion() error", err2)
-					t.Errorf("PeelOnion() error = %v", err2)
-					return err2
-				}
-
-				var Msg structs.Message
-				err = json.Unmarshal([]byte(peelOnion.Payload), &Msg)
-				if err != nil {
-					slog.Error("json.Unmarshal() error", err)
-					t.Errorf("json.Unmarshal() error: %v", err)
-					return err
-				}
-				if Msg.Msg != secretMessage {
-					t.Errorf("PeelOnion() expected payload %s, got %s", string(payload), peelOnion.Payload)
-					return pl.NewError("PeelOnion() expected payload %s, got %s", string(payload), peelOnion.Payload)
-				}
-				if Msg.To != nodes[numNodes-1].address {
-					t.Errorf("PeelOnion() expected to address %s, got %s", nodes[numNodes-1].address, Msg.To)
-					return pl.NewError("PeelOnion() expected to address %s, got %s", nodes[numNodes-1].address, Msg.To)
-				}
-				if Msg.From != nodes[0].address {
-					t.Errorf("PeelOnion() expected from address %s, got %s", nodes[0].address, Msg.From)
-					return pl.NewError("PeelOnion() expected from address %s, got %s", nodes[0].address, Msg.From)
-				}
-
-				slog.Info("Successfully received message", "message", peelOnion.Payload)
-
-				return nil
-			})
-		})
-		server := &http.Server{
-			Addr:    fmt.Sprintf(":%d", nodes[numNodes-1].port),
-			Handler: mux,
+		err = SendOnion(nodes[1].address, nodes[0].address, onionStr)
+		if err != nil {
+			slog.Error("SendOnion() error", err)
+			t.Fatalf("SendOnion() error = %v", err)
 		}
-		if err2 := server.ListenAndServe(); err2 != nil && !errors.Is(err2, http.ErrServerClosed) {
-			slog.Error("failed to start HTTP server", err2)
-			t.Errorf("failed to start HTTP server: %v", err2)
-		}
-	}()
 
-	err = SendOnion(nodes[1].address, nodes[0].address, onionStr)
-	if err != nil {
-		slog.Error("SendOnion() error", err)
-		t.Fatalf("SendOnion() error = %v", err)
+		wg.Wait()
 	}
-
-	wg.Wait()
 }

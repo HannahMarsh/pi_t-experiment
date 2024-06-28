@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"github.com/jfcg/sorty/v2"
+	"math/rand"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -235,6 +236,13 @@ func GetValues[K comparable, V any](m map[K]V) []V {
 		values = append(values, v)
 	}
 	return values
+}
+
+func Shuffle[T any](items []T) {
+	for i := len(items) - 1; i > 0; i-- {
+		j := rand.Intn(i + 1)
+		items[i], items[j] = items[j], items[i]
+	}
 }
 
 func GetKeys[K comparable, V any](m map[K]V) []K {
