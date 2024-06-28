@@ -169,9 +169,8 @@
   <summary><a name="introduction"></a><h2>Introduction</h2></summary>
 
 This project focuses on implementing [ $`\Pi_t`$ ](https://eprint.iacr.org/2024/885), a differentially anonymous mixnet architecture,
-to explore its performance under  
-various conditions. We will conduct experiments to determine the minimum number of rounds required for a given server load  
-and desired parameters $\epsilon$ and $\delta$.
+to explore its performance under various conditions. We will conduct experiments to determine the minimum number of rounds required
+for a given server load and desired parameters $\epsilon$ and $\delta$.
 
 </details>
 
@@ -179,13 +178,11 @@ and desired parameters $\epsilon$ and $\delta$.
   <summary><a name="background"></a><h2>Background</h2></summary>
 
 
-$`\Pi_t`$, s
-An anonymous communication channel allows parties to communicate over the Internet while concealing their identities. Onion routing is a widely used
-technique where messages are encapsulated in layers of encryption and sent through a series of intermediary nodes (relays). This project
-implements $`\Pi_t`$, an advanced mixnet architecture that ensures differential privacy, which means the adversary's view when Alice sends a message
+Onion routing is a widely used technique where messages are encapsulated in layers of encryption and sent through a series of intermediary nodes (relays). This project
+implements $`\Pi_t`$, which is designed to ensure differential privacy. This means the adversary's view when Alice sends a message
 to Bob is statistically close to the view when Alice sends a message to Carol instead. This is significant because it provides privacy guarantees even
-if the adversary can observe a fraction of the network nodes and network traffic. While $\Pi_t$ has been described in https://eprint.iacr.org/2024/885,
-this project aims to implement it as a service model (the clients know all the servers, but the servers do not know all the clients).
+if the adversary can observe a fraction of the network nodes and network traffic. While $\Pi_t$ has been described theoretically in https://eprint.iacr.org/2024/885,
+this project aims to implement it in a service model environment (where the clients know all the servers, but the servers do not know all the clients).
 
 </details>
 
