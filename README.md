@@ -3,6 +3,7 @@ Implementing $\Pi_t$
 
 
 **TODO**
+
 - instead of a bruise counter,
 - Client: calculate how many checkpoint onions each node on path should expect
 - Client calculate time window for when onion should arrive at each hop
@@ -10,24 +11,30 @@ Implementing $\Pi_t$
 - Node: check if onion is late or the nonce is not in expected set, add bruises if so
 
 ### References
+
 - https://eprint.iacr.org/2024/885
 
 ## Introduction
 
-This project focuses on implementing [ $`\Pi_t`$ ](https://eprint.iacr.org/2024/885), a differentially anonymous mixnet architecture, 
+This project focuses on implementing [ $`\Pi_t`$ ](https://eprint.iacr.org/2024/885), a differentially anonymous mixnet architecture,
 to explore its performance under  
 various conditions. We will conduct experiments to determine the minimum number of rounds required for a given server load  
 and desired parameters $\epsilon$ and $\delta$.
 
 ## Background
-$`\Pi_t`$, s
-An anonymous communication channel allows parties to communicate over the Internet while concealing their identities. Onion routing is a widely used technique where messages are encapsulated in layers of encryption and sent through a series of intermediary nodes (relays). This project implements $`\Pi_t`$, an advanced mixnet architecture that ensures differential privacy, which means the adversary's view when Alice sends a message to Bob is statistically close to the view when Alice sends a message to Carol instead. This is significant because it provides privacy guarantees even if the adversary can observe a fraction of the network nodes and network traffic. While $\Pi_t$ has been described in https://eprint.iacr.org/2024/885, this project aims to implement it as a service model (the clients know all the servers, but the servers do not know all the clients).
 
+$`\Pi_t`$, s
+An anonymous communication channel allows parties to communicate over the Internet while concealing their identities. Onion routing is a widely used
+technique where messages are encapsulated in layers of encryption and sent through a series of intermediary nodes (relays). This project
+implements $`\Pi_t`$, an advanced mixnet architecture that ensures differential privacy, which means the adversary's view when Alice sends a message
+to Bob is statistically close to the view when Alice sends a message to Carol instead. This is significant because it provides privacy guarantees even
+if the adversary can observe a fraction of the network nodes and network traffic. While $\Pi_t$ has been described in https://eprint.iacr.org/2024/885,
+this project aims to implement it as a service model (the clients know all the servers, but the servers do not know all the clients).
 
 ## $\Pi_t$ Implementation Overview
 
-
 ### Parameters
+
 - **$x$**: The server load (number of onions each node receives per round).
 - **$L$**:The number of rounds (also the length of the routing path).
 - **$\tau$**: The fraction of expected checkpoint onions needed for a node to progress its local clock.
@@ -59,6 +66,7 @@ An anonymous communication channel allows parties to communicate over the Intern
 ### Onion Structure:
 
 #### Header ($H$):
+
 - Consists of two parts: a [ ciphertext $`E_i`$ ](#Ei) and the [ rest of the header $`V_i`$ ](#Bi).
   - **$E_i$**: An encryption under the public key of the current processing party $P_i$ of the tuple <a name="Ei"></a>  
     $(i, y_i, k_i)$ where:
@@ -71,12 +79,14 @@ An anonymous communication channel allows parties to communicate over the Intern
     - The next hop in the routing path.
 
 #### Content ($C$):
+
 - Contains the payload or the next layer of the onion.
 - Encrypted under the [ layer key, $`k`$ ](#layer-key).
 - For intermediate nodes, it contains the encrypted content of the next onion layer.
 - For the final recipient, it contains the actual message.
 
 #### Sepal ($S$):
+
 - Protects the inner layers of the onion.
 - Consists of key-blocks and null-blocks.
 - The key-blocks are encrypted versions of the bulb master key $K$.
@@ -85,8 +95,8 @@ An anonymous communication channel allows parties to communicate over the Intern
   As each mixer processes the onion, it peels a layer from the sepal:
   - If unbruised, the rightmost sepal block is dropped, retaining the same number of key blocks.
   - If bruised, the leftmost sepal block is dropped, reducing the number of key blocks.
-  - This ensures that if the number of bruises exceeds a threshold $d$, the final gatekeeper cannot recover the master key $K$, making the onion undecryptable.
-
+  - This ensures that if the number of bruises exceeds a threshold $d$, the final gatekeeper cannot recover the master key $K$, making the onion
+    undecryptable.
 
 ### Node / Client Registration:
 
@@ -100,9 +110,9 @@ An anonymous communication channel allows parties to communicate over the Intern
 
 ### 1. Initialization:
 
-
 - When a client $k$ is notified of the start of a run, it receives a list of active nodes from the bulletin board.
-- For each message to be sent, the client constructs a routing path by selecting a random subset of [Mixers](#3-mixing-and-bruising) and [Gatekeepers](#5-gatekeeping) in the network.
+- For each message to be sent, the client constructs a routing path by selecting a random subset of [Mixers](#3-mixing-and-bruising)
+  and [Gatekeepers](#5-gatekeeping) in the network.
   - The first node in the path is always a Mixer.
   - The last node before the final destination is always a Gatekeeper.
 - The onion is constructed in layers, with the innermost layer containing the message encrypted with the recipient's public key.
@@ -114,8 +124,10 @@ An anonymous communication channel allows parties to communicate over the Intern
     to determine if it should create a checkpoint onion for that layer. It then uses F2 to generate a nonce for each   
     checkpoint onion with its own random routing path.
     - The construction of checkpoint onions follows the same layer-by-layer encryption process as the regular onions.   
-      The only difference is that checkpoint onions (a.k.a. dummy onions) don't carry a payload and instead provide cover for the "real" payload-carrying onions.
-    - Each layer of the onion contains the encrypted shared key which is used by the next node in the path to decrypt the layer. This shared key is encrypted with the public key of the respective node and included in the header of each layer.
+      The only difference is that checkpoint onions (a.k.a. dummy onions) don't carry a payload and instead provide cover for the "real"
+      payload-carrying onions.
+    - Each layer of the onion contains the encrypted shared key which is used by the next node in the path to decrypt the layer. This shared key is
+      encrypted with the public key of the respective node and included in the header of each layer.
 - All onions are sent to their first hop (a Mixer).
 
 ### 3. Mixing and Bruising:
@@ -126,7 +138,8 @@ An anonymous communication channel allows parties to communicate over the Intern
   - The window of expected arrival time for the onion.
   - The next hop in the path (another Mixer or a Gatekeeper).
 - The Mixer checks for delays or signs of tampering.
-  - To detect a delay, the mixer compares the received "time" (see [local time](#no-global-clock)) with an expected time window. If an onion arrives outside this window, it is considered delayed.
+  - To detect a delay, the mixer compares the received "time" (see [local time](#no-global-clock)) with an expected time window. If an onion arrives
+    outside this window, it is considered delayed.
   - To check for tampering, the mixer verifies the nonce against its expected set $Y_k$ (calculated with session key).
     - If the nonce is valid, the node removes the nonce from $Y_k$.
     - Otherwise, the onion is considered tampered with.
@@ -172,8 +185,6 @@ An anonymous communication channel allows parties to communicate over the Intern
 5. Calculate the empirical probability of the adversary’s view for each dataset.
 6. Verify that the privacy loss conforms to the differential privacy inequality (for &epsilon; and &delta;).
 
-
-
 ## Notes
 
 ### No Global Clock:
@@ -183,28 +194,33 @@ An anonymous communication channel allows parties to communicate over the Intern
   - **Checkpoints ($Y_k$)**: A set of expected nonces for the k-th layer checkpoint onions.
 
 1. **Receiving Onions**:
-  - A node $P_i$ (acting as a mixer) receives an onion $O$ and determines whether it was received "on time"   
-    or not relative to $P_i$'s local clock.
-  - If the onion $O$ arrived late, $P_i$ bruises the onion and forwards the bruised onion _O'_ to the next destination.
+
+- A node $P_i$ (acting as a mixer) receives an onion $O$ and determines whether it was received "on time"   
+  or not relative to $P_i$'s local clock.
+- If the onion $O$ arrived late, $P_i$ bruises the onion and forwards the bruised onion _O'_ to the next destination.
 
 2. **Processing Onions**:
-  - If $P_i$ is the last mixer on the routing path, it sends the peeled onion _O'_ to the first gatekeeper $G_1$.
-  - If $P_i$ is either early or on time, it places the peeled onion _O'_ in its message outbox.
+
+- If $P_i$ is the last mixer on the routing path, it sends the peeled onion _O'_ to the first gatekeeper $G_1$.
+- If $P_i$ is either early or on time, it places the peeled onion _O'_ in its message outbox.
 
 3. **Checking Nonces**:
-  - If processing $O$ reveals a non-empty nonce $y$ &ne; &perp;, $P_i$ checks whether $y$ belongs to the set   
-    $Y_k$ (the set of $k$-th layer checkpoint nonces P<sub>i</sub> expects to see from the onions it receives).
-  - If $y$ is expected, $P_i$ increments $c_k$ by one and updates $Y_k$ to exclude $y$.
+
+- If processing $O$ reveals a non-empty nonce $y$ &ne; &perp;, $P_i$ checks whether $y$ belongs to the set   
+  $Y_k$ (the set of $k$-th layer checkpoint nonces P<sub>i</sub> expects to see from the onions it receives).
+- If $y$ is expected, $P_i$ increments $c_k$ by one and updates $Y_k$ to exclude $y$.
 
 4. **Advancing the Local Clock**:
-  - Upon processing a sufficient number of j-th layer onions (i.e., if $c_j$ &geq; &tau; |$Y_j$|),   
-    $P_i$ sends out these onions (but not the onions for future hops) in random order and advances its local clock $c_j$ by one.
-  - Onions are batch-processed and sent out in random order at honest intermediaries when batch-processed.
+
+- Upon processing a sufficient number of j-th layer onions (i.e., if $c_j$ &geq; &tau; |$Y_j$|),   
+  $P_i$ sends out these onions (but not the onions for future hops) in random order and advances its local clock $c_j$ by one.
+- Onions are batch-processed and sent out in random order at honest intermediaries when batch-processed.
 
 ### Summary
 
-In the $\Pi_t$ protocol, nodes use local clocks to manage the timing and sequence of onion processing. This mechanism involves verifying nonces, detecting late onions, and advancing the clock based on a threshold of processed checkpoint onions. This approach ensures synchronized processing and robust detection of network disruptions without relying on a global clock.
-
+In the $\Pi_t$ protocol, nodes use local clocks to manage the timing and sequence of onion processing. This mechanism involves verifying nonces,
+detecting late onions, and advancing the clock based on a threshold of processed checkpoint onions. This approach ensures synchronized processing and
+robust detection of network disruptions without relying on a global clock.
 
 ### Path Information
 
@@ -222,15 +238,15 @@ Clone the repository:
 git clone https://github.com/HannahMarsh/pi_t-experiment.git;
 cd pi_t-experiment
 ```
-  
-Install dependencies:  
-  
+
+Install dependencies:
+
 ```bash
 bash go mod tidy
 ```
 
-Build the project:  
-  
+Build the project:
+
 ```bash
 go build -v ./...
 ```  
@@ -239,59 +255,62 @@ Development
 -----  
 
 Run tests:
+
 ```bash
 go test -v ./...
 ```
 
-Usage  
+Usage
 -----  
-  
-All configurations are set in the [`config/config.yaml`](config/config/yaml) file.  
-  
-### Running the Bulletin Board  
-  
+
+All configurations are set in the [`config/config.yaml`](config/config/yaml) file.
+
+### Running the Bulletin Board
+
 ```bash  
 go run cmd/bulletin-board/main.go
 ```  
-  
-### Running a Node  
-  
+
+### Running a Node
+
 ```bash  
 go run cmd/node/main.go -id=1
 ```  
-  
-### Running a Client  
-  
+
+### Running a Client
+
 ```bash  
 go run cmd/client/main.go -id=1
 ```  
-  
-### Serving Metrics  
-  
+
+### Serving Metrics
+
 ```bash  
 go run cmd/metrics/main.go -port 8200
 ```  
-  
-## Endpoints  
-  
-### Bulletin Board  
-- **Register Client**: `POST /register`  
-- **Register Node**: `POST /register`  
-- **Get Active Nodes**: `GET /nodes`  
-  
-### Node & Client  
-- **Receive Onion**: `POST /receive`  
-- **Get Status**: `GET /status`  
-- **Start Run**: `POST /start`  
-  
-### Metrics  
-- **Messages**: `GET /messages`  
-- **Nodes**: `GET /nodes`  
-- **Clients**: `GET /clients`  
-- **Checkpoint Onion Counts**: `GET /checkpoints`  
-- **Visualize Onion Paths**: `GET /visualization`  
-  
-  
-For a small number of clients/nodes, this makes debugging easier.  
-  
+
+## Endpoints
+
+### Bulletin Board
+
+- **Register Client**: `POST /register`
+- **Register Node**: `POST /register`
+- **Get Active Nodes**: `GET /nodes`
+
+### Node & Client
+
+- **Receive Onion**: `POST /receive`
+- **Get Status**: `GET /status`
+- **Start Run**: `POST /start`
+
+### Metrics
+
+- **Messages**: `GET /messages`
+- **Nodes**: `GET /nodes`
+- **Clients**: `GET /clients`
+- **Checkpoint Onion Counts**: `GET /checkpoints`
+- **Visualize Onion Paths**: `GET /visualization`
+
+For a small number of clients/nodes, this makes debugging easier.
+
 ![](img/vis.png)
