@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"crypto/ecdh"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
@@ -12,6 +13,7 @@ import (
 	"encoding/pem"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"io"
+	"math/big"
 )
 
 // KeyGen generates an ECDH key pair using the P256 curve.
@@ -44,6 +46,18 @@ func GenerateSymmetricKey() ([]byte, error) {
 		return nil, err
 	}
 	return key, nil
+}
+
+// GenerateScalar generates a random scalar for use in the Diffie-Hellman exchange.
+// Returns:
+// - A byte slice representing the scalar.
+// - An error object if an error occurred, otherwise nil.
+func GenerateScalar() ([]byte, error) {
+	scalar := make([]byte, 32) // 256-bit scalar
+	if _, err := rand.Read(scalar); err != nil {
+		return nil, err
+	}
+	return scalar, nil
 }
 
 // EncryptWithAES encrypts plaintext using AES encryption.
@@ -95,6 +109,72 @@ func DecryptWithAES(key []byte, ct string) ([]byte, error) {
 	stream.XORKeyStream(ciphertext, ciphertext)
 
 	return ciphertext, nil
+}
+
+// EncodeWithScalar encrypts the payload and returns the encrypted shared key and payload.
+// Parameters:
+// - payload: The plaintext payload to be encrypted.
+// - privateKeyPEM: The PEM-encoded private key of the node.
+// - publicKeyPEM: The PEM-encoded public key of the receiver.
+// - scalar: The random scalar used in the Diffie-Hellman exchange.
+// Returns:
+// - The encrypted shared key.
+// - The encrypted payload.
+func EncodeWithScalar(payload []byte, privateKeyPEM string, publicKeyPEM string, scalar []byte) (encryptedSharedKey string, encryptedPayload string, err error) {
+	symmetricKey, err := GenerateSymmetricKey()
+	if err != nil {
+		return "", "", pl.WrapError(err, "failed to generate symmetric key")
+	}
+
+	encryptedPayload, err = EncryptWithAES(symmetricKey, payload)
+	if err != nil {
+		return "", "", pl.WrapError(err, "failed to encrypt payload")
+	}
+
+	sharedKey, err := ComputeSharedKeyWithScalar(privateKeyPEM, publicKeyPEM, scalar)
+	if err != nil {
+		return "", "", pl.WrapError(err, "failed to compute shared key")
+	}
+
+	encryptedKey, err := EncryptWithAES(sharedKey, symmetricKey)
+	if err != nil {
+		return "", "", pl.WrapError(err, "failed to encrypt key")
+	}
+
+	return base64.StdEncoding.EncodeToString([]byte(encryptedKey)), encryptedPayload, nil
+}
+
+// DecodeWithScalar decrypts the encrypted shared key and payload.
+// Parameters:
+// - encryptedSharedKey: The base64-encoded encrypted shared key.
+// - encryptedPayload: The base64-encoded encrypted payload.
+// - privateKeyPEM: The PEM-encoded private key of the node.
+// - publicKeyPEM: The PEM-encoded public key of the sender.
+// Returns:
+// - The decrypted payload.
+// - An error object if an error occurred, otherwise nil.
+func DecodeWithScalar(encryptedSharedKey string, encryptedPayload string, privateKeyPEM string, publicKeyPEM string, scalar []byte) (decryptedPayload []byte, err error) {
+	encryptedKey, err := base64.StdEncoding.DecodeString(encryptedSharedKey)
+	if err != nil {
+		return nil, err
+	}
+
+	sharedKey, err := ComputeSharedKeyWithScalar(privateKeyPEM, publicKeyPEM, scalar)
+	if err != nil {
+		return nil, err
+	}
+
+	symmetricKey, err := DecryptWithAES(sharedKey, string(encryptedKey))
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedBytes, err := DecryptWithAES(symmetricKey, encryptedPayload)
+	if err != nil {
+		return nil, err
+	}
+
+	return decryptedBytes, nil
 }
 
 // Enc encrypts the payload and returns the encrypted shared key and payload.
@@ -199,29 +279,28 @@ func encodeKeys(privKey *ecdh.PrivateKey) (privateKeyPEM string, publicKeyPEM st
 // - privateKeyPEM: The PEM-encoded private key.
 // Returns:
 // - The decoded ECDH private key.
-// - An error object if an error occurred, otherwise nil.
-func decodePrivateKey(privateKeyPEM string) (*ecdh.PrivateKey, error) {
+func decodePrivateKey(privateKeyPEM string) (*ecdh.PrivateKey, *ecdsa.PrivateKey, error) {
 	block, _ := pem.Decode([]byte(privateKeyPEM))
 	if block == nil || block.Type != "EC PRIVATE KEY" {
-		return nil, pl.NewError("invalid private key PEM block")
+		return nil, nil, pl.NewError("invalid private key PEM block")
 	}
 
 	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
-		return nil, pl.WrapError(err, "failed to parse private key")
+		return nil, nil, pl.WrapError(err, "failed to parse private key")
 	}
 
 	privKeyECDSA, ok := key.(*ecdsa.PrivateKey)
 	if !ok {
-		return nil, pl.NewError("failed to cast key to *ecdsa.PrivateKey")
+		return nil, nil, pl.NewError("failed to cast key to *ecdsa.PrivateKey")
 	}
 
 	privKey, err := privKeyECDSA.ECDH()
 	if err != nil {
-		return nil, pl.WrapError(err, "failed to cast key to *ecdh.PrivateKey")
+		return nil, nil, pl.WrapError(err, "failed to cast key to *ecdh.PrivateKey")
 	}
 
-	return privKey, nil
+	return privKey, privKeyECDSA, nil
 }
 
 // decodePublicKey decodes the given PEM-encoded public key.
@@ -229,29 +308,28 @@ func decodePrivateKey(privateKeyPEM string) (*ecdh.PrivateKey, error) {
 // - publicKeyPEM: The PEM-encoded public key.
 // Returns:
 // - The decoded ECDH public key.
-// - An error object if an error occurred, otherwise nil.
-func decodePublicKey(publicKeyPEM string) (*ecdh.PublicKey, error) {
+func decodePublicKey(publicKeyPEM string) (*ecdh.PublicKey, *ecdsa.PublicKey, error) {
 	block, _ := pem.Decode([]byte(publicKeyPEM))
 	if block == nil || block.Type != "EC PUBLIC KEY" {
-		return nil, pl.NewError("invalid public key PEM block")
+		return nil, nil, pl.NewError("invalid public key PEM block")
 	}
 
 	key, err := x509.ParsePKIXPublicKey(block.Bytes)
 	if err != nil {
-		return nil, pl.WrapError(err, "failed to parse public key")
+		return nil, nil, pl.WrapError(err, "failed to parse public key")
 	}
 
 	pubKeyECDSA, ok := key.(*ecdsa.PublicKey)
 	if !ok {
-		return nil, pl.NewError("failed to cast key to *ecdsa.OriginalSenderPubKey")
+		return nil, nil, pl.NewError("failed to cast key to *ecdsa.ClientPubKey")
 	}
 
 	pubKey, err := pubKeyECDSA.ECDH()
 	if err != nil {
-		return nil, pl.WrapError(err, "failed to cast key to *ecdh.OriginalSenderPubKey")
+		return nil, nil, pl.WrapError(err, "failed to cast key to *ecdh.ClientPubKey")
 	}
 
-	return pubKey, nil
+	return pubKey, pubKeyECDSA, nil
 }
 
 // ComputeSharedKey computes the shared secret using the ECDH private key and a peer's public key.
@@ -262,12 +340,12 @@ func decodePublicKey(publicKeyPEM string) (*ecdh.PublicKey, error) {
 // - A byte slice representing the shared key.
 // - An error object if an error occurred, otherwise nil.
 func ComputeSharedKey(privKeyPEM, pubKeyPEM string) ([]byte, error) {
-	privKey, err := decodePrivateKey(privKeyPEM)
+	privKey, _, err := decodePrivateKey(privKeyPEM)
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to decode private key")
 	}
 
-	pubKey, err := decodePublicKey(pubKeyPEM)
+	pubKey, _, err := decodePublicKey(pubKeyPEM)
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to decode public key")
 	}
@@ -279,4 +357,71 @@ func ComputeSharedKey(privKeyPEM, pubKeyPEM string) ([]byte, error) {
 
 	hashedSharedKey := sha256.Sum256(sharedKey)
 	return hashedSharedKey[:], nil
+}
+
+// ComputeSharedKeyWithScalar computes the shared secret using the ECDH private key and a peer's public key.
+// Parameters:
+// - privKeyPEM: The PEM-encoded private key of the node.
+// - pubKeyPEM: The PEM-encoded public key of the peer.
+// - scalar: The random scalar used in the Diffie-Hellman exchange.
+// Returns:
+// - A byte slice representing the shared key.
+func ComputeSharedKeyWithScalar(privKeyPEM, pubKeyPEM string, scalar []byte) ([]byte, error) {
+	_, decodedPrivKeyECDSA, err := decodePrivateKey(privKeyPEM)
+	if err != nil {
+		return nil, pl.WrapError(err, "failed to decode private key")
+	}
+
+	decodedPubKeyECDH, _, err := decodePublicKey(pubKeyPEM)
+	if err != nil {
+		return nil, pl.WrapError(err, "failed to decode public key")
+	}
+
+	// Multiply the private key with the scalar
+	scaledPrivKey, err := scalePrivateKey(decodedPrivKeyECDSA, scalar)
+	if err != nil {
+		return nil, pl.WrapError(err, "failed to scale private key with scalar")
+	}
+
+	sharedKey, err := scaledPrivKey.ECDH(decodedPubKeyECDH)
+	if err != nil {
+		return nil, pl.WrapError(err, "failed to compute shared key")
+	}
+
+	hashedSharedKey := sha256.Sum256(sharedKey)
+	return hashedSharedKey[:], nil
+}
+
+// scalePrivateKey scales the given ECDH private key with the provided scalar.
+// Parameters:
+// - privKey: The ECDH private key.
+// - scalar: The scalar to multiply with the private key.
+// Returns:
+// - The scaled ECDH private key.
+func scalePrivateKey(privKeyECDSA *ecdsa.PrivateKey, scalar []byte) (*ecdh.PrivateKey, error) {
+	curve := elliptic.P256()
+	scalarBigInt := new(big.Int).SetBytes(scalar)
+
+	// Multiply the private key's D value by the scalar
+	scaledD := new(big.Int).Mul(privKeyECDSA.D, scalarBigInt)
+	scaledD.Mod(scaledD, curve.Params().N)
+
+	// Create a new ECDSA private key with the scaled D value
+	scaledPrivKeyECDSA := &ecdsa.PrivateKey{
+		PublicKey: ecdsa.PublicKey{
+			Curve: curve,
+		},
+		D: scaledD,
+	}
+
+	// Generate the public key from the scaled private key
+	scaledPrivKeyECDSA.PublicKey.X, scaledPrivKeyECDSA.PublicKey.Y = curve.ScalarBaseMult(scaledD.Bytes())
+
+	// Convert the scaled ECDSA private key back to an ECDH private key
+	scaledECDHPrivKey, err := scaledPrivKeyECDSA.ECDH()
+	if err != nil {
+		return nil, err
+	}
+
+	return scaledECDHPrivKey, nil
 }

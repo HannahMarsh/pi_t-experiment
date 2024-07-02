@@ -481,3 +481,16 @@ func FindLast[T any](items []T, f func(T) bool) *T {
 	}
 	return nil
 }
+
+func Count[T any](items []T, f func(T) bool) int {
+	if items == nil {
+		return 0
+	}
+	count := 0
+	for _, item := range items {
+		if f(item) {
+			count++
+		}
+	}
+	return count
+}

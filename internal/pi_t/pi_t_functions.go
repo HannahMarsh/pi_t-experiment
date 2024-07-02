@@ -27,9 +27,10 @@ type OnionPayload struct {
 // CombinedPayload represents the combined encrypted payload structure.
 // It includes the shared key from the original sender (client)
 type CombinedPayload struct {
-	EncryptedSharedKey   string // The encrypted shared key
-	EncryptedPayload     string // The encrypted payload
-	OriginalSenderPubKey string // The original sender's public key
+	EncryptedSharedKey string // The encrypted shared key
+	EncryptedPayload   string // The encrypted payload
+	ClientPubKey       string // The original sender's public key
+	ClientScalar       string // The original sender's scalar
 }
 
 // Header represents the header of the onion with the bruise counter.
@@ -55,6 +56,7 @@ type Header struct {
 // - An error object if an error occurred, otherwise nil.
 func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, publicKeys []string, routingPath []string, checkpoint int, clientAddr string) (string, string, []bool, error) {
 	var sendCheckPoints []bool
+
 	if checkpoint <= 0 {
 		sendCheckPoints = make([]bool, len(publicKeys))
 		for i := range sendCheckPoints {
@@ -65,6 +67,11 @@ func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, public
 	for i := len(publicKeys) - 1; i >= 0; i-- {
 		var layerBytes []byte
 		var err error
+
+		scalar, err := keys.GenerateScalar()
+		if err != nil {
+			return "", "", nil, pl.WrapError(err, "failed to generate scalar")
+		}
 
 		if i == len(publicKeys)-1 {
 			layerBytes = payload
@@ -89,12 +96,12 @@ func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, public
 			var nonce []byte
 			if checkpoint <= 0 {
 				// Use PRF_F1 to determine if a checkpoint onion is expected
-				checkpointExpected := prf.PRF_F1(privateKeyPEM, publicKeys[i], i)
+				checkpointExpected := prf.PRF_F1(privateKeyPEM, publicKeys[i], scalar, i)
 				if checkpointExpected == 0 {
 					sendCheckPoints[i] = true
 				}
 				if checkpointExpected == 0 {
-					nonce = prf.PRF_F2(privateKeyPEM, publicKeys[i], i)
+					nonce = prf.PRF_F2(privateKeyPEM, publicKeys[i], scalar, i)
 				}
 			}
 			if nonce == nil {
@@ -113,12 +120,13 @@ func FormOnion(privateKeyPEM string, publicKeyPEM string, payload []byte, public
 			}
 		}
 
-		encryptedSharedKey, encryptedPayload, err := keys.Enc(layerBytes, privateKeyPEM, publicKeys[i])
+		encryptedSharedKey, encryptedPayload, err := keys.EncodeWithScalar(layerBytes, privateKeyPEM, publicKeys[i], scalar)
 
 		combinedPayload := CombinedPayload{
-			EncryptedSharedKey:   encryptedSharedKey, //base64.StdEncoding.EncodeToString([]byte(encryptedKey)),
-			EncryptedPayload:     encryptedPayload,
-			OriginalSenderPubKey: publicKeyPEM,
+			EncryptedSharedKey: encryptedSharedKey, //base64.StdEncoding.EncodeToString([]byte(encryptedKey)),
+			EncryptedPayload:   encryptedPayload,
+			ClientPubKey:       publicKeyPEM,
+			ClientScalar:       base64.StdEncoding.EncodeToString(scalar),
 		}
 
 		payload, err = json.Marshal(combinedPayload)
@@ -248,7 +256,12 @@ func peelOnionAfterRemovingPayload(onion string, privateKeyPEM string) (*OnionPa
 		return nil, true, false, pl.WrapError(err, "failed to unmarshal combined payload")
 	}
 
-	decryptedBytes, err := keys.Dec(combinedPayload.EncryptedSharedKey, combinedPayload.EncryptedPayload, privateKeyPEM, combinedPayload.OriginalSenderPubKey)
+	scalar, err := base64.StdEncoding.DecodeString(combinedPayload.ClientScalar)
+	if err != nil {
+		return nil, true, false, pl.WrapError(err, "failed to decode scalar")
+	}
+
+	decryptedBytes, err := keys.DecodeWithScalar(combinedPayload.EncryptedSharedKey, combinedPayload.EncryptedPayload, privateKeyPEM, combinedPayload.ClientPubKey, scalar)
 
 	decryptedPayload := string(decryptedBytes)
 
@@ -273,9 +286,9 @@ func peelOnionAfterRemovingPayload(onion string, privateKeyPEM string) (*OnionPa
 		return nil, true, false, pl.WrapError(err, "failed to decode nonce")
 	}
 
-	checkpointExpected := prf.PRF_F1(privateKeyPEM, combinedPayload.OriginalSenderPubKey, layer.Layer)
+	checkpointExpected := prf.PRF_F1(privateKeyPEM, combinedPayload.ClientPubKey, scalar, layer.Layer)
 	if checkpointExpected == 0 {
-		expectedNonce := prf.PRF_F2(privateKeyPEM, combinedPayload.OriginalSenderPubKey, layer.Layer)
+		expectedNonce := prf.PRF_F2(privateKeyPEM, combinedPayload.ClientPubKey, scalar, layer.Layer)
 		if !hmac.Equal(nonce, expectedNonce) {
 			slog.Warn("nonce verification failed")
 			return &layer, false, true, nil

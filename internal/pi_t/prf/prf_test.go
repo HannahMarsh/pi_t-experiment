@@ -92,7 +92,7 @@ func TestPRF_F2(t *testing.T) {
 }
 
 func computeExpectedPRF_F1(privateKeyPEM, publicKeyPEM string, j int) int {
-	sharedKey, err := keys.ComputeSharedKey(privateKeyPEM, publicKeyPEM)
+	sharedKey, err := keys.ComputeSharedKeyWithScalar(privateKeyPEM, publicKeyPEM)
 	if err != nil {
 		log.Fatalf("failed to compute shared key: %v", err)
 	}
@@ -103,7 +103,7 @@ func computeExpectedPRF_F1(privateKeyPEM, publicKeyPEM string, j int) int {
 }
 
 func computeExpectedPRF_F2(privateKeyPEM, publicKeyPEM string, j int) []byte {
-	sharedKey, err := keys.ComputeSharedKey(privateKeyPEM, publicKeyPEM)
+	sharedKey, err := keys.ComputeSharedKeyWithScalar(privateKeyPEM, publicKeyPEM)
 	if err != nil {
 		log.Fatalf("failed to compute shared key: %v", err)
 	}

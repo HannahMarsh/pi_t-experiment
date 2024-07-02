@@ -15,8 +15,8 @@ import (
 // - j: The current hop index.
 // Returns:
 // - An integer, 0 or 1, indicating whether a checkpoint onion is expected.
-func PRF_F1(privateKeyPEM, publicKeyPEM string, j int) int {
-	sharedKey, err := keys.ComputeSharedKey(privateKeyPEM, publicKeyPEM)
+func PRF_F1(privateKeyPEM, publicKeyPEM string, scalar []byte, j int) int {
+	sharedKey, err := keys.ComputeSharedKeyWithScalar(privateKeyPEM, publicKeyPEM, scalar)
 	if err != nil {
 		slog.Error("failed to compute shared key", err)
 		return 0
@@ -37,8 +37,8 @@ func PRF_F1(privateKeyPEM, publicKeyPEM string, j int) int {
 // - j: The current hop index.
 // Returns:
 // - A byte slice representing the expected nonce.
-func PRF_F2(privateKeyPEM, publicKeyPEM string, j int) []byte {
-	sharedKey, err := keys.ComputeSharedKey(privateKeyPEM, publicKeyPEM)
+func PRF_F2(privateKeyPEM, publicKeyPEM string, scalar []byte, j int) []byte {
+	sharedKey, err := keys.ComputeSharedKeyWithScalar(privateKeyPEM, publicKeyPEM, scalar)
 	if err != nil {
 		slog.Error("failed to compute shared key", err)
 		return nil

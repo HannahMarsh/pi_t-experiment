@@ -424,7 +424,7 @@ func (c *Client) Receive(o string) error {
 			c.status.AddReceived(msg)
 
 		} else {
-			return pl.NewError("Received onion", "destination", peeled.NextHop)
+			return pl.NewError("Received non-destination onion. Expected 'nextHop' to be empty (\"\"), but instead got \"%s\".", peeled.NextHop)
 		}
 	}
 	return nil
