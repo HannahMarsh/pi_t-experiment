@@ -130,9 +130,15 @@
 <summary><a name="todo-pending-tasks"></a>TODO (Pending Tasks)</summary>
 
 #### Crypto / Onion Functions: :key:
+- [ ] Implement sepal / header / content onion layers (replacing all existing functions in [/internal/pi_t/pi_t_functions.go](/internal/pi_t/pi_t_functions.go)).
+- [ ] Instead of incrementing a bruise counter, handle multiple key slots that contain copies of the final decryption key.
+- [ ] Bulletin board should tell nodes (relays) which nonces to expect for each round.
+- [ ] Routing path needs to have all mixers first, then all gatekeepers (as opposed to a random mix besides the first and last nodes)].
+- [ ] l1 (number of mixers) and l2 (number of gatekeepers) should be fixed and given in the config file.
+- [ ] Fix logic in client during checkpoint onion construction. ( $`P_k \in Parties`$ is not a routing path, refer to section 5.2 in [Bruisable Onions](https://eprint.iacr.org/2024/885))
+- [ ] Replace CFB encryption/decryption with CTR ([/internal/pi_t/keys/ecdh.go](/internal/pi_t/keys/ecdh.go))
+- [ ] Investigate benefits of replacing 255 curve with low-level 25519 ([/internal/pi_t/keys/ecdh.go](/internal/pi_t/keys/ecdh.go))
 - [ ] Ensure that sepal block management does not reveal positional information.
-- [ ] Implement additional dummy layers to mask actual number of active layers.
-- [ ] Replace bruise counter with copies of shared key.
 - [ ] Bug: Why are ~15% of nonce validations failing throughout the run? This results in about 5% of all onions being dropped (with $`d = 3`$ )
 
 
@@ -140,7 +146,7 @@
 - [ ] Calculate time window for when onion should arrive at each hop.
 
 #### Node-Side: :computer:
-- [ ] Mixers: Instead of incrementing a bruise counter, handle multiple key slots that contain copies of the decryption key.
+- [ ] Bruising removes the left most key slot, not bruising removes right-most slot.
 - [ ] Local clock handling and synchronization.
 - [ ] Check if onion is late or the nonce is not in expected set, and add bruises if so.
 
@@ -152,12 +158,7 @@
 - [ ] Calculate empirical probability of adversary’s view for dataset pairs.
 
 #### Test in a Distributed Environment
-- [ ] Finish setting up docker containers for the client and node
-- [ ] Obtain access to remote servers
-- [ ] Update the config.yaml file with the urls of each server
-- [ ] Pull the docker images on these servers
-- [ ] Build and run the containers
-- [ ] Start the bulletin board and begin collecting metrics
+- [ ] Look into [cloudlab](https://cloudlab.us/) for deploying
 
 </details>
 
