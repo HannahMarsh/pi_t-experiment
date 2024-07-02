@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/keys"
+	"golang.org/x/exp/slog"
 	"log"
 	"testing"
 )
@@ -23,17 +24,22 @@ func TestPRF_F1(t *testing.T) {
 		if err != nil {
 			t.Fatalf("KeyGen() error: %v", err)
 		}
+		scalar, err := keys.GenerateScalar()
+		if err != nil {
+			slog.Error("failed to generate scalar", err)
+			t.Fatalf("GenerateScalar() error: %v", err)
+		}
 
 		hopIndex := 1
-		expectedResult := computeExpectedPRF_F1(privateKeyPEM, publicKeyPEM1, hopIndex)
-		actualResult := PRF_F1(privateKeyPEM, publicKeyPEM1, hopIndex)
+		expectedResult := computeExpectedPRF_F1(privateKeyPEM, publicKeyPEM1, scalar, hopIndex)
+		actualResult := PRF_F1(privateKeyPEM, publicKeyPEM1, scalar, hopIndex)
 
 		if expectedResult != actualResult {
 			t.Errorf("PRF_F1() = %d; want %d", actualResult, expectedResult)
 		}
 
-		expectedResult2 := computeExpectedPRF_F1(privateKeyPEM1, publicKeyPEM, hopIndex)
-		actualResult2 := PRF_F1(privateKeyPEM1, publicKeyPEM, hopIndex)
+		expectedResult2 := computeExpectedPRF_F1(privateKeyPEM1, publicKeyPEM, scalar, hopIndex)
+		actualResult2 := PRF_F1(privateKeyPEM1, publicKeyPEM, scalar, hopIndex)
 
 		if expectedResult2 != actualResult2 {
 			t.Errorf("PRF_F1() = %d; want %d", actualResult2, expectedResult2)
@@ -69,17 +75,22 @@ func TestPRF_F2(t *testing.T) {
 		if err != nil {
 			t.Fatalf("KeyGen() error: %v", err)
 		}
+		scalar, err := keys.GenerateScalar()
+		if err != nil {
+			slog.Error("failed to generate scalar", err)
+			t.Fatalf("GenerateScalar() error: %v", err)
+		}
 
 		hopIndex := 1
-		expectedResult := computeExpectedPRF_F2(privateKeyPEM, publicKeyPEM1, hopIndex)
-		actualResult := PRF_F2(privateKeyPEM, publicKeyPEM1, hopIndex)
+		expectedResult := computeExpectedPRF_F2(privateKeyPEM, publicKeyPEM1, scalar, hopIndex)
+		actualResult := PRF_F2(privateKeyPEM, publicKeyPEM1, scalar, hopIndex)
 
 		if !bytes.Equal(expectedResult, actualResult) {
 			t.Errorf("PRF_F2() = %x; want %x", actualResult, expectedResult)
 		}
 
-		expectedResult2 := computeExpectedPRF_F2(privateKeyPEM1, publicKeyPEM, hopIndex)
-		actualResult2 := PRF_F2(privateKeyPEM1, publicKeyPEM, hopIndex)
+		expectedResult2 := computeExpectedPRF_F2(privateKeyPEM1, publicKeyPEM, scalar, hopIndex)
+		actualResult2 := PRF_F2(privateKeyPEM1, publicKeyPEM, scalar, hopIndex)
 
 		if !bytes.Equal(expectedResult2, actualResult2) {
 			t.Errorf("PRF_F2() = %x; want %x", actualResult2, expectedResult2)
@@ -91,8 +102,8 @@ func TestPRF_F2(t *testing.T) {
 	}
 }
 
-func computeExpectedPRF_F1(privateKeyPEM, publicKeyPEM string, j int) int {
-	sharedKey, err := keys.ComputeSharedKeyWithScalar(privateKeyPEM, publicKeyPEM)
+func computeExpectedPRF_F1(privateKeyPEM, publicKeyPEM string, scalar []byte, j int) int {
+	sharedKey, err := keys.ComputeSharedKeyWithScalar(privateKeyPEM, publicKeyPEM, scalar)
 	if err != nil {
 		log.Fatalf("failed to compute shared key: %v", err)
 	}
@@ -102,8 +113,8 @@ func computeExpectedPRF_F1(privateKeyPEM, publicKeyPEM string, j int) int {
 	return int(result[0]) % 2 // Returns 0 or 1
 }
 
-func computeExpectedPRF_F2(privateKeyPEM, publicKeyPEM string, j int) []byte {
-	sharedKey, err := keys.ComputeSharedKeyWithScalar(privateKeyPEM, publicKeyPEM)
+func computeExpectedPRF_F2(privateKeyPEM, publicKeyPEM string, scalar []byte, j int) []byte {
+	sharedKey, err := keys.ComputeSharedKeyWithScalar(privateKeyPEM, publicKeyPEM, scalar)
 	if err != nil {
 		log.Fatalf("failed to compute shared key: %v", err)
 	}
