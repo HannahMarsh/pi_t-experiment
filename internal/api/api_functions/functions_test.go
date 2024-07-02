@@ -12,6 +12,7 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/keys"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"golang.org/x/exp/slog"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -103,6 +104,30 @@ import (
 //	}
 //}
 
+var usedPorts sync.Map
+
+// Helper function to get an available port
+func getAvailablePort() int {
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		slog.Error("failed to listen", err)
+		return -1
+	}
+	defer func(listener net.Listener) {
+		err := listener.Close()
+		if err != nil {
+			slog.Error("failed to close listener", err)
+		}
+	}(listener)
+	port := listener.Addr().(*net.TCPAddr).Port
+
+	// Check if port is already in use
+	if _, ok := usedPorts.LoadOrStore(port, true); ok {
+		return getAvailablePort()
+	}
+	return port
+}
+
 func TestReceiveOnion(t *testing.T) {
 	pl.SetUpLogrusAndSlog("debug")
 
@@ -111,7 +136,7 @@ func TestReceiveOnion(t *testing.T) {
 		os.Exit(1)
 	}
 
-	receiverPort := 8500
+	receiverPort := getAvailablePort()
 
 	privateKeyPEM, publicKeyPEM, err := keys.KeyGen()
 	if err != nil {
@@ -175,8 +200,8 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 		os.Exit(1)
 	}
 
-	receiverPort1 := 8500
-	receiverPort2 := 8501
+	receiverPort1 := getAvailablePort()
+	receiverPort2 := getAvailablePort()
 
 	privateKeyPEM, publicKeyPEM, err := keys.KeyGen()
 	if err != nil {
@@ -279,8 +304,8 @@ func TestReceiveCheckpointOnions(t *testing.T) {
 		os.Exit(1)
 	}
 
-	receiverPort1 := 8500
-	receiverPort2 := 8501
+	receiverPort1 := getAvailablePort()
+	receiverPort2 := getAvailablePort()
 
 	privateKeyPEM, publicKeyPEM, err := keys.KeyGen()
 	if err != nil {
@@ -426,14 +451,14 @@ func TestReceiveOnionMultipleLayers2(t *testing.T) {
 			if err != nil {
 				t.Fatalf("KeyGen() error: %v", err)
 			}
-			port := 8080 + i
+			port := getAvailablePort()
 			nodes[i] = node{privateKeyPEM, publicKeyPEM, fmt.Sprintf("http://localhost:%d", port), port}
 		}
 
-		nodes[0].port = 8101
+		nodes[0].port = getAvailablePort()
 		nodes[0].address = fmt.Sprintf("http://localhost:%d", nodes[0].port)
 
-		nodes[numNodes-1].port = 8102
+		nodes[numNodes-1].port = getAvailablePort()
 		nodes[numNodes-1].address = fmt.Sprintf("http://localhost:%d", nodes[numNodes-1].port)
 
 		shuffled := utils.Copy(nodes[1 : numNodes-1])
