@@ -242,9 +242,187 @@ server load and desired parameters $\epsilon$ and $\delta$.
 
 ### Tulip Bulb Structure:
 
+<table>
+  <tr>
+    <td>Header ($H_i$)</td>
+    <td>Content ($C_i$)</td>
+    <td>Stepel ($S_i$)</td>
+  </tr>
+  <tr>
+   <td>
+    <table>
+     <tr>
+      <td> $E_i$ </td>
+      <td> $B_{i,1}$ </td>
+      <td> $B_{i,2}$ </td>
+      <td> ... </td>
+      <td> $B_{i,l-1}$ </td>
+     </tr>
+    </table>
+   </td>
+   <td>
+    <table>
+     <tr>
+      <td> $\{ . . . \{ \{ \{m\}_{k_{l}} \}_{k_{l-1}} \}_{k_{l-2}} . . . \}_{k_{1}}$ </td>
+     </tr>
+    </table>
+   </td>
+   <td>
+    <table style="border: 0;">
+     <tr>
+      <td>
+       $\langle K \rangle$-blocks:<br>
+       <table>
+        <tr>
+         <td> $S_{i,1}$ </td>
+         <td> $S_{i,2}$ </td>
+         <td> ... </td>
+         <td> $S_{i,d}$ </td>
+        </tr>
+       </table>
+      </td>
+       <td>
+        $\langle 0 \rangle$-blocks:<br>
+       <table>
+        <tr>
+         <td> $S_{i,d+1}$ </td>
+         <td> $S_{i,d+2}$ </td>
+         <td> ... </td>
+         <td> $S_{i,l_{1}+1}$ </td>
+        </tr>
+       </table>
+      </td>
+     </tr>
+    </table>
+   </td>
+  </tr>
+</table>
+
+<table>
+ <tr>
+  <td>Header ($H_i$)</td>
+ </tr>
+ <tr>
+  <td>
+   <table>
+    <tr>
+     <td>$E_i$</td>
+     <td>$B_i$</td>
+    </tr>
+    <tr>
+     <td>
+      Enc( <br>
+      &nbsp; $pk$ ( $P_i$ ), <br>
+      &nbsp; $t_i$ ,  <br>
+      &nbsp; ( Role, $i$ , $y_i$ , $\vec{A}_i$ , $k_i$ ) <br>
+      )
+     </td>
+     <td>
+      <table>
+       <tr>
+        <td>$B_{i,1} = $</td>
+        <td>$B_{i,2} = $</td>
+        <td>...</td>
+        <td>$B_{i,l-1} = $</td>
+       </tr>
+       <tr>
+        <td>
+         <table>
+          <tr>
+           <td>
+            Encrypted with $k_{i}$:
+           </td>
+          </tr>
+          <tr>
+           <td>
+            <table>
+             <tr> <td> $I_{i+1}$ </td> <td> $E_{i+1}$ </td> </tr>
+            </table>
+           </td>
+          </tr>
+         </table>
+        </td>
+        <td>
+         <table>
+          <tr>
+           <td>Encrypted with $k_{i}$:</td>
+          </tr>
+          <tr>
+           <td>
+            <table>
+             <tr>
+              <td>
+               Encrypted with $k_{i+1}$:
+              </td>
+             </tr>
+             <tr>
+              <td>
+               <table>
+                <tr> <td> $I_{i+2}$ </td> <td> $E_{i+2}$ </td> </tr>
+               </table>
+              </td>
+             </tr>
+            </table>
+           </td>
+          </tr>
+         </table>
+        </td>
+        <td>...</td>
+        <td>
+         <table>
+          <tr>
+           <td>Encrypted with $k_{i}$:</td>
+          </tr>
+          <tr>
+           <td>
+            <table>
+             <tr>
+              <td>Encrypted with $k_{i+1}$:</td>
+             </tr>
+             <tr>
+              <td>
+               <table>
+                <tr>
+                 <td>...</td>
+                </tr>
+                <tr>
+                 <td>
+                  <table>
+                   <tr>
+                    <td>
+                     Encrypted with $k_{i+l-2}$:
+                    </td>
+                   </tr>
+                   <tr>
+                    <td>
+                     <table>
+                      <tr> <td> $I_{i+l-1}$ </td> <td> $E_{i+l-1}$ </td> </tr>
+                     </table>
+                    </td>
+                   </tr>
+                  </table>
+                 </td>
+                </tr>
+               </table>
+              </td>
+             </tr>
+            </table>
+           </td>
+          </tr>
+         </table>   
+        </td>
+       </tr>
+      </table>
+     </td>
+    </tr>
+   </table>
+  </td>
+ </tr>
+</table>
+
 #### Header ($H$):
 
-- Consists of two parts: a [ ciphertext $`E_i`$ ](#Ei) and the [ rest of the header $`V_i`$ ](#Bi).
+- Consists of two parts: a [ ciphertext $`E_i`$ ](#Ei) and the [ rest of the header $`B_i`$ ](#Bi).
   - **$E_i$**: An encryption under the public key of the current processing party $P_i$ of the tuple <a name="Ei"></a>  
     $(i, y_i, k_i)$ where:
     - $i$&nbsp; is the position in the route.
