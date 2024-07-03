@@ -1,4 +1,4 @@
-# Implementing $\Pi_t$
+# Implementing $\Pi_t$ :tulip:
 
 <details>
 <summary><h4><i>Table of Contents</i></h4></summary>
@@ -140,6 +140,9 @@
 - [ ] Ensure that sepal block management does not reveal positional information.
 - [ ] Bug: Why are ~15% of nonce validations failing throughout the run? This results in about 5% of all onions being dropped (with $`d = 3`$ )
 
+#### Bulletin Board: :newspaper:
+- [ ] How does the bulletin board calculate the expected nonces for each node and for each round?
+- [ ] How does the bulletin board calculate which nonces to give to which clients for forming their onions?
 
 #### Client-Side: :bust_in_silhouette:
 - [ ] Calculate time window for when onion should arrive at each hop.
@@ -148,6 +151,10 @@
 - [ ] Bruising removes the left most key slot, not bruising removes right-most slot.
 - [ ] Local clock handling and synchronization.
 - [ ] Check if onion is late or the nonce is not in expected set, and add bruises if so.
+
+
+#### Documentation: :blue_book:
+- [ ] Update README where it is marked <span style="color: red;">TODO</span>
 
 #### Adversary Simulation: :trollface:
 - [ ] Implement functions to simulate adversarial behaviors.
@@ -197,14 +204,15 @@ server load and desired parameters $\epsilon$ and $\delta$.
 - **$l_1$**: The number of mixers in each routing path.
 - **$l_2$**: The number of gatekeepers in each routing path.
 - **$L$**:The number of rounds (also the length of the routing path, equal to $`l_1 + l_2 + 1`$ ).
-- **$\tau$**: The fraction of expected checkpoint onions needed for a node to progress its local clock.
+- **$N$**: The number of active nodes in the network at the start of the protocol.
+- **$M$**: The approximate ratio of mixers to gatekeepers in the network.
+- **$R$**: The number of clients registered with intent-to-send at the start the protocol.
 - **$h$**: The heartbeat interval in seconds.
-- **$N$**: The minimum number of active nodes in the network at the start of the protocol.
-- **$R$**: The minimum number of clients registered with intent-to-send to start the protocol.
+- **$\tau$**: The fraction of expected checkpoint onions needed for a node to progress its local clock.
 - **$\epsilon$**: The privacy loss in the worst case scenario.
 - **$\delta$**: The probability of differential privacy violation due to the adversary's actions.
 - **$\lambda$**: The security parameter. We assume every quantity of the system, including $`N`$, $`R`$, $`L`$, and $`x`$, are polynomially bounded by $`\lambda`$.
-- **$d$**: Threshold for number of bruises before an onion is discard by a gatekeeper.
+- **$d$**: The number of key-blocks per sepal. (also the threshold for number of bruises before an onion is discard by a gatekeeper).
 - **$\theta$**: The maximum fraction of bruisable layers that can be bruised before the innermost tulip bulb becomes 
   unrecoverable. Note that $d = \theta \cdot l_1$
 - **$\xi$**: The fraction of $N$ nodes that can be corrupted and controlled by the adversary (the subset is chosen prior to execution).
@@ -219,13 +227,18 @@ server load and desired parameters $\epsilon$ and $\delta$.
 - Nodes publish part of a Diffie-Hellman exchange as part of their public keys.
   - See [internal/pi_t/keys/ecdh.go](internal/pi_t/keys/ecdh.go) for this project's ECDH usage.
 - Clients generate a random scalar $r$ for each onion to compute the shared secret with the server.
-- The client's part of the exchange is included in the onion header.
+- The client's part of the exchange is included in the onion header.  
+
+<div style="color: red;">TODO: update this:</div>
+
+```markdown
 - These shared keys are used (by the client during onion formation, and by a node when it processes the onion at layer $j$)   
   for each hop $j$ in the path with pseudorandom functions $F1(sk_{i,k}, j)$ and $F2(sk_{i,k}, j)$.
   - **$F1(sk_{i,k}, j)$**: If the result is 1, then a checkpoint onion is expected to be received by $P_i$   
     at hop $j$ and $y$ = $F2(sk_{i,k}, j)$ is used to calculate the expected nonce of that checkpoint onion.
     - See [internal/pi_t/prf/prf.go](/internal/pi_t/prf/prf.go) for `PRF_F1` and `PRF_F2` implementations.
 - **Checkpoints ($Y_k$)**: The set of expected nonces (calculated by _F2_) for the $k$-th layer checkpoint onions.
+```
 
 ### Tulip Bulb Structure:
 
@@ -261,23 +274,36 @@ server load and desired parameters $\epsilon$ and $\delta$.
   - This ensures that if the number of bruises exceeds a threshold $d$, the final gatekeeper cannot recover the master key $K$, making the onion
     undecryptable.
 
-### Node / Client Registration:
+### 1. Node / Client Registration:
 
 - Nodes publish their existence and public keys to the bulletin board.
   - See [internal/model/node/node.go](internal/model/node/node.go)
   - Nodes send periodic heartbeat messages so that the bulletin board can maintain a list of all active nodes in the network.
 - Clients register their intent to send messages with the bulletin board.
   - See [internal/model/client/client.go](internal/model/client/client.go)
-- When a sufficient number of nodes have registered, the bulletin board broadcasts a start signal
+- When a sufficient number of nodes are active (given by $N$ ), and a sufficient number of clients have registered their 
+  intent-to-send messages (given by $R$ ), the bulletin board broadcasts a start signal along with the following information.
+  - Each participating client receives:
+    - a list of active Mixers and Gatekeepers (along with their public keys and which checkpoint onions the client needs to create).
+  - All participating nodes receive:
+    - a list of expected nonces it should receive for each round _j_. 
   - See [internal/model/bulletin_board/bulletin_board.go](internal/model/bulletin_board/bulletin_board.go)
 
-### 1. Initialization:
+### 2. Initialization:
 
-- When a client $k$ is notified of the start of a run, it receives a list of active nodes from the bulletin board.
-- For each message to be sent, the client constructs a routing path by selecting a random subset of [Mixers](#3-mixing-and-bruising)
-  and [Gatekeepers](#5-gatekeeping) in the network.
-  - The first node in the path is always a Mixer.
-  - The last node before the final destination is always a Gatekeeper.
+- When a client $k$ is notified of the start of a run, it receives from the bulletin board:
+  - A list of participating Mixers and Gatekeepers where each relay node $P_i$ is associated with a public key $pk_i$ and a 
+    list of sets P_$Y_1,...,Y_{l_1}$ , where $Y_j$ represents the subset of nonces $P_i$ expects to receive during round _j_ 
+    which the client is responsible for sending.
+- For each message to be sent, the client constructs a routing path by selecting a random subset of $l_1& [Mixers](#3-mixing-and-bruising)
+  and $l_2$ [Gatekeepers](#5-gatekeeping) in the network.
+  - routing_path[ $1...l_1$ ] are Mixers.
+  - routing_path[ $l_1 + 1...l_1 + l_2$ ] are Gatekeepers.
+  - routing_path[ $l_1 + l_2 + 1$ ] is the final destination.
+
+<div style="color: red;">TODO: update this:</div>
+
+```markdown
 - The onion is constructed in layers, with the innermost layer containing the message encrypted with the recipient's public key.
   - Each subsequent layer $j$ contains encrypted metadata that includes:
     - A pseudorandom nonce that is unique to each onion (used to detect replay attacks).
@@ -291,10 +317,14 @@ server load and desired parameters $\epsilon$ and $\delta$.
       payload-carrying onions.
     - Each layer of the onion contains the encrypted shared key which is used by the next node in the path to decrypt the layer. This shared key is
       encrypted with the public key of the respective node and included in the header of each layer.
+```
 - All onions are sent to their first hop (a Mixer).
 
 ### 3. Mixing and Bruising:
 
+<div style="color: red;">TODO: update this:</div>
+
+```markdown
 - When a Mixer receives an onion and decrypts its outer layer (header), it reveals the following data:
   - Multiple key slots that contain copies of the decryption key. If an onion is bruised, one of these key slots is invalidated.
   - The nonce (decrypted using the session key shared with the original sender).
@@ -310,6 +340,7 @@ server load and desired parameters $\epsilon$ and $\delta$.
 - The onion is then forwarded to the next node in the path.
 - The number of protection layers is managed in a way that does not reveal any positional information. For instance,   
   additional dummy layers might be used to mask the actual number of active layers.
+```
 
 ### 4. Intermediate Nodes:
 
