@@ -6,12 +6,11 @@
 - [Roadmap](#roadmap)
   * [Completed Tasks](#completed-tasks)
   * [Pending Tasks](#todo-pending-tasks)
-- [Introduction](#introduction)
 - [Background](#background)
 - [Parameters](#parameters)
 - [No Global Clock](#no-global-clock)
 - [Session Keys](#session-keys)
-- [Onion Structure](#onion-structure)
+- [Tulip Bulb Structure](#tulip-bulb-structure)
   * [ Header ($`H`$) ](#header-h)
   * [ Content ($`C`$) ](#content-c)
   * [ Sepal ($`S`$) ](#sepal-s)
@@ -162,33 +161,53 @@
 
 </details>
 
-## Introduction
-
-This project focuses on implementing [ $`\Pi_t`$ ](https://eprint.iacr.org/2024/885), a differentially anonymous mixnet architecture,
-to explore its performance under various conditions. We will conduct experiments to determine the minimum number of rounds required
-for a given server load and desired parameters $\epsilon$ and $\delta$.
-
 ## Background
 
-Onion routing is a widely used technique where messages are encapsulated in layers of encryption and sent through a series of intermediary nodes (relays). This project
-implements $`\Pi_t`$, which is designed to ensure differential privacy. This means the adversary's view when Alice sends a message
-to Bob is statistically close to the view when Alice sends a message to Carol instead. This is significant because it provides privacy guarantees even
-if the adversary can observe a fraction of the network nodes and network traffic. While $\Pi_t$ has been described theoretically in https://eprint.iacr.org/2024/885,
-this project aims to implement it in a service model environment (where the clients know all the servers, but the servers do not know all the clients).
+A communication protocol achieves anonymity if no attacker can distinguish who is communicating with whom based on 
+observable data such as network traffic. Onion routing is a well-established technique for achieving anonymity, where messages 
+are encapsulated in layers of encryption and sent through a series of intermediary nodes (relays). However, onion routing 
+_alone_ does not protect against adversaries who can observe all network traffic, such as AS-level or ISP-level attackers.
+
+Mix networks (or _mixnets_) enhance onion routing by mixing messages at each relay, making it harder for adversaries to 
+correlate incoming and outgoing messages. Various mixnet architectures have been proposed, including
+[Vuvuzela](#vdHLZZ15) and [Stadium](#TGL-17). Despite their strong anonymity guarantees, these
+solutions assume synchronous communication, where time progresses in rounds, and message transmissions are lossless 
+and instantaneous. In practice, however, network communication is asynchronous and thus adversaries can exploit timing 
+discrepancies to correlate messages entering and leaving the network.
+
+$`\Pi_t`$ (_"t"_ for _"tulip"_ or _"threshold"_), is the first provably anonymous onion 
+routing protocol for the asynchronous communications setting. As described in [\[ALU24\]](#ALU24), this protocol introduces 
+several novel concepts such as [checkpoint onions]() and [bruising]().
+Theoretical analysis demonstrates that $\Pi_t$ can provide differential privacy (a slightly weaker guarantee than anonymity) even under strong 
+adversarial models. This means the adversary's view when Alice sends a message to Bob is statistically close to the 
+view when Alice sends a message to Carol instead. This analysis assumes a peer-to-peer network where nodes must discover each other, exchange keys, and
+manage communication paths independently. Unfortunately this leads to several practical challenges such as increased complexity, lower fault tolerance,
+and inconsistent security enforcement.
+
+This project aims to transition $`\Pi_t`$ to a service-model environment by introducing a fault-tolerant bulletin board that maintains a 
+consistent view of all active relays and coordinates the start of a run. Our objective is to explore its performance
+under various conditions, and so we will conduct experiments to determine the minimum number of rounds required for a given 
+server load and desired parameters $\epsilon$ and $\delta$.
 
 ## $\Pi_t$ Implementation Overview
 
 ### Parameters
 
 - **$x$**: The server load (number of onions each node receives per round).
-- **$L$**:The number of rounds (also the length of the routing path).
+- **$l_1$**: The number of mixers in each routing path.
+- **$l_2$**: The number of gatekeepers in each routing path.
+- **$L$**:The number of rounds (also the length of the routing path, equal to $`l_1 + l_2 + 1`$ ).
 - **$\tau$**: The fraction of expected checkpoint onions needed for a node to progress its local clock.
-- **$h$**: The heartbeat interval in seconds
+- **$h$**: The heartbeat interval in seconds.
 - **$N$**: The minimum number of active nodes in the network at the start of the protocol.
-- **$R$**: Approximate ratio of gatekeepers to mixers in a routing path.
+- **$R$**: The minimum number of clients registered with intent-to-send to start the protocol.
 - **$\epsilon$**: The privacy loss in the worst case scenario.
 - **$\delta$**: The probability of differential privacy violation due to the adversary's actions.
+- **$\lambda$**: The security parameter. We assume every quantity of the system, including $`N`$, $`R`$, $`L`$, and $`x`$, are polynomially bounded by $`\lambda`$.
 - **$d$**: Threshold for number of bruises before an onion is discard by a gatekeeper.
+- **$\theta$**: The maximum fraction of bruisable layers that can be bruised before the innermost tulip bulb becomes 
+  unrecoverable. Note that $d = \theta \cdot l_1$
+- **$\xi$**: The fraction of $N$ nodes that can be corrupted and controlled by the adversary (the subset is chosen prior to execution).
 
 ### No Global Clock:
 
@@ -208,7 +227,7 @@ this project aims to implement it in a service model environment (where the clie
     - See [internal/pi_t/prf/prf.go](/internal/pi_t/prf/prf.go) for `PRF_F1` and `PRF_F2` implementations.
 - **Checkpoints ($Y_k$)**: The set of expected nonces (calculated by _F2_) for the $k$-th layer checkpoint onions.
 
-### Onion Structure:
+### Tulip Bulb Structure:
 
 #### Header ($H$):
 
@@ -232,12 +251,11 @@ this project aims to implement it in a service model environment (where the clie
 
 #### Sepal ($S$):
 
-- Protects the inner layers of the onion.
+- Protects the inner layers of the onion by absorbing bruises (caused by delays, tampering, or replay attacks) during transit.
 - Consists of key-blocks and null-blocks.
 - The key-blocks are encrypted versions of the bulb master key $K$.
 - The null-blocks are encrypted versions of the value 0.
-- The purpose of the sepal is to absorb the bruising (delays, tampering, or replay attacks) during transit.   
-  As each mixer processes the onion, it peels a layer from the sepal:
+- As each mixer processes the onion, it peels a layer from the sepal:
   - If unbruised, the rightmost sepal block is dropped, retaining the same number of key blocks.
   - If bruised, the leftmost sepal block is dropped, reducing the number of key blocks.
   - This ensures that if the number of bruises exceeds a threshold $d$, the final gatekeeper cannot recover the master key $K$, making the onion
@@ -459,4 +477,15 @@ Obviously, it is not recommended to run the visualization program once we deploy
 
 ### References
 
-- https://eprint.iacr.org/2024/885
+- <a name="ALU24"></a>[\[ALU24\]](https://ia.cr/2024/885) - Ando M, Lysyanskaya A, Upfal E. Bruisable Onions: Anonymous Communication in the 
+Asynchronous Model. _Cryptology ePrint Archive_. 2024.
+  - [Link to PDF](https://eprint.iacr.org/2024/885.pdf)
+- <a name="TGL-17"></a>[\[TGL+17\]](https://doi.org/10.1145/3132747.3132783) - Nirvan Tyagi, Yossi Gilad, Derek Leung, 
+  Matei Zaharia, and Nickolai Zeldovich. Stadium: A distributed metadata-private messaging system. In Proceedings of the 26th
+  Symposium on Operating Systems Principles, Shanghai, China, October 28-31, 2017, pages 423–440. ACM, 2017.
+  - [Link to PDF](https://dl.acm.org/doi/pdf/10.1145/3132747.3132783)
+- <a name="vdHLZZ15"></a>[\[vdHLZZ15\]](https://doi.org/10.1145/2815400.2815417) - Jelle van den Hooff, David Lazar, Matei Zaharia, and Nickolai Zeldovich. Vuvuzela: scalable private 
+  messaging resistant to traffic analysis. In Ethan L. Miller and Steven Hand, editors, Proceedings of the 25th Symposium 
+  on Operating Systems Principles, SOSP 2015, Monterey, CA, USA, October 4-7, 2015, pages 137–152. ACM, 2015.
+  - [Link to PDF](https://dl.acm.org/doi/pdf/10.1145/2815400.2815417)
+
