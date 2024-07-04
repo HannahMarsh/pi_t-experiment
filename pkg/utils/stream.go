@@ -350,6 +350,15 @@ func FindIndex[T any](items []T, f func(T) bool) int {
 	return -1
 }
 
+func FindLastIndex[T any](items []T, f func(T) bool) int {
+	for i := len(items) - 1; i >= 0; i-- {
+		if f(items[i]) {
+			return i
+		}
+	}
+	return -1
+}
+
 func Copy[T any](items []T) []T {
 	result := make([]T, len(items))
 	copy(result, items)

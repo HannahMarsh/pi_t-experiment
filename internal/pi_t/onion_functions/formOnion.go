@@ -13,6 +13,7 @@ import (
 )
 
 const fixedLegnthOfMessage = 256
+const saltLength = 16
 
 // OnionLayer represents each layer of the onion with encrypted content, header, and sepals.
 type OnionLayer struct {
@@ -42,13 +43,51 @@ type CypherText struct {
 	Key       string
 }
 
-func generateSaltSpace() []byte {
-	space := make([]byte, 16)
+func (s Sepal) PeelSepal(layerKey []byte, addBruise bool, d int) (peeledSepal Sepal, err error) {
+
+	peeledSepal = Sepal{Blocks: make([]string, len(s.Blocks))}
+
+	// first decrypt all non-dropped blocks with the layer key
+	for j, sepalBlock := range s.Blocks {
+		_, decryptedString, err := keys.DecryptStringWithAES(layerKey, sepalBlock)
+		if err != nil {
+			return Sepal{}, pl.WrapError(err, "failed to decrypt sepal block")
+		} else {
+			peeledSepal.Blocks[j] = decryptedString
+		}
+	}
+	if addBruise { // "drop" left-most sepal block that hasn't already been bruised
+		//slog.Info("Dropping left-most sepal block")
+		peeledSepal.Blocks = peeledSepal.Blocks[1:]
+	} else { // "drop" right-most sepal block that hasn't already been dropped
+		//slog.Info("Dropping right-most sepal block")
+		peeledSepal.Blocks = peeledSepal.Blocks[:len(peeledSepal.Blocks)-1]
+	}
+	return peeledSepal, nil
+}
+
+func generateSaltSpace(length int) []byte {
+	space := make([]byte, length)
 	_, err := rand.Read(space)
 	if err != nil {
 		panic(err)
 	}
 	return space
+}
+
+func generateEncodedSaltSpace(length int) string {
+	space := generateSaltSpace(length)
+	return base64.StdEncoding.EncodeToString(space)
+}
+
+func saltEncodedValue(value string, length int) (string, error) {
+	decoded, err := base64.StdEncoding.DecodeString(value)
+	if err != nil {
+		return "", pl.WrapError(err, "failed to decode value")
+	}
+	salt := generateSaltSpace(length)
+	saltedValue := append(decoded, salt...)
+	return base64.StdEncoding.EncodeToString(saltedValue), nil
 }
 
 // FormOnion creates a forward onion from a message m, a path P, public keys pk, and metadata y.
@@ -78,7 +117,7 @@ func FORMONION(publicKey, privateKey, m string, mixers []string, gatekeepers []s
 	layerKeys := make([][]byte, l+1)
 	for i := range layerKeys {
 		layerKey, _ := keys.GenerateSymmetricKey()
-		layerKeys[i+1] = layerKey //base64.StdEncoding.EncodeToString(layerKey)
+		layerKeys[i] = layerKey //base64.StdEncoding.EncodeToString(layerKey)
 	}
 	K, _ := keys.GenerateSymmetricKey()
 	masterKey := base64.StdEncoding.EncodeToString(K)
@@ -91,31 +130,13 @@ func FORMONION(publicKey, privateKey, m string, mixers []string, gatekeepers []s
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to create sepal")
 	}
-
+	
 	// form header and content for penultimate onion layer
-	// Construct the innermost onion layer
 
-	C_l, err := keys.EncryptWithAES(layerKeys[l], message)
-	C_l_bytes, err := base64.StdEncoding.DecodeString(C_l)
-	if err != nil {
-		return nil, pl.WrapError(err, "failed to decode C_l")
-	}
-
-	C_arr := make([]string, l+1)
-	C_arr[l], err = keys.EncryptWithAES(K, C_l_bytes)
-	if err != nil {
-		return nil, pl.WrapError(err, "failed to encrypt C_l_minus_1")
-	}
-	for i := l - 1; i >= 1; i-- {
-		c_i_plus_1_bytes, err := base64.StdEncoding.DecodeString(C_arr[i+1])
-		C_arr[i], err = keys.EncryptWithAES(layerKeys[i], c_i_plus_1_bytes)
-		if err != nil {
-			return nil, pl.WrapError(err, "failed to encrypt C_i")
-		}
-	}
+	C_arr, err := formContent(layerKeys, l, message, K)
 
 	t_arr := make([]string, l+1)
-	t_arr[l] = hash(C_l)
+	t_arr[l] = C_arr[l]
 
 	E_arr := make([]string, l+1)
 	E_arr[l], err = Enc(publicKeys[l-1], t_arr[l], recipient, l, layerKeys[l])
@@ -181,12 +202,31 @@ func FORMONION(publicKey, privateKey, m string, mixers []string, gatekeepers []s
 	return onionLayers, nil
 }
 
+func formContent(layerKeys [][]byte, l int, message []byte, K []byte) ([]string, error) {
+	C_arr := make([]string, l+1)
+	C_l, _, err := keys.EncryptWithAES(layerKeys[l], message)
+	if err != nil {
+		return nil, pl.WrapError(err, "failed to encrypt C_l")
+	}
+	_, C_arr[l], err = keys.EncryptWithAES(K, C_l)
+	if err != nil {
+		return nil, pl.WrapError(err, "failed to encrypt C_l_minus_1")
+	}
+	for i := l - 1; i >= 1; i-- {
+		_, C_arr[i], err = keys.EncryptStringWithAES(layerKeys[i], C_arr[i+1])
+		if err != nil {
+			return nil, pl.WrapError(err, "failed to encrypt C_i")
+		}
+	}
+	return C_arr, nil
+}
+
 func createSepal(masterKey string, d int, layerKeys [][]byte, l int, l1 int) (Sepal, error) {
-	keyBlocks, err := constructKeyBlocks(masterKey, d, layerKeys[:l])
+	keyBlocks, err := constructKeyBlocks(masterKey, d, layerKeys[1:l]) // salted and encrypted under k_{1}...k_{l-1}
 	if err != nil {
 		return Sepal{}, pl.WrapError(err, "failed to construct key blocks")
 	}
-	nullBlocks, err := constructKeyBlocks("", l1, layerKeys[:l1])
+	nullBlocks, err := constructKeyBlocks("null", l1-d+1, layerKeys[1:l1+2]) // salted and encrypted under k_{1}...k_{l1+1}
 	if err != nil {
 		return Sepal{}, pl.WrapError(err, "failed to construct null blocks")
 	}
@@ -203,7 +243,7 @@ func EncryptB(address string, E string, layerKey []byte) (string, error) {
 	if err != nil {
 		return "", pl.WrapError(err, "failed to marshal b")
 	}
-	bEncrypted, err := keys.EncryptWithAES(layerKey, b)
+	_, bEncrypted, err := keys.EncryptWithAES(layerKey, b)
 	return bEncrypted, nil
 }
 
@@ -224,7 +264,7 @@ func Enc(publicKey string, tag string, role string, layer int, layerKey []byte) 
 		return "", pl.WrapError(err, "failed to decode public key")
 	}
 
-	E_l, err := keys.EncryptWithAES(k_l, cypherBytes)
+	_, E_l, err := keys.EncryptWithAES(k_l, cypherBytes)
 	if err != nil {
 		return "", pl.WrapError(err, "failed to encrypt ciphertext")
 	}
@@ -234,24 +274,19 @@ func Enc(publicKey string, tag string, role string, layer int, layerKey []byte) 
 func constructKeyBlocks(wrappedValue string, numBlocks int, layerKeys [][]byte) ([]string, error) {
 	keyBlocks := make([]string, numBlocks)
 	for j := 0; j < numBlocks; j++ {
-		S_1, err := base64.StdEncoding.DecodeString(wrappedValue)
-		if err != nil {
-			return nil, pl.WrapError(err, "failed to decode inner block")
-		}
-		S_1 = append(S_1, generateSaltSpace()...)
+		value := wrappedValue
 		for i := len(layerKeys) - 1; i >= 0; i-- {
 			k := layerKeys[i]
-			innerBlockCipher, err := keys.EncryptWithAES(k, S_1)
+			saltedValue, err := saltEncodedValue(value, saltLength)
+			if err != nil {
+				return nil, pl.WrapError(err, "failed to salt value")
+			}
+			_, value, err = keys.EncryptStringWithAES(k, saltedValue)
 			if err != nil {
 				return nil, pl.WrapError(err, "failed to encrypt inner block")
 			}
-			S_1, err = base64.StdEncoding.DecodeString(innerBlockCipher)
-			if err != nil {
-				return nil, pl.WrapError(err, "failed to decode inner block")
-			}
-			S_1 = append(S_1, generateSaltSpace()...)
 		}
-		keyBlocks[j] = base64.StdEncoding.EncodeToString(S_1)
+		keyBlocks[j] = value
 	}
 	return keyBlocks, nil
 }

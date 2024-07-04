@@ -65,24 +65,35 @@ func GenerateScalar() ([]byte, error) {
 // - key: The AES key.
 // - plaintext: The plaintext to be encrypted.
 // Returns:
-// - The base64-encoded ciphertext.
+// - The encrypted ciphertext.
+// - The encrypted ciphertext (base64-encoded as string).
 // - An error object if an error occurred, otherwise nil.
-func EncryptWithAES(key, plaintext []byte) (string, error) {
+func EncryptWithAES(key, plaintext []byte) (cipherText []byte, encodedCiphertext string, err error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
 
-	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
-	iv := ciphertext[:aes.BlockSize]
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		return "", err
+	cipherText = make([]byte, aes.BlockSize+len(plaintext))
+	iv := cipherText[:aes.BlockSize]
+	if _, err = io.ReadFull(rand.Reader, iv); err != nil {
+		return nil, "", err
 	}
 
-	stream := cipher.NewCFBEncrypter(block, iv)
-	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
+	stream := cipher.NewCFBEncrypter(block, iv) // replace with ctr
+	stream.XORKeyStream(cipherText[aes.BlockSize:], plaintext)
 
-	return base64.StdEncoding.EncodeToString(ciphertext), nil
+	encodedCiphertext = base64.StdEncoding.EncodeToString(cipherText)
+
+	return cipherText, encodedCiphertext, nil
+}
+
+func EncryptStringWithAES(key []byte, plaintext string) (cipherText []byte, encodedCiphertext string, err error) {
+	plainBytes, err := base64.StdEncoding.DecodeString(plaintext)
+	if err != nil {
+		return nil, "", pl.WrapError(err, "failed to decode plaintext")
+	}
+	return EncryptWithAES(key, plainBytes)
 }
 
 // DecryptWithAES decrypts ciphertext using AES encryption.
@@ -91,24 +102,33 @@ func EncryptWithAES(key, plaintext []byte) (string, error) {
 // - ct: The base64-encoded ciphertext to be decrypted.
 // Returns:
 // - The decrypted plaintext.
+// - The decrypted plaintext (base64-encoded as string).
 // - An error object if an error occurred, otherwise nil.
-func DecryptWithAES(key []byte, ct string) ([]byte, error) {
-	ciphertext, _ := base64.StdEncoding.DecodeString(ct)
+func DecryptWithAES(key []byte, ciphertext []byte) (plainText []byte, encodedPlainText string, err error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, err
+		return nil, "", pl.WrapError(err, "failed to create new cipher")
 	}
 
 	if len(ciphertext) < aes.BlockSize {
-		return nil, pl.NewError("ciphertext too short")
+		return nil, "", pl.NewError("ciphertext too short")
 	}
 	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
+	plainText = ciphertext[aes.BlockSize:]
 
 	stream := cipher.NewCFBDecrypter(block, iv)
-	stream.XORKeyStream(ciphertext, ciphertext)
+	stream.XORKeyStream(plainText, plainText)
 
-	return ciphertext, nil
+	encodedPlainText = base64.StdEncoding.EncodeToString(plainText)
+	return plainText, encodedPlainText, nil
+}
+
+func DecryptStringWithAES(key []byte, ct string) (plainText []byte, encodedPlainText string, err error) {
+	ciphertext, err := base64.StdEncoding.DecodeString(ct)
+	if err != nil {
+		return nil, "", pl.WrapError(err, "failed to decode ciphertext")
+	}
+	return DecryptWithAES(key, ciphertext)
 }
 
 // EncodeWithScalar encrypts the payload and returns the encrypted shared key and payload.
@@ -126,7 +146,7 @@ func EncodeWithScalar(payload []byte, privateKeyPEM string, publicKeyPEM string,
 		return "", "", pl.WrapError(err, "failed to generate symmetric key")
 	}
 
-	encryptedPayload, err = EncryptWithAES(symmetricKey, payload)
+	_, encryptedPayload, err = EncryptWithAES(symmetricKey, payload)
 	if err != nil {
 		return "", "", pl.WrapError(err, "failed to encrypt payload")
 	}
@@ -136,7 +156,7 @@ func EncodeWithScalar(payload []byte, privateKeyPEM string, publicKeyPEM string,
 		return "", "", pl.WrapError(err, "failed to compute shared key")
 	}
 
-	encryptedKey, err := EncryptWithAES(sharedKey, symmetricKey)
+	_, encryptedKey, err := EncryptWithAES(sharedKey, symmetricKey)
 	if err != nil {
 		return "", "", pl.WrapError(err, "failed to encrypt key")
 	}
@@ -164,12 +184,12 @@ func DecodeWithScalar(encryptedSharedKey string, encryptedPayload string, privat
 		return nil, err
 	}
 
-	symmetricKey, err := DecryptWithAES(sharedKey, string(encryptedKey))
+	symmetricKey, _, err := DecryptStringWithAES(sharedKey, string(encryptedKey))
 	if err != nil {
 		return nil, err
 	}
 
-	decryptedBytes, err := DecryptWithAES(symmetricKey, encryptedPayload)
+	decryptedBytes, _, err := DecryptStringWithAES(symmetricKey, encryptedPayload)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +212,7 @@ func Enc(payload []byte, privateKeyPEM string, publicKeyPEM string) (encryptedSh
 		return "", "", pl.WrapError(err, "failed to generate symmetric key")
 	}
 
-	encryptedPayload, err = EncryptWithAES(symmetricKey, payload)
+	_, encryptedPayload, err = EncryptWithAES(symmetricKey, payload)
 	if err != nil {
 		return "", "", pl.WrapError(err, "failed to encrypt payload")
 	}
@@ -202,7 +222,7 @@ func Enc(payload []byte, privateKeyPEM string, publicKeyPEM string) (encryptedSh
 		return "", "", pl.WrapError(err, "failed to compute shared key")
 	}
 
-	encryptedKey, err := EncryptWithAES(sharedKey, symmetricKey)
+	_, encryptedKey, err := EncryptWithAES(sharedKey, symmetricKey)
 	if err != nil {
 		return "", "", pl.WrapError(err, "failed to encrypt key")
 	}
@@ -230,12 +250,12 @@ func Dec(encryptedSharedKey string, encryptedPayload string, privateKeyPEM strin
 		return nil, err
 	}
 
-	symmetricKey, err := DecryptWithAES(sharedKey, string(encryptedKey))
+	symmetricKey, _, err := DecryptStringWithAES(sharedKey, string(encryptedKey))
 	if err != nil {
 		return nil, err
 	}
 
-	decryptedBytes, err := DecryptWithAES(symmetricKey, encryptedPayload)
+	decryptedBytes, _, err := DecryptStringWithAES(symmetricKey, encryptedPayload)
 	if err != nil {
 		return nil, err
 	}
