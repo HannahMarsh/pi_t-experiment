@@ -5,10 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"golang.org/x/exp/constraints"
 	"golang.org/x/exp/slog"
 	"io"
 	rng "math/rand"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -81,9 +83,113 @@ func GenerateRandomString(str string) string {
 	return hashString
 }
 
+func DropLastElement[T any](elements []T) []T {
+	if elements == nil || len(elements) <= 1 {
+		return []T{}
+	}
+	return elements[:len(elements)-1]
+}
+
+func DropFirstElement[T any](elements []T) []T {
+	if elements == nil || len(elements) <= 1 {
+		return []T{}
+	}
+	return elements[1:]
+}
+
+func DropFromLeft[T any](elements []T, n int) []T {
+	if elements == nil || len(elements) <= 1 || n >= len(elements) {
+		return []T{}
+	}
+	return elements[n:]
+}
+
+func DropFromRight[T any](elements []T, n int) []T {
+	if elements == nil || len(elements) <= 1 || n >= len(elements) {
+		return []T{}
+	}
+	return elements[:len(elements)-n]
+}
+
 var r = rng.New(rng.NewSource(time.Now().UnixNano()))
 
 func RandomElement[T any](elements []T) (element T, index int) {
 	index = r.Intn(len(elements))
 	return elements[index], index
+}
+
+func Min[T constraints.Ordered](a, b T) T {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func Max[T constraints.Ordered](a, b T) T {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// Swap function to swap two elements in the array
+func swap(arr []bool, i, j int) {
+	arr[i], arr[j] = arr[j], arr[i]
+}
+
+// Recursive function to generate all unique permutations
+func generatePermutations(arr []bool, start int, result *[][]bool) {
+	if start == len(arr)-1 {
+		perm := make([]bool, len(arr))
+		copy(perm, arr)
+		*result = append(*result, perm)
+		return
+	}
+	seen := make(map[bool]bool)
+	for i := start; i < len(arr); i++ {
+		if seen[arr[i]] {
+			continue
+		}
+		seen[arr[i]] = true
+		swap(arr, start, i)
+		generatePermutations(arr, start+1, result)
+		swap(arr, start, i) // backtrack
+	}
+}
+
+// Function to create an array with a specified number of true and false values
+func createInitialArray(numTrue, numFalse int) []bool {
+	arr := make([]bool, numTrue+numFalse)
+	for i := 0; i < numTrue; i++ {
+		arr[i] = true
+	}
+	for i := numTrue; i < numTrue+numFalse; i++ {
+		arr[i] = false
+	}
+	return arr
+}
+
+// Function to generate all unique permutations of an array with numTrue true values and numFalse false values
+func GenerateUniquePermutations(numTrue, numFalse int) [][]bool {
+	arr := createInitialArray(numTrue, numFalse)
+	sort.Slice(arr, func(i, j int) bool { return !arr[i] && arr[j] })
+	var result [][]bool
+	generatePermutations(arr, 0, &result)
+	return result
+}
+
+func Factorial(number int) int {
+
+	// if the number has reached 1 then we have to
+	// return 1 as 1 is the minimum value we have to multiply with
+	if number == 1 {
+		return 1
+	}
+
+	// multiplying with the current number and calling the function
+	// for 1 lesser number
+	factorialOfNumber := number * Factorial(number-1)
+
+	// return the factorial of the current number
+	return factorialOfNumber
 }

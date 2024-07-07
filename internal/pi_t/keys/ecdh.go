@@ -323,12 +323,12 @@ func decodePrivateKey(privateKeyPEM string) (*ecdh.PrivateKey, *ecdsa.PrivateKey
 	return privKey, privKeyECDSA, nil
 }
 
-// decodePublicKey decodes the given PEM-encoded public key.
+// DecodePublicKey decodes the given PEM-encoded public key.
 // Parameters:
 // - publicKeyPEM: The PEM-encoded public key.
 // Returns:
 // - The decoded ECDH public key.
-func decodePublicKey(publicKeyPEM string) (*ecdh.PublicKey, *ecdsa.PublicKey, error) {
+func DecodePublicKey(publicKeyPEM string) (*ecdh.PublicKey, *ecdsa.PublicKey, error) {
 	block, _ := pem.Decode([]byte(publicKeyPEM))
 	if block == nil || block.Type != "EC PUBLIC KEY" {
 		return nil, nil, pl.NewError("invalid public key PEM block")
@@ -365,7 +365,7 @@ func ComputeSharedKey(privKeyPEM, pubKeyPEM string) ([]byte, error) {
 		return nil, pl.WrapError(err, "failed to decode private key")
 	}
 
-	pubKey, _, err := decodePublicKey(pubKeyPEM)
+	pubKey, _, err := DecodePublicKey(pubKeyPEM)
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to decode public key")
 	}
@@ -392,7 +392,7 @@ func ComputeSharedKeyWithScalar(privKeyPEM, pubKeyPEM string, scalar []byte) ([]
 		return nil, pl.WrapError(err, "failed to decode private key")
 	}
 
-	decodedPubKeyECDH, _, err := decodePublicKey(pubKeyPEM)
+	decodedPubKeyECDH, _, err := DecodePublicKey(pubKeyPEM)
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to decode public key")
 	}

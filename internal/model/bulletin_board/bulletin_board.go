@@ -96,7 +96,7 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 		}
 	})
 
-	numMessages := utils.Max(utils.MapEntries(bb.Clients, func(_ int, client *ClientView) int {
+	numMessages := utils.MaxValue(utils.MapEntries(bb.Clients, func(_ int, client *ClientView) int {
 		return len(client.MessageQueue)
 	})) + 2
 

@@ -193,9 +193,8 @@ func InsertAtIndex[T any](items []T, index int, value T) []T {
 	if index == len(items) {
 		return append(items, value)
 	}
-	temp := append(items[:index], value)
-	items = append(temp, items[index:]...)
-	return items
+	temp := append(Copy(items)[:index], value)
+	return append(temp, items[index:]...)
 }
 
 func RemoveIndex[T any](items []T, index int) []T {
@@ -222,6 +221,24 @@ func Filter[V any](values []V, condition func(V) bool) []V {
 	return filteredValues
 }
 
+func CompareArrays[T comparable](a, b []T) (bool, int) {
+	if a == nil && b == nil {
+		return true, -1
+	}
+	if a == nil || b == nil {
+		return false, -1
+	}
+	if len(a) != len(b) {
+		return false, -1
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false, i
+		}
+	}
+	return true, -1
+}
+
 func Sum(values []int) int {
 	sum := 0
 	for _, v := range values {
@@ -230,7 +247,7 @@ func Sum(values []int) int {
 	return sum
 }
 
-func Max(values []int) int {
+func MaxValue(values []int) int {
 	m := values[0]
 	for _, v := range values {
 		if v > m {
@@ -244,6 +261,17 @@ func GetValues[K comparable, V any](m map[K]V) []V {
 	values := make([]V, 0, len(m))
 	for _, v := range m {
 		values = append(values, v)
+	}
+	return values
+}
+
+func FillArray[T any](value T, numElements int) []T {
+	if numElements <= 0 {
+		return []T{}
+	}
+	values := make([]T, numElements)
+	for i := 0; i < numElements; i++ {
+		values[i] = value
 	}
 	return values
 }
