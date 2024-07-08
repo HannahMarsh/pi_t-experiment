@@ -17,9 +17,7 @@ func PeelOnion(onion string, sharedKey [32]byte) (layer int, metadata *om.Metada
 	if err = json.Unmarshal(onionBytes, &o); err != nil {
 		return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to unmarshal onion")
 	}
-	//peeledSepal := o.Sepal.PeelSepal()
-
-	cypherText, ctw, err := o.Header.DecodeHeader(sharedKey)
+	cypherText, nextHop, nextHeader, err := o.Header.DecodeHeader(sharedKey)
 	if err != nil {
 		return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decode header")
 	}
@@ -31,14 +29,20 @@ func PeelOnion(onion string, sharedKey [32]byte) (layer int, metadata *om.Metada
 		return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to peel sepal")
 	}
 
+	decryptedContent, err := o.Content.DecryptContent(layerKey)
+	if err != nil {
+		return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decrypt content")
+	}
+
 	layer = cypherText.Layer
-	nextDestination = ctw[0].Address
+	nextDestination = nextHop
 	metadata = &cypherText.Metadata
 	peeled = om.Onion{
-		Header:  om.Header{},
+		Header:  nextHeader,
 		Sepal:   peeledSepal,
-		Content: o.Content,
+		Content: decryptedContent,
 	}
+
 	return layer, metadata, peeled, nextDestination, nil
 }
 

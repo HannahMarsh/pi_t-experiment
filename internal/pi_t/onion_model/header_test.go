@@ -82,8 +82,13 @@ func TestFormHeader(t *testing.T) {
 
 	recipient := routingPath[len(routingPath)-1]
 
+	metadata := make([]Metadata, l+1)
+	for i := 0; i < l+1; i++ {
+		metadata[i] = Metadata{Example: fmt.Sprintf("example%d", i)}
+	}
+
 	// form header
-	H, err := FormHeaders(l, l1, C, A, nodes[0].privateKeyPEM, publicKeys, recipient, layerKeys, K, append([]string{""}, routingPath...), Hash, nil)
+	H, err := FormHeaders(l, l1, C, A, nodes[0].privateKeyPEM, publicKeys, recipient, layerKeys, K, append([]string{""}, routingPath...), Hash, metadata)
 
 	for i, h := range H[1:] {
 		sharedKey, err := keys.ComputeSharedKey(nodes[i+1].privateKeyPEM, nodes[0].publicKeyPEM)
@@ -91,11 +96,13 @@ func TestFormHeader(t *testing.T) {
 			slog.Error("failed to compute shared key", err)
 			t.Fatalf("failed to compute shared key")
 		}
-		cypherText, ctw, err := h.DecodeHeader(sharedKey)
+		cypherText, nextHop, nextHeader, err := h.DecodeHeader(sharedKey)
 		if err != nil {
 			slog.Error("failed to decode header", err)
 			t.Fatalf("failed to decode header")
 		}
+		slog.Info("", "", nextHeader)
+
 		if i < l1 && cypherText.Recipient != "mixer" {
 			t.Fatalf("Expected mixer")
 		} else if i >= l1 && i < l1+l2-1 && cypherText.Recipient != "gatekeeper" {
@@ -108,7 +115,7 @@ func TestFormHeader(t *testing.T) {
 		if cypherText.Layer != i+1 {
 			t.Fatalf("Expected layer to match")
 		}
-		if i != l1+l2 && ctw[0].Address != routingPath[i+1] {
+		if i != l1+l2 && nextHop != routingPath[i+1] {
 			t.Fatalf("Expected address to match")
 		}
 	}

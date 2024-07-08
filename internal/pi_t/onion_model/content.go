@@ -27,3 +27,11 @@ func FormContent(layerKeys [][]byte, l int, message []byte, K []byte) ([]Content
 	}
 	return C_arr, nil
 }
+
+func (c Content) DecryptContent(layerKey []byte) (Content, error) {
+	_, decryptedString, err := keys.DecryptStringWithAES(layerKey, string(c))
+	if err != nil {
+		return "", pl.WrapError(err, "failed to decrypt content")
+	}
+	return Content(decryptedString), nil
+}

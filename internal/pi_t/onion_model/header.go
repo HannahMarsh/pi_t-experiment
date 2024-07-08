@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/tools/keys"
-	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"strings"
 )
 
 type Header struct {
-	E string
-	B []string
-	A []string // verification hashes
+	E          string   // encryption under pk(Pi) of CypherText
+	B          []string // encryption under the layerKey of CypherTextWrapper
+	A          []string // verification hashes
+	NextHeader string   // encryption under the layerKey of CypherTextWrapper
 }
 
 type CypherText struct {
@@ -29,7 +29,7 @@ type Metadata struct {
 
 type CypherTextWrapper struct {
 	Address    string
-	CypherText string
+	NextHeader string
 }
 
 func FormHeaders(l int, l1 int, C []Content, A [][]string, privateKey string, publicKeys []string, recipient string, layerKeys [][]byte, K []byte, path []string, hash func(string) string, metadata []Metadata) (H []Header, err error) {
@@ -56,7 +56,7 @@ func FormHeaders(l int, l1 int, C []Content, A [][]string, privateKey string, pu
 	for i, _ := range B {
 		B[i] = make([]string, l+1)
 	}
-	B[l-1][1], err = encryptB(recipient, E[l], K)
+	B[l][1], err = encryptB(recipient, E[l], K)
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to encrypt B_l_minus_1_1")
 	}
@@ -68,6 +68,9 @@ func FormHeaders(l int, l1 int, C []Content, A [][]string, privateKey string, pu
 		}
 		for j := 2; j <= l-j+1; j++ {
 			B[i][j], err = encryptB("", B[i+1][j-1], layerKeys[i])
+			if err != nil {
+				return nil, pl.WrapError(err, "failed to encrypt B_i_j")
+			}
 		}
 		B_i_1_to_C_i := append(B[i][1:], string(C[i]))
 		concat := strings.Join(B_i_1_to_C_i, "")
@@ -78,12 +81,23 @@ func FormHeaders(l int, l1 int, C []Content, A [][]string, privateKey string, pu
 		} else if i > l1 {
 			role = "gatekeeper"
 		}
-		E[i], err = enc(privateKey, publicKeys[i-1], tags[i], role, i, layerKeys[i], metadata[i]) // TODO add y_i, A_i
+		E[i], err = enc(privateKey, publicKeys[i-1], tags[i], role, i, layerKeys[i], metadata[i])
+		nextHeader := H[i+1]
+		headerBytes, err := json.Marshal(nextHeader)
+		if err != nil {
+			return nil, pl.WrapError(err, "failed to marshal next header")
+		}
+		nh, err := encryptB(path[i+1], base64.StdEncoding.EncodeToString(headerBytes), layerKeys[i])
+		if err != nil {
+			return nil, pl.WrapError(err, "failed to encrypt next header")
+		}
+
 		if i-1 < len(A) {
 			H[i] = Header{
-				E: E[i],
-				B: B[i],
-				A: A[i-1],
+				E:          E[i],
+				B:          B[i],
+				A:          A[i-1],
+				NextHeader: nh,
 			}
 		} else {
 			H[i] = Header{
@@ -96,10 +110,10 @@ func FormHeaders(l int, l1 int, C []Content, A [][]string, privateKey string, pu
 	return H, nil
 }
 
-func encryptB(address string, E string, layerKey []byte) (string, error) {
+func encryptB(address string, nextHeader string, layerKey []byte) (string, error) {
 	b, err := json.Marshal(CypherTextWrapper{
 		Address:    address,
-		CypherText: E,
+		NextHeader: nextHeader,
 	})
 	if err != nil {
 		return "", pl.WrapError(err, "failed to marshal b")
@@ -133,46 +147,77 @@ func enc(privateKey, publicKey string, tag string, role string, layer int, layer
 	return E_l, nil
 }
 
-func (h Header) DecodeHeader(sharedKey [32]byte) (*CypherText, []CypherTextWrapper, error) {
+func (h Header) DecodeHeader(sharedKey [32]byte) (*CypherText, string, Header, error) {
 
 	cypherbytes, _, err := keys.DecryptStringWithAES(sharedKey[:], h.E)
 	if err != nil {
-		return nil, nil, pl.WrapError(err, "failed to decrypt ciphertext")
+		return nil, "", Header{}, pl.WrapError(err, "failed to decrypt ciphertext")
 	}
 
 	var ciphertext CypherText
 	err = json.Unmarshal(cypherbytes, &ciphertext)
 	if err != nil {
-		return nil, nil, pl.WrapError(err, "failed to unmarshal ciphertext")
+		return nil, "", Header{}, pl.WrapError(err, "failed to unmarshal ciphertext")
 	}
 
 	layerKey, err := base64.StdEncoding.DecodeString(ciphertext.Key)
 	if err != nil {
-		return nil, nil, pl.WrapError(err, "failed to decode layer key")
+		return nil, "", Header{}, pl.WrapError(err, "failed to decode layer key")
 	}
 
 	if len(h.B) == 0 {
-		return &ciphertext, nil, nil
-	}
-	ctwArr := utils.Map(h.B[1:], func(b string) CypherTextWrapper {
-		if b != "" {
-			b_bytes, _, err2 := keys.DecryptStringWithAES(layerKey, b)
-			if err2 != nil {
-				err = pl.WrapError(err2, "failed to decrypt b")
-			}
-			var ctw CypherTextWrapper
-			err2 = json.Unmarshal(b_bytes, &ctw)
-			if err2 != nil {
-				err = pl.WrapError(err2, "failed to unmarshal b")
-			}
-			return ctw
-		} else {
-			return CypherTextWrapper{}
-		}
-	})
-	if err != nil {
-		return nil, nil, pl.WrapError(err, "failed to decrypt b")
+		return &ciphertext, "", Header{}, nil
 	}
 
-	return &ciphertext, ctwArr, nil
+	nextHeader, _, err := keys.DecryptStringWithAES(layerKey, h.NextHeader)
+	if err != nil {
+		return nil, "", Header{}, pl.WrapError(err, "failed to decrypt next header")
+	}
+	var ctw CypherTextWrapper
+	err = json.Unmarshal(nextHeader, &ctw)
+	if err != nil {
+		return nil, "", Header{}, pl.WrapError(err, "failed to unmarshal next header")
+	}
+
+	nextHeaderBytes, err := base64.StdEncoding.DecodeString(ctw.NextHeader)
+	if err != nil {
+		return nil, "", Header{}, pl.WrapError(err, "failed to decode next header")
+	}
+
+	var nh Header
+	err = json.Unmarshal(nextHeaderBytes, &nh)
+	if err != nil {
+		return nil, "", Header{}, pl.WrapError(err, "failed to unmarshal next header")
+	}
+
+	return &ciphertext, ctw.Address, nh, nil
+	//
+	//
+	//ctwArr := utils.Map(h.B[1:], func(b string) CypherTextWrapper {
+	//	if b != "" {
+	//		b_bytes, _, err2 := keys.DecryptStringWithAES(layerKey, b)
+	//		if err2 != nil {
+	//			err = pl.WrapError(err2, "failed to decrypt b")
+	//		}
+	//		var ctw CypherTextWrapper
+	//		err2 = json.Unmarshal(b_bytes, &ctw)
+	//		if err2 != nil {
+	//			err = pl.WrapError(err2, "failed to unmarshal b")
+	//		}
+	//		return ctw
+	//	} else {
+	//		return CypherTextWrapper{}
+	//	}
+	//})
+	//if err != nil {
+	//	return nil, nil, pl.WrapError(err, "failed to decrypt b")
+	//}
+	//
+	////result, _, err := keys.DecryptStringWithAES(layerKey, ctwArr[0].NextHeader)
+	////if err != nil {
+	////	return nil, nil, pl.WrapError(err, "failed to decrypt next header")
+	////}
+	////slog.Info("", "", result)
+	//
+	//return &ciphertext, ctwArr, nil
 }
