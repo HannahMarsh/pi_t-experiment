@@ -46,6 +46,8 @@ type Config struct {
 	MinNodes          int           `yaml:"min_nodes"`
 	Epsilon           float64       `yaml:"epsilon"`
 	Delta             float64       `yaml:"delta"`
+	L1                int           `yaml:"l1"`
+	L2                int           `yaml:"l2"`
 	Rounds            int           `yaml:"num_rounds"`
 	MinTotalMessages  int           `yaml:"min_total_messages"`
 	BulletinBoard     BulletinBoard `yaml:"bulletin_board"`

@@ -230,15 +230,11 @@ func FORMONION(publicKey, privateKey, m string, mixers []string, gatekeepers []s
 
 	// tag array
 	tags := make([]string, l+1)
-	tags[l] = C[l]
+	tags[l] = hash(C[l])
 
 	// ciphertext array
 	E := make([]string, l+1)
-	sharedKey, err := keys.ComputeSharedKey(privateKey, publicKeys[l-1])
-	if err != nil {
-		return nil, pl.WrapError(err, "failed to compute shared key")
-	}
-	E[l], err = Enc(sharedKey, tags[l], recipient, l, layerKeys[l])
+	E[l], err = Enc(privateKey, publicKeys[l-1], tags[l], recipient, l, layerKeys[l])
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to encrypt ciphertext")
 	}
@@ -262,7 +258,9 @@ func FORMONION(publicKey, privateKey, m string, mixers []string, gatekeepers []s
 	onionLayers[l] = OnionLayer{
 		Header:  H[l],
 		Content: C[l],
-		Sepal:   sepal,
+		Sepal: Sepal{
+			Blocks: []string{},
+		},
 	}
 
 	for i := l - 1; i >= 1; i-- {
@@ -282,16 +280,12 @@ func FORMONION(publicKey, privateKey, m string, mixers []string, gatekeepers []s
 		} else if i > l1 {
 			role = "gatekeeper"
 		}
-		sharedKey, err := keys.ComputeSharedKey(privateKey, publicKeys[i-1])
-		if err != nil {
-			return nil, pl.WrapError(err, "failed to compute shared key")
-		}
-		E[i], err = Enc(sharedKey, tags[i], role, i, layerKeys[i]) // TODO add y_i, A_i
+		E[i], err = Enc(privateKey, publicKeys[i-1], tags[i], role, i, layerKeys[i]) // TODO add y_i, A_i
 		if i < len(A) {
 			H[i] = Header{
 				E: E[i],
 				B: B[i],
-				A: A[i],
+				A: A[i-1],
 			}
 		} else {
 			H[i] = Header{
@@ -308,6 +302,8 @@ func FORMONION(publicKey, privateKey, m string, mixers []string, gatekeepers []s
 			},
 		}
 	}
+
+	onionLayers[1].Sepal = sepal
 
 	return onionLayers[1:], nil
 }
@@ -343,7 +339,11 @@ func EncryptB(address string, E string, layerKey []byte) (string, error) {
 	return bEncrypted, nil
 }
 
-func Enc(sharedKey []byte, tag string, role string, layer int, layerKey []byte) (string, error) {
+func Enc(privateKey, publicKey string, tag string, role string, layer int, layerKey []byte) (string, error) {
+	sharedKey, err := keys.ComputeSharedKey(privateKey, publicKey)
+	if err != nil {
+		return "", pl.WrapError(err, "failed to compute shared key")
+	}
 	ciphertext := CypherText{
 		Tag:       tag,
 		Recipient: role,
@@ -354,12 +354,6 @@ func Enc(sharedKey []byte, tag string, role string, layer int, layerKey []byte) 
 	if err != nil {
 		return "", pl.WrapError(err, "failed to marshal ciphertext")
 	}
-
-	//pubKey, _, err := keys.DecodePublicKey(sharedKey)
-	////k_l := []byte(sharedKey) //, err := base64.StdEncoding.DecodeString(sharedKey)
-	////if err != nil {
-	////	return "", pl.WrapError(err, "failed to decode public key")
-	////}
 
 	_, E_l, err := keys.EncryptWithAES(sharedKey, cypherBytes)
 	if err != nil {

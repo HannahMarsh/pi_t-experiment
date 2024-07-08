@@ -1,11 +1,27 @@
-server_load: 7
-heartbeat_interval: 5
+lambda: 5     # The security parameter. (Every quantity of the system is polynomially bounded by λ)
+l1: 3         # Number of planned mixers in a routing path
+l2: 2         # Number of planned gatekeepers in a routing path
+x: 8          # Server load (x = Ω(polylog λ)) i.e. the expected number of onions per intermediary hop
+tau: 0.8      # (τ < (1 − γ)(1 − X)) Fraction of checkpoints needed to progress local clock
+L: 5          # (L = l1 + l2 + 1) Number of rounds
+N: 5          # Number of active nodes at the start of the protocol
+R: 2          # Number of clients registered with intent-to-send at the start the protocol.
+h: 5          # Heartbeat interval in seconds
+d: 3          # Threshold for number of bruises before an onion is discarded by a gatekeeper
+epsilon: 0.1  # The privacy loss in the worst case scenario.
+delta: 1e-5   # The probability of differential privacy violation due to the adversary's actions.
 min_nodes: 2
 min_total_messages: 1
 num_rounds: 5
 max_bruises: 2
-epsilon: 0.1
-delta: 1e-5
+
+adversary:
+  gamma: 0.8    # γ: Fraction of (indistinguishable) onions that A can drop
+  chi: 0.3      # (X < θ - 0.5) and (X < (d / l1) - 0.5) and (X < 1 - (τ / (1 - γ))) Fraction of nodes that A can corrupt
+  theta: 0.8    # (θ > 0.5 + X) and (θ = d / l1) Fraction of layers that need to be bruised so that the innermost tulip bulb becomes unrecoverable
+  nodeID: 1     # ID of the adversary
+
+
 metrics:
   host: 'localhost'
   port: 8200

@@ -306,6 +306,10 @@ func TestFORMONION(t *testing.T) {
 		slog.Error("", err)
 		t.Fatalf("failed")
 	}
+	h := hash(strings.Join(onion[0].Sepal.Blocks, ""))
+	if onion[0].Header.A[0] != h {
+		t.Fatalf("Expected hash to match")
+	}
 	slog.Info("", "", onion)
 
 }
