@@ -30,7 +30,7 @@ const fixedLegnthOfMessage = 256
 //   - For 2 <= i <= l1, the list O_i contains i options, O_i = (O_i,0, ..., O_i,i-1), each O_i,j representing the i-th onion layer with j prior bruises.
 //   - For l1 + 1 <= i <= l1 + l2, the list O_i contains l1 + 1 options, depending on the total bruising from the mixers.
 //   - The last list O_(l1 + l2 + 1) contains just the innermost onion for the recipient.
-func FORMONION(publicKey, privateKey, m string, mixers []string, gatekeepers []string, recipient string, publicKeys []string, metadata []string, d int) ([][]onion_model.Onion, error) {
+func FORMONION(publicKey, privateKey, m string, mixers []string, gatekeepers []string, recipient string, publicKeys []string, metadata []onion_model.Metadata, d int) ([][]onion_model.Onion, error) {
 
 	message := padMessage(m)
 
@@ -63,7 +63,7 @@ func FORMONION(publicKey, privateKey, m string, mixers []string, gatekeepers []s
 	}
 
 	// form header
-	H, err := onion_model.FormHeaders(l, l1, C, A, privateKey, publicKeys, recipient, layerKeys, K, path, Hash)
+	H, err := onion_model.FormHeaders(l, l1, C, A, privateKey, publicKeys, recipient, layerKeys, K, path, Hash, metadata)
 
 	// Initialize the onion structure
 	onionLayers := make([][]onion_model.Onion, l+1)

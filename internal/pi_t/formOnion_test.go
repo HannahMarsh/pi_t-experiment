@@ -5,6 +5,7 @@ import (
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
+	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/onion_model"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/tools/keys"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"golang.org/x/exp/slog"
@@ -53,7 +54,12 @@ func TestFORMONION(t *testing.T) {
 	publicKeys := utils.Map(nodes[1:], func(n node) string { return n.publicKeyPEM })
 	routingPath := utils.Map(nodes[1:], func(n node) string { return n.address })
 
-	onions, err := FORMONION(nodes[0].publicKeyPEM, nodes[0].privateKeyPEM, string(payload), routingPath[1:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys[1:], []string{}, d)
+	metadata := make([]onion_model.Metadata, l+1)
+	for i := 0; i < l+1; i++ {
+		metadata[i] = onion_model.Metadata{Example: fmt.Sprintf("example%d", i)}
+	}
+
+	onions, err := FORMONION(nodes[0].publicKeyPEM, nodes[0].privateKeyPEM, string(payload), routingPath[1:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys[1:], metadata, d)
 	if err != nil {
 		slog.Error("", err)
 		t.Fatalf("failed")

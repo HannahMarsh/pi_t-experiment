@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/tools/keys"
+	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"strings"
 )
 
@@ -19,6 +20,11 @@ type CypherText struct {
 	Recipient string
 	Layer     int
 	Key       string
+	Metadata  Metadata
+}
+
+type Metadata struct {
+	Example string
 }
 
 type CypherTextWrapper struct {
@@ -26,7 +32,7 @@ type CypherTextWrapper struct {
 	CypherText string
 }
 
-func FormHeaders(l int, l1 int, C []Content, A [][]string, privateKey string, publicKeys []string, recipient string, layerKeys [][]byte, K []byte, path []string, hash func(string) string) (H []Header, err error) {
+func FormHeaders(l int, l1 int, C []Content, A [][]string, privateKey string, publicKeys []string, recipient string, layerKeys [][]byte, K []byte, path []string, hash func(string) string, metadata []Metadata) (H []Header, err error) {
 
 	// tag array
 	tags := make([]string, l+1)
@@ -34,7 +40,7 @@ func FormHeaders(l int, l1 int, C []Content, A [][]string, privateKey string, pu
 
 	// ciphertext array
 	E := make([]string, l+1)
-	E[l], err = enc(privateKey, publicKeys[l-1], tags[l], recipient, l, layerKeys[l])
+	E[l], err = enc(privateKey, publicKeys[l-1], tags[l], recipient, l, layerKeys[l], metadata[l])
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to encrypt ciphertext")
 	}
@@ -72,7 +78,7 @@ func FormHeaders(l int, l1 int, C []Content, A [][]string, privateKey string, pu
 		} else if i > l1 {
 			role = "gatekeeper"
 		}
-		E[i], err = enc(privateKey, publicKeys[i-1], tags[i], role, i, layerKeys[i]) // TODO add y_i, A_i
+		E[i], err = enc(privateKey, publicKeys[i-1], tags[i], role, i, layerKeys[i], metadata[i]) // TODO add y_i, A_i
 		if i-1 < len(A) {
 			H[i] = Header{
 				E: E[i],
@@ -102,7 +108,7 @@ func encryptB(address string, E string, layerKey []byte) (string, error) {
 	return bEncrypted, nil
 }
 
-func enc(privateKey, publicKey string, tag string, role string, layer int, layerKey []byte) (string, error) {
+func enc(privateKey, publicKey string, tag string, role string, layer int, layerKey []byte, metadata Metadata) (string, error) {
 	sharedKey, err := keys.ComputeSharedKey(privateKey, publicKey)
 	if err != nil {
 		return "", pl.WrapError(err, "failed to compute shared key")
@@ -112,19 +118,61 @@ func enc(privateKey, publicKey string, tag string, role string, layer int, layer
 		Recipient: role,
 		Layer:     layer,
 		Key:       base64.StdEncoding.EncodeToString(layerKey),
+		Metadata:  metadata,
 	}
 	cypherBytes, err := json.Marshal(ciphertext)
 	if err != nil {
 		return "", pl.WrapError(err, "failed to marshal ciphertext")
 	}
 
-	_, E_l, err := keys.EncryptWithAES(sharedKey, cypherBytes)
+	_, E_l, err := keys.EncryptWithAES(sharedKey[:], cypherBytes)
 	if err != nil {
 		return "", pl.WrapError(err, "failed to encrypt ciphertext")
 	}
+
 	return E_l, nil
 }
 
-func dec(privateKey string, cyphertext string) (string, error) {
+func (h Header) DecodeHeader(sharedKey [32]byte) (*CypherText, []CypherTextWrapper, error) {
 
+	cypherbytes, _, err := keys.DecryptStringWithAES(sharedKey[:], h.E)
+	if err != nil {
+		return nil, nil, pl.WrapError(err, "failed to decrypt ciphertext")
+	}
+
+	var ciphertext CypherText
+	err = json.Unmarshal(cypherbytes, &ciphertext)
+	if err != nil {
+		return nil, nil, pl.WrapError(err, "failed to unmarshal ciphertext")
+	}
+
+	layerKey, err := base64.StdEncoding.DecodeString(ciphertext.Key)
+	if err != nil {
+		return nil, nil, pl.WrapError(err, "failed to decode layer key")
+	}
+
+	if len(h.B) == 0 {
+		return &ciphertext, nil, nil
+	}
+	ctwArr := utils.Map(h.B[1:], func(b string) CypherTextWrapper {
+		if b != "" {
+			b_bytes, _, err2 := keys.DecryptStringWithAES(layerKey, b)
+			if err2 != nil {
+				err = pl.WrapError(err2, "failed to decrypt b")
+			}
+			var ctw CypherTextWrapper
+			err2 = json.Unmarshal(b_bytes, &ctw)
+			if err2 != nil {
+				err = pl.WrapError(err2, "failed to unmarshal b")
+			}
+			return ctw
+		} else {
+			return CypherTextWrapper{}
+		}
+	})
+	if err != nil {
+		return nil, nil, pl.WrapError(err, "failed to decrypt b")
+	}
+
+	return &ciphertext, ctwArr, nil
 }
