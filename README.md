@@ -199,23 +199,24 @@ server load and desired parameters $\epsilon$ and $\delta$.
 ## $\Pi_t$ Implementation Overview
 
 ### Parameters
+(_also defined in [/config/config.yml](config/config.yml)_)
 
-- **$x$**: The server load (number of onions each node receives per round).
-- **$l_1$**: The number of mixers in each routing path.
-- **$l_2$**: The number of gatekeepers in each routing path.
-- **$L$**:The number of rounds (also the length of the routing path, equal to $`l_1 + l_2 + 1`$ ).
+- **$x$**: Server load (i.e. the expected number of onions each node processes per round).
+- **$\ell_1$**: The number of mixers in each routing path.
+- **$\ell_2$**: The number of gatekeepers in each routing path.
+- **$L$**: The number of rounds (also the length of the routing path, equal to $`\ell_1 + \ell_2 + 1`$ ).
 - **$N$**: The number of active nodes in the network at the start of the protocol.
-- **$M$**: The approximate ratio of mixers to gatekeepers in the network.
 - **$R$**: The number of clients registered with intent-to-send at the start the protocol.
+- **$d$**: The number of non-null key-blocks in $S_1$. (thus $d$ is the threshold for number of bruises before an onion is discard by a gatekeeper).
 - **$h$**: The heartbeat interval in seconds.
-- **$\tau$**: The fraction of expected checkpoint onions needed for a node to progress its local clock.
+- **$\tau$**: ( $\tau \lt \(1 − \gamma\)\(1 − \chi\)$ ) The fraction of expected checkpoint onions needed for a node to progress its local clock.
 - **$\epsilon$**: The privacy loss in the worst case scenario.
 - **$\delta$**: The probability of differential privacy violation due to the adversary's actions.
 - **$\lambda$**: The security parameter. We assume every quantity of the system, including $`N`$, $`R`$, $`L`$, and $`x`$, are polynomially bounded by $`\lambda`$.
-- **$d$**: The number of key-blocks per sepal. (also the threshold for number of bruises before an onion is discard by a gatekeeper).
+- **$\gamma$**: Fraction of (indistinguishable) onions that A can drop.
 - **$\theta$**: The maximum fraction of bruisable layers that can be bruised before the innermost tulip bulb becomes 
-  unrecoverable. Note that $d = \theta \cdot l_1$
-- **$\xi$**: The fraction of $N$ nodes that can be corrupted and controlled by the adversary (the subset is chosen prior to execution).
+  unrecoverable. Note that $d = \theta \cdot \ell_1$
+- **$\chi$**: The fraction of $N$ nodes that can be corrupted and controlled by the adversary (the subset is chosen prior to execution). Note that $\chi \lt \theta - 0.5$ and $\chi \lt \frac{d}{\ell_1} - 0.5$
 
 ### No Global Clock:
 
