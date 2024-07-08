@@ -157,6 +157,15 @@ func generatePermutations(arr []bool, start int, result *[][]bool) {
 	}
 }
 
+func ContainsElement[T comparable](elements []T, element T) bool {
+	for _, e := range elements {
+		if e == element {
+			return true
+		}
+	}
+	return false
+}
+
 // Function to create an array with a specified number of true and false values
 func createInitialArray(numTrue, numFalse int) []bool {
 	arr := make([]bool, numTrue+numFalse)

@@ -1,17 +1,24 @@
-package onion_functions
+package onion_model
 
 import (
 	"encoding/base64"
-	"encoding/json"
-	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
-	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
-	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/keys"
+	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/tools/keys"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"golang.org/x/exp/slog"
 	"strings"
 	"testing"
 )
+
+//func Hash(s string) string {
+//	h := fnv.New32a()
+//	_, err := h.Write([]byte(s))
+//	if err != nil {
+//		slog.Error("failed to Hash string", err)
+//		return ""
+//	}
+//	return fmt.Sprint(h.Sum32())
+//}
 
 func TestFormSepal(t *testing.T) {
 	pl.SetUpLogrusAndSlog("debug")
@@ -34,14 +41,16 @@ func TestFormSepal(t *testing.T) {
 	masterKey := base64.StdEncoding.EncodeToString(K)
 
 	// Construct first sepal for M1
-	sepal, _, err := formSepal(masterKey, d, layerKeys, l, l1)
+	_, sepals, err := FormSepals(masterKey, d, layerKeys, l, l1, l2, Hash)
 	if err != nil {
 		slog.Error("failed to create sepal", err)
-		t.Fatalf("formSepal() error: %v", err)
+		t.Fatalf("formSepals() error: %v", err)
 	}
 
+	sepal := sepals[0][0]
+
 	if len(sepal.Blocks) != l1+1 {
-		t.Fatalf("formSepal() expected %d blocks, got %d", l1+1, len(sepal.Blocks))
+		t.Fatalf("formSepals() expected %d blocks, got %d", l1+1, len(sepal.Blocks))
 	}
 
 	for j, sepalBlock := range sepal.Blocks {
@@ -65,7 +74,7 @@ func TestFormSepal(t *testing.T) {
 				keyblockByte := decryptedBlock[index]
 				if keyblockByte != b {
 					slog.Info("failed to decrypt sepal block. Expected master key")
-					t.Fatalf("formSepal() expected keyblock %v, got %v", b, keyblockByte)
+					t.Fatalf("formSepals() expected keyblock %v, got %v", b, keyblockByte)
 				}
 			}
 		} else {
@@ -85,10 +94,10 @@ func TestFormSepal(t *testing.T) {
 				}
 			}
 			if !strings.HasPrefix(decryptedString, "null") {
-				t.Fatalf("formSepal() expected decryptedString to start with 'null', got %v", decryptedString)
+				t.Fatalf("formSepals() expected decryptedString to start with 'null', got %v", decryptedString)
 			}
 			//if len(decryptedString) != (saltLength * 8) {
-			//	t.Fatalf("formSepal() expected decryptedString length %v, got %v", (saltLength * 8), len(decryptedString))
+			//	t.Fatalf("formSepals() expected decryptedString length %v, got %v", (saltLength * 8), len(decryptedString))
 			//}
 		}
 	}
@@ -115,14 +124,15 @@ func TestBruiseSepal(t *testing.T) {
 	masterKey := base64.StdEncoding.EncodeToString(K)
 
 	// Construct first sepal for M1
-	sepal, _, err := formSepal(masterKey, d, layerKeys, l, l1)
+	_, sepals, err := FormSepals(masterKey, d, layerKeys, l, l1, l2, Hash)
 	if err != nil {
 		slog.Error("failed to create sepal", err)
-		t.Fatalf("formSepal() error: %v", err)
+		t.Fatalf("formSepals() error: %v", err)
 	}
+	sepal := sepals[0][0]
 
 	if len(sepal.Blocks) != l1+1 {
-		t.Fatalf("formSepal() expected %d blocks, got %d", l1+1, len(sepal.Blocks))
+		t.Fatalf("formSepals() expected %d blocks, got %d", l1+1, len(sepal.Blocks))
 	}
 
 	bruised, err := bruiseSepal(sepal, layerKeys, d-1, l1, l, d)
@@ -158,7 +168,7 @@ func TestBruiseSepal(t *testing.T) {
 		keyblockByte := keyblockBytes[index]
 		if keyblockByte != b {
 			slog.Info("failed to decrypt sepal block. Expected master key")
-			t.Fatalf("formSepal() expected keyblock %v, got %v", b, keyblockByte)
+			t.Fatalf("formSepals() expected keyblock %v, got %v", b, keyblockByte)
 		}
 	}
 
@@ -183,7 +193,7 @@ func TestBruiseSepal(t *testing.T) {
 	slog.Info("decrypted block: ", "block", block)
 
 	if !strings.HasPrefix(block, "null") {
-		t.Fatalf("formSepal() expected decryptedString to start with 'null', got %v", bruised.Blocks[0])
+		t.Fatalf("formSepals() expected decryptedString to start with 'null', got %v", bruised.Blocks[0])
 	}
 }
 
@@ -204,7 +214,7 @@ func bruiseSepal(sepal Sepal, layerKeys [][]byte, numBruises int, l1 int, l int,
 		if i <= l1 {
 			dobruiseSepal = randomBools[i]
 		}
-		sepal, err = sepal.PeelSepal(layerKeys[i], dobruiseSepal, d)
+		sepal, err = sepal.PeelSepal(layerKeys[i], dobruiseSepal)
 		if err != nil {
 			return Sepal{}, pl.WrapError(err, "failed to peel sepal")
 		}
@@ -233,83 +243,32 @@ func TestSepalHashes(t *testing.T) {
 	masterKey := base64.StdEncoding.EncodeToString(K)
 
 	// Construct first sepal for M1
-	sepal, A, err := formSepal(masterKey, d, layerKeys, l, l1)
+	A, sepals, err := FormSepals(masterKey, d, layerKeys, l, l1, l2, Hash)
 	if err != nil {
 		slog.Error("failed to create sepal", err)
-		t.Fatalf("formSepal() error: %v", err)
+		t.Fatalf("formSepals() error: %v", err)
 	}
 
-	h := hash(strings.Join(sepal.Blocks, ""))
+	sepal := sepals[0][0]
+
+	h := Hash(strings.Join(sepal.Blocks, ""))
 	if A[0][0] != h {
 		t.Fatalf("hash not expected")
 	}
 
 	for i := 1; i <= l1; i++ {
-		sepal, err = sepal.PeelSepal(layerKeys[i], false, d)
+
+		sepal, err = sepal.PeelSepal(layerKeys[i], false)
 		if err != nil {
 			slog.Error("failed to peel sepal", err)
 			t.Fatalf("PeelSepal() error: %v", err)
 		}
-		h = hash(strings.Join(sepal.Blocks, ""))
+		h = Hash(strings.Join(sepal.Blocks, ""))
 		if !utils.Contains(A[i], func(str string) bool {
 			return str == h
 		}) {
 			t.Fatalf("hash not expected")
 		}
 	}
-
-}
-
-func TestFORMONION(t *testing.T) {
-	pl.SetUpLogrusAndSlog("debug")
-
-	var err error
-
-	l1 := 5
-	l2 := 5
-	d := 3
-	l := l1 + l2 + 1
-
-	type node struct {
-		privateKeyPEM string
-		publicKeyPEM  string
-		address       string
-	}
-
-	nodes := make([]node, l+1)
-
-	for i := 0; i < l+1; i++ {
-		privateKeyPEM, publicKeyPEM, err := keys.KeyGen()
-		if err != nil {
-			t.Fatalf("KeyGen() error: %v", err)
-		}
-		nodes[i] = node{privateKeyPEM, publicKeyPEM, fmt.Sprintf("node%d", i)}
-	}
-
-	secretMessage := "secret message"
-
-	payload, err := json.Marshal(structs.Message{
-		Msg:  secretMessage,
-		To:   nodes[l].address,
-		From: nodes[0].address,
-	})
-	if err != nil {
-		slog.Error("json.Marshal() error", err)
-		t.Fatalf("json.Marshal() error: %v", err)
-	}
-
-	publicKeys := utils.Map(nodes[1:], func(n node) string { return n.publicKeyPEM })
-	routingPath := utils.Map(nodes[1:], func(n node) string { return n.address })
-
-	onion, err := FORMONION(nodes[0].publicKeyPEM, nodes[0].privateKeyPEM, string(payload), routingPath[1:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys[1:], []string{}, d)
-	if err != nil {
-		slog.Error("", err)
-		t.Fatalf("failed")
-	}
-	h := hash(strings.Join(onion[0].Sepal.Blocks, ""))
-	if onion[0].Header.A[0] != h {
-		t.Fatalf("Expected hash to match")
-	}
-	slog.Info("", "", onion)
 
 }

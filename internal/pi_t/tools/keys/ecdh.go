@@ -12,6 +12,7 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	pl "github.com/HannahMarsh/PrettyLogger"
+	"golang.org/x/crypto/curve25519"
 	"io"
 	"math/big"
 )
@@ -34,6 +35,27 @@ func KeyGen() (privateKeyPEM string, publicKeyPEM string, err error) {
 	}
 
 	return privateKeyPEM, publicKeyPEM, nil
+}
+
+// GenerateECDHKeys generates a new ECDH key pair using X25519
+func GenerateECDHKeys() ([]byte, []byte, error) {
+	privKey := make([]byte, curve25519.ScalarSize)
+	_, err := rand.Read(privKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// The base point for Curve25519 (9 in little-endian encoding), defined in the original Curve25519 paper by Daniel J. Bernstein.
+	basepoint := []byte{
+		9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	}
+
+	pubKey, err := curve25519.X25519(privKey, basepoint)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return privKey, pubKey, nil
 }
 
 // GenerateSymmetricKey generates a random AES key for encryption.

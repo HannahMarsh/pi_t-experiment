@@ -9,7 +9,7 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/api_functions"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t"
-	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/keys"
+	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/tools/keys"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"golang.org/x/exp/slog"
 	"io"

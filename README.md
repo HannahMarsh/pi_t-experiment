@@ -36,10 +36,10 @@
 
 #### Crypto Functions: :key:
 - [x] ECDH key generation.
-  - See [internal/pi\_t/keys/ecdh.go](internal/pi_t/keys/ecdh.go)
+  - See [internal/pi\_t/keys/ecdh.go](internal/pi_t/tools/keys/ecdh.go)
 - [x] AES encryption/decryption functions.
 - [x] Pseudo-random functions `F1` and `F2`.
-  - See [internal/pi\_t/prf/prf.go](internal/pi_t/prf/prf.go)
+  - See [internal/pi\_t/prf/prf.go](internal/pi_t/tools/prf/prf.go)
 - [x] Onion `FormOnion`, `PeelOnion`, and related functions.
   - See [internal/pi\_t/pi\_t\_functions.go](internal/pi_t/pi_t_functions.go)
 
@@ -135,8 +135,8 @@
 - [ ] Routing path needs to have all mixers first, then all gatekeepers (as opposed to a random mix besides the first and last nodes)].
 - [ ] l1 (number of mixers) and l2 (number of gatekeepers) should be fixed and given in the config file.
 - [ ] Fix logic in client during checkpoint onion construction. ( $`P_k \in Parties`$ is not a routing path, refer to section 5.2 in [Bruisable Onions](https://eprint.iacr.org/2024/885))
-- [ ] Replace CFB encryption/decryption with CTR ([/internal/pi_t/keys/ecdh.go](/internal/pi_t/keys/ecdh.go))
-- [ ] Investigate benefits of replacing 255 curve with low-level 25519 ([/internal/pi_t/keys/ecdh.go](/internal/pi_t/keys/ecdh.go))
+- [ ] Replace CFB encryption/decryption with CTR ([/internal/pi_t/keys/ecdh.go](/internal/pi_t/tools/keys/ecdh.go))
+- [ ] Investigate benefits of replacing 255 curve with low-level 25519 ([/internal/pi_t/keys/ecdh.go](/internal/pi_t/tools/keys/ecdh.go))
 - [ ] Ensure that sepal block management does not reveal positional information.
 - [ ] Bug: Why are ~15% of nonce validations failing throughout the run? This results in about 5% of all onions being dropped (with $`d = 3`$ )
 
@@ -226,7 +226,7 @@ server load and desired parameters $\epsilon$ and $\delta$.
 ### Session Keys:
 
 - Nodes publish part of a Diffie-Hellman exchange as part of their public keys.
-  - See [internal/pi_t/keys/ecdh.go](internal/pi_t/keys/ecdh.go) for this project's ECDH usage.
+  - See [internal/pi_t/keys/ecdh.go](internal/pi_t/tools/keys/ecdh.go) for this project's ECDH usage.
 - Clients generate a random scalar $r$ for each onion to compute the shared secret with the server.
 - The client's part of the exchange is included in the onion header.  
 
@@ -237,7 +237,7 @@ server load and desired parameters $\epsilon$ and $\delta$.
   for each hop $j$ in the path with pseudorandom functions $F1(sk_{i,k}, j)$ and $F2(sk_{i,k}, j)$.
   - **$F1(sk_{i,k}, j)$**: If the result is 1, then a checkpoint onion is expected to be received by $P_i$   
     at hop $j$ and $y$ = $F2(sk_{i,k}, j)$ is used to calculate the expected nonce of that checkpoint onion.
-    - See [internal/pi_t/prf/prf.go](/internal/pi_t/prf/prf.go) for `PRF_F1` and `PRF_F2` implementations.
+    - See [internal/pi_t/prf/prf.go](/internal/pi_t/tools/prf/prf.go) for `PRF_F1` and `PRF_F2` implementations.
 - **Checkpoints ($Y_k$)**: The set of expected nonces (calculated by _F2_) for the $k$-th layer checkpoint onions.
 ```
 
