@@ -24,7 +24,7 @@ func PeelOnion(onion string, sharedKey [32]byte) (layer int, metadata *om.Metada
 
 	layerKey, err := base64.StdEncoding.DecodeString(cypherText.Key)
 
-	peeledSepal, err := o.Sepal.PeelSepal(layerKey, false)
+	peeledSepal, err := o.Sepal.PeelSepal(layerKey)
 	if err != nil {
 		return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to peel sepal")
 	}

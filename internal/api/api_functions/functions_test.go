@@ -2,6 +2,7 @@ package api_functions
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -146,6 +147,8 @@ func TestReceiveOnion(t *testing.T) {
 	payload := []byte("secret message")
 	publicKeys := []string{publicKeyPEM, publicKeyPEM}
 	routingPath := []string{fmt.Sprintf("http://localhost:%d", receiverPort), "node2"}
+
+	o, err := pi_t.FORMONION(publicKeyPEM, privateKeyPEM, base64.StdEncoding.EncodeToString(payload), mixersAddr, gatekeepersAddr, destination.Address, publicKeys, metadata, config.GlobalConfig.D)
 
 	addr, onion, _, err := pi_t.FormOnion(privateKeyPEM, publicKeyPEM, payload, publicKeys, routingPath, -1, "")
 

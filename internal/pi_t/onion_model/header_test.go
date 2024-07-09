@@ -10,6 +10,7 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"golang.org/x/exp/slog"
 	"hash/fnv"
+	"strings"
 	"testing"
 )
 
@@ -101,7 +102,18 @@ func TestFormHeader(t *testing.T) {
 			slog.Error("failed to decode header", err)
 			t.Fatalf("failed to decode header")
 		}
-		slog.Info("", "", nextHeader)
+		if i < len(H)-2 {
+			if nextHeader.NextHeader != H[i+2].NextHeader {
+				t.Fatalf("Expected next header to match")
+			}
+			if nextHeader.E != H[i+2].E {
+				t.Fatalf("Expected E to match")
+			}
+			if strings.Join(nextHeader.A, "") != strings.Join(H[i+2].A, "") {
+				t.Fatalf("Expected A to match")
+			}
+		}
+		//slog.Info("", "", nextHeader)
 
 		if i < l1 && cypherText.Recipient != "mixer" {
 			t.Fatalf("Expected mixer")

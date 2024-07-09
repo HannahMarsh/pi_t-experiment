@@ -65,22 +65,38 @@ func TestPeelOnion22(t *testing.T) {
 		t.Fatalf("failed")
 	}
 
-	oBytes, err := json.Marshal(onions[0][0])
-	if err != nil {
-		slog.Error("failed to marshal onion", err)
-		t.Fatalf("failed to marshal onion")
-	}
-	sharedKey, err := keys.ComputeSharedKey(nodes[1].privateKeyPEM, nodes[0].publicKeyPEM)
-	if err != nil {
-		slog.Error("failed to compute shared key", err)
-		t.Fatalf("failed to compute shared key")
-	}
-	layer, metadata_, peeled, nextDestination, err := PeelOnion(base64.StdEncoding.EncodeToString(oBytes), sharedKey)
-	if err != nil {
-		slog.Error("failed to peel onion", err)
-		t.Fatalf("failed to peel onion")
-	}
+	for i, _ := range onions {
+		for _, onion := range onions[i] {
 
-	slog.Info("", "layer", layer, "metadata", metadata_, "peeled", peeled, "nextDestination", nextDestination)
+			oBytes, err := json.Marshal(onion)
+			if err != nil {
+				slog.Error("failed to marshal onion", err)
+				t.Fatalf("failed to marshal onion")
+			}
+			sharedKey, err := keys.ComputeSharedKey(nodes[i+1].privateKeyPEM, nodes[0].publicKeyPEM)
+			if err != nil {
+				slog.Error("failed to compute shared key", err)
+				t.Fatalf("failed to compute shared key")
+			}
+			layer, metadata_, _, nextDestination, err := PeelOnion(base64.StdEncoding.EncodeToString(oBytes), sharedKey)
+
+			if err != nil {
+				slog.Error("failed to peel onion", err)
+				t.Fatalf("failed to peel onion")
+			}
+
+			if layer != i+1 {
+				t.Fatalf("layer does not match. Expected %d, got %d", i+1, layer)
+			}
+
+			if nextDestination != nodes[i+2].address {
+				t.Fatalf("next destination does not match. Expected %s, got %s", nodes[i+2].address, nextDestination)
+			}
+
+			if metadata_.Example != metadata[i+1].Example {
+				t.Fatalf("metadata does not match. Expected %s, got %s", metadata[i+1].Example, metadata_.Example)
+			}
+		}
+	}
 
 }

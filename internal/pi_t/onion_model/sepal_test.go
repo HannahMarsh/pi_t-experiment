@@ -214,7 +214,12 @@ func bruiseSepal(sepal Sepal, layerKeys [][]byte, numBruises int, l1 int, l int,
 		if i <= l1 {
 			dobruiseSepal = randomBools[i]
 		}
-		sepal, err = sepal.PeelSepal(layerKeys[i], dobruiseSepal)
+		sepal, err = sepal.PeelSepal(layerKeys[i])
+		if dobruiseSepal {
+			sepal.AddBruise()
+		} else {
+			sepal.RemoveBlock()
+		}
 		if err != nil {
 			return Sepal{}, pl.WrapError(err, "failed to peel sepal")
 		}
@@ -258,11 +263,12 @@ func TestSepalHashes(t *testing.T) {
 
 	for i := 1; i <= l1; i++ {
 
-		sepal, err = sepal.PeelSepal(layerKeys[i], false)
+		sepal, err = sepal.PeelSepal(layerKeys[i])
 		if err != nil {
 			slog.Error("failed to peel sepal", err)
 			t.Fatalf("PeelSepal() error: %v", err)
 		}
+		sepal.RemoveBlock()
 		h = Hash(strings.Join(sepal.Blocks, ""))
 		if !utils.Contains(A[i], func(str string) bool {
 			return str == h

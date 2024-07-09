@@ -7,7 +7,9 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/api_functions"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
+	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/onion_model"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/tools/keys"
+	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"io"
 	"net/http"
 	"sync"
@@ -31,7 +33,7 @@ type Node struct {
 	lastUpdate          time.Time
 	status              *structs.NodeStatus
 	checkpoints         map[int]int
-	expectedCheckpoints map[int]int
+	expectedCheckpoints [][]int
 }
 
 // NewNode creates a new node
@@ -49,7 +51,7 @@ func NewNode(id int, host string, port int, bulletinBoardUrl string, isMixer boo
 			isMixer:             isMixer,
 			status:              structs.NewNodeStatus(id, fmt.Sprintf("http://%s:%d", host, port), publicKey, isMixer),
 			checkpoints:         make(map[int]int),
-			expectedCheckpoints: make(map[int]int),
+			expectedCheckpoints: make([][]int, 0),
 		}
 		if err2 := n.RegisterWithBulletinBoard(); err2 != nil {
 			return nil, pl.WrapError(err2, "node.NewNode(): failed to register with bulletin board")
@@ -88,9 +90,15 @@ func (n *Node) StartPeriodicUpdates(interval time.Duration) {
 	}()
 }
 
-func (n *Node) startRun(start structs.StartRunApi) (didParticipate bool, e error) {
+func (n *Node) startRun(start structs.NodeStartRunApi) (didParticipate bool, e error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+
+	n.expectedCheckpoints = start.Checkpoints
+
+	for _, c := range n.checkpoints {
+		n.status.AddExpectedCheckpoint(c)
+	}
 
 	//n.wg.Wait()
 	//n.wg.Add(1)
@@ -98,50 +106,44 @@ func (n *Node) startRun(start structs.StartRunApi) (didParticipate bool, e error
 	return true, nil
 }
 
-func (n *Node) Receive(o string) error {
-	if peeled, bruises, nonceVerification, expectCheckpoint, err := pi_t.PeelOnion(o, n.PrivateKey); err != nil {
+func (n *Node) Receive(from string, o string, sharedKey [32]byte) error {
+	layer, metadata, peeled, nextHop, err := pi_t.PeelOnion(o, sharedKey)
+	if err != nil {
 		return pl.WrapError(err, "node.Receive(): failed to remove layer")
-	} else {
-		n.mu.Lock()
-		defer n.mu.Unlock()
-
-		if expectCheckpoint {
-			n.expectedCheckpoints[peeled.Layer]++
-			n.status.AddExpectedCheckpoint(peeled.Layer)
-		}
-		if peeled.IsCheckpointOnion {
-			n.checkpoints[peeled.Layer]++
-			n.status.AddCheckpointOnion(peeled.Layer)
-		}
-		slog.Info("Received onion", "ischeckpoint?", peeled.IsCheckpointOnion, "layer", peeled.Layer, "nextHop", config.AddressToName(peeled.NextHop), "lastHop", config.AddressToName(peeled.LastHop), "nonceVerification", nonceVerification, "expectCheckpoint", expectCheckpoint)
-
-		if !nonceVerification {
-			bruises += 1
-		}
-
-		if !n.isMixer && bruises > config.GlobalConfig.MaxBruises {
-
-			n.status.AddOnion(peeled.LastHop, fmt.Sprintf("http://%s:%d", n.Host, n.Port), peeled.NextHop, peeled.Layer, peeled.IsCheckpointOnion, bruises, true, nonceVerification, expectCheckpoint)
-			slog.Info("Dropping onion", "layer", peeled.Layer, "destination", peeled.NextHop)
-			return nil
-
-		} else {
-
-			n.status.AddOnion(peeled.LastHop, fmt.Sprintf("http://%s:%d", n.Host, n.Port), peeled.NextHop, peeled.Layer, peeled.IsCheckpointOnion, bruises, false, nonceVerification, expectCheckpoint)
-
-			addedHeader, err4 := pi_t.AddHeader(peeled, bruises, n.PrivateKey, n.PublicKey)
-			if err4 != nil {
-				return pl.WrapError(err4, "node.Receive(): failed to add header")
-			}
-			if err3 := n.sendToNode(peeled.NextHop, addedHeader); err != nil {
-				return pl.WrapError(err3, "node.Receive(): failed to send to next node")
-			}
-		}
 	}
+
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if metadata.Nonce != -1 {
+		if utils.Contains(n.expectedCheckpoints[layer], func(i int) bool {
+			return i == metadata.Nonce
+		}) { // nonce is verified
+			n.checkpoints[layer]++
+			if n.isMixer {
+				peeled.Sepal.RemoveBlock()
+			}
+		} else {
+			if n.isMixer {
+				peeled.Sepal.AddBruise()
+			}
+		}
+
+		n.status.AddCheckpointOnion(layer)
+	}
+
+	slog.Info("Received onion", "ischeckpoint?", metadata.Nonce != -1, "layer", layer, "nextHop", config.AddressToName(nextHop))
+
+	n.status.AddOnion(from, fmt.Sprintf("http://%s:%d", n.Host, n.Port), nextHop, layer, metadata.Nonce != -1)
+
+	if err3 := n.sendToNode(nextHop, peeled); err != nil {
+		return pl.WrapError(err3, "node.Receive(): failed to send to next node")
+	}
+
 	return nil
 }
 
-func (n *Node) sendToNode(addr string, constructedOnion string) error {
+func (n *Node) sendToNode(addr string, constructedOnion onion_model.Onion) error {
 	go func() {
 		err := api_functions.SendOnion(addr, fmt.Sprintf("http://%s:%d", n.Host, n.Port), constructedOnion)
 		if err != nil {

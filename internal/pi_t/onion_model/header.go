@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/tools/keys"
-	"strings"
 )
 
 type Header struct {
 	E          string   // encryption under pk(Pi) of CypherText
-	B          []string // encryption under the layerKey of CypherTextWrapper
 	A          []string // verification hashes
 	NextHeader string   // encryption under the layerKey of CypherTextWrapper
 }
@@ -25,6 +23,7 @@ type CypherText struct {
 
 type Metadata struct {
 	Example string
+	Nonce   int
 }
 
 type CypherTextWrapper struct {
@@ -49,32 +48,31 @@ func FormHeaders(l int, l1 int, C []Content, A [][]string, privateKey string, pu
 	H = make([]Header, l+1)
 	H[l] = Header{
 		E: E[l],
-		B: []string{},
 	}
 
-	B := make([][]string, l+1)
-	for i, _ := range B {
-		B[i] = make([]string, l+1)
-	}
-	B[l][1], err = encryptB(recipient, E[l], K)
-	if err != nil {
-		return nil, pl.WrapError(err, "failed to encrypt B_l_minus_1_1")
-	}
+	//B := make([][]string, l+1)
+	//for i, _ := range B {
+	//	B[i] = make([]string, l+1)
+	//}
+	//B[l][1], err = encryptB(recipient, E[l], K)
+	//if err != nil {
+	//	return nil, pl.WrapError(err, "failed to encrypt B_l_minus_1_1")
+	//}
 
 	for i := l - 1; i >= 1; i-- {
-		B[i][1], err = encryptB(path[i+1], E[i+1], layerKeys[i])
-		if err != nil {
-			return nil, pl.WrapError(err, "failed to encrypt B_i_1")
-		}
-		for j := 2; j <= l-j+1; j++ {
-			B[i][j], err = encryptB("", B[i+1][j-1], layerKeys[i])
-			if err != nil {
-				return nil, pl.WrapError(err, "failed to encrypt B_i_j")
-			}
-		}
-		B_i_1_to_C_i := append(B[i][1:], string(C[i]))
-		concat := strings.Join(B_i_1_to_C_i, "")
-		tags[i] = hash(concat)
+		//B[i][1], err = encryptB(path[i+1], E[i+1], layerKeys[i])
+		//if err != nil {
+		//	return nil, pl.WrapError(err, "failed to encrypt B_i_1")
+		//}
+		//for j := 2; j <= l-j+1; j++ {
+		//	B[i][j], err = encryptB("", B[i+1][j-1], layerKeys[i])
+		//	if err != nil {
+		//		return nil, pl.WrapError(err, "failed to encrypt B_i_j")
+		//	}
+		//}
+		//B_i_1_to_C_i := append(B[i][1:], string(C[i]))
+		//concat := strings.Join(B_i_1_to_C_i, "")
+		//tags[i] = hash(concat)
 		role := "mixer"
 		if i == l-1 {
 			role = "lastGatekeeper"
@@ -95,14 +93,13 @@ func FormHeaders(l int, l1 int, C []Content, A [][]string, privateKey string, pu
 		if i-1 < len(A) {
 			H[i] = Header{
 				E:          E[i],
-				B:          B[i],
 				A:          A[i-1],
 				NextHeader: nh,
 			}
 		} else {
 			H[i] = Header{
-				E: E[i],
-				B: B[i],
+				E:          E[i],
+				NextHeader: nh,
 			}
 		}
 	}
@@ -165,7 +162,7 @@ func (h Header) DecodeHeader(sharedKey [32]byte) (*CypherText, string, Header, e
 		return nil, "", Header{}, pl.WrapError(err, "failed to decode layer key")
 	}
 
-	if len(h.B) == 0 {
+	if h.NextHeader == "" {
 		return &ciphertext, "", Header{}, nil
 	}
 

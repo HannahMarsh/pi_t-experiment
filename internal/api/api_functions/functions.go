@@ -3,11 +3,13 @@ package api_functions
 import (
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
+	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/onion_model"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"golang.org/x/exp/slog"
 	"io"
@@ -78,7 +80,7 @@ type item struct {
 //}
 
 // sendOnion sends an onion to the specified address with compression and timeout
-func SendOnion(to, from, onionStr string) error {
+func SendOnion(to, from string, o onion_model.Onion) error {
 	slog.Info(pl.GetFuncName()+": Sending onion...", "from", config.AddressToName(from), "to", config.AddressToName(to))
 	url := fmt.Sprintf("%s/receive", to)
 
@@ -99,10 +101,17 @@ func SendOnion(to, from, onionStr string) error {
 	//
 	//encodeToString := base64.StdEncoding.EncodeToString(compressedData)
 
+	data, err := json.Marshal(o)
+	if err != nil {
+		return pl.WrapError(err, "%s: failed to marshal onion", pl.GetFuncName())
+	}
+
+	oStr := base64.StdEncoding.EncodeToString(data)
+
 	onion := structs.OnionApi{
 		To:    to,
 		From:  from,
-		Onion: onionStr,
+		Onion: oStr,
 	}
 
 	payload, err := json.Marshal(onion)

@@ -42,6 +42,7 @@ type Metrics struct {
 
 type Config struct {
 	ServerLoad        int           `yaml:"server_load"`
+	D                 int           `yaml:"d"`
 	HeartbeatInterval int           `yaml:"heartbeat_interval"`
 	MinNodes          int           `yaml:"min_nodes"`
 	Epsilon           float64       `yaml:"epsilon"`

@@ -11,7 +11,7 @@ type Sepal struct {
 	Blocks []string
 }
 
-func (s Sepal) PeelSepal(layerKey []byte, addBruise bool) (peeledSepal Sepal, err error) {
+func (s Sepal) PeelSepal(layerKey []byte) (peeledSepal Sepal, err error) {
 
 	peeledSepal = Sepal{Blocks: make([]string, len(s.Blocks))}
 
@@ -24,14 +24,22 @@ func (s Sepal) PeelSepal(layerKey []byte, addBruise bool) (peeledSepal Sepal, er
 			peeledSepal.Blocks[j] = decryptedString
 		}
 	}
-	if addBruise { // "drop" left-most sepal block that hasn't already been bruised
-		//slog.Info("Dropping left-most sepal block")
-		peeledSepal.Blocks = utils.DropFirstElement(peeledSepal.Blocks) //peeledSepal.Blocks[1:]
-	} else if len(peeledSepal.Blocks) > 1 { // "drop" right-most sepal block that hasn't already been dropped
-		//slog.Info("Dropping right-most sepal block")
-		peeledSepal.Blocks = utils.DropLastElement(peeledSepal.Blocks) // peeledSepal.Blocks[:len(peeledSepal.Blocks)-1]
-	} // else, this is a gatekeeper processing, so only one block left
+	//if addBruise { // "drop" left-most sepal block that hasn't already been bruised
+	//	//slog.Info("Dropping left-most sepal block")
+	//	peeledSepal.Blocks = utils.DropFirstElement(peeledSepal.Blocks) //peeledSepal.Blocks[1:]
+	//} else if len(peeledSepal.Blocks) > 1 { // "drop" right-most sepal block that hasn't already been dropped
+	//	//slog.Info("Dropping right-most sepal block")
+	//	peeledSepal.Blocks = utils.DropLastElement(peeledSepal.Blocks) // peeledSepal.Blocks[:len(peeledSepal.Blocks)-1]
+	//} // else, this is a gatekeeper processing, so only one block left
 	return peeledSepal, nil
+}
+
+func (s Sepal) AddBruise() {
+	s.Blocks = utils.DropFirstElement(s.Blocks) //peeledSepal.Blocks[1:]
+}
+
+func (s Sepal) RemoveBlock() {
+	s.Blocks = utils.DropLastElement(s.Blocks) //peeledSepal.Blocks[1:]
 }
 
 func FormSepals(masterKey string, d int, layerKeys [][]byte, l int, l1 int, l2 int, hash func(string) string) (A [][]string, S_i [][]Sepal, err error) {
