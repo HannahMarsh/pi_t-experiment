@@ -17,6 +17,10 @@ func (s Sepal) PeelSepal(layerKey []byte) (peeledSepal Sepal, err error) {
 
 	// first decrypt all non-dropped blocks with the layer key
 	for j, sepalBlock := range s.Blocks {
+		if sepalBlock == "" || sepalBlock == "null" {
+			peeledSepal.Blocks[j] = sepalBlock
+			continue
+		}
 		_, decryptedString, err := keys.DecryptStringWithAES(layerKey, sepalBlock)
 		if err != nil {
 			return Sepal{}, pl.WrapError(err, "failed to decrypt sepal block")
