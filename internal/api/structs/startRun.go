@@ -5,12 +5,18 @@ type ClientStartRunApi struct {
 	Gatekeepers          []PublicNodeApi
 	Clients              []PublicNodeApi
 	NumMessagesPerClient int
-	Checkpoints          [][]int
+	Checkpoints          []Checkpoint
 }
 
 type NodeStartRunApi struct {
 	Mixers      []PublicNodeApi
 	Gatekeepers []PublicNodeApi
 	Clients     []PublicNodeApi
-	Checkpoints [][]int
+	Checkpoints []Checkpoint
+}
+
+type Checkpoint struct {
+	Receiver PublicNodeApi
+	Nonce    string
+	Layer    int
 }

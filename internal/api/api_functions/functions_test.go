@@ -505,7 +505,7 @@ func TestReceiveOnionMultipleLayers2(t *testing.T) {
 			metadata[i] = onion_model.Metadata{Example: fmt.Sprintf("example%d", i)}
 		}
 
-		onions, err := pi_t.FORMONION(nodes[0].publicKeyPEM, nodes[0].privateKeyPEM, string(payload), routingPath[:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys, metadata, d)
+		onions, _, err := pi_t.FORMONION(nodes[0].publicKeyPEM, nodes[0].privateKeyPEM, string(payload), routingPath[:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys, metadata, d)
 		if err != nil {
 			slog.Error("", err)
 			t.Fatalf("failed")
@@ -526,7 +526,8 @@ func TestReceiveOnionMultipleLayers2(t *testing.T) {
 				defer wg.Done()
 				mux := http.NewServeMux()
 				mux.HandleFunc("/receive", func(w http.ResponseWriter, r *http.Request) {
-					HandleReceiveOnion(w, r, func(onionStr string) error {
+					HandleReceiveOnion(w, r, func(oApi structs.OnionApi) error {
+						onionStr := oApi.Onion
 						sharedKey, err := keys.ComputeSharedKey(nodes[i].privateKeyPEM, nodes[0].publicKeyPEM)
 						if err != nil {
 							slog.Error("ComputeSharedKey() error", err)
@@ -557,7 +558,7 @@ func TestReceiveOnionMultipleLayers2(t *testing.T) {
 							peeled.Sepal.RemoveBlock()
 						}
 
-						err4 := SendOnion(nextDestination, nodes[i].address, peeled)
+						err4 := SendOnion(nextDestination, nodes[i].address, peeled, "")
 						if err4 != nil {
 							slog.Error("SendOnion() error", err4)
 							t.Errorf("SendOnion() error = %v", err4)
@@ -584,8 +585,8 @@ func TestReceiveOnionMultipleLayers2(t *testing.T) {
 		go func() {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/receive", func(w http.ResponseWriter, r *http.Request) {
-				HandleReceiveOnion(w, r, func(onionStr string) error {
-
+				HandleReceiveOnion(w, r, func(oApi structs.OnionApi) error {
+					onionStr := oApi.Onion
 					defer wg.Done()
 					sharedKey, err := keys.ComputeSharedKey(nodes[l].privateKeyPEM, nodes[0].publicKeyPEM)
 					if err != nil {
@@ -660,7 +661,7 @@ func TestReceiveOnionMultipleLayers2(t *testing.T) {
 			}
 		}()
 
-		err = SendOnion(nodes[1].address, nodes[0].address, onions[0][0])
+		err = SendOnion(nodes[1].address, nodes[0].address, onions[0][0], "")
 		if err != nil {
 			slog.Error("SendOnion() error", err)
 			t.Fatalf("SendOnion() error = %v", err)

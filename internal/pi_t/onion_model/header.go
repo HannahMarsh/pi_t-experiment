@@ -23,7 +23,7 @@ type CypherText struct {
 
 type Metadata struct {
 	Example string
-	Nonce   int
+	Nonce   string
 }
 
 type CypherTextWrapper struct {

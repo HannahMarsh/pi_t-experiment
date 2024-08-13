@@ -147,3 +147,20 @@ func ComputeSharedKey(privKeyHex, pubKeyHex string) ([32]byte, error) {
 
 	return sharedKey, nil
 }
+
+func DecodeSharedKey(sharedKeyStr string) ([32]byte, error) {
+	// Convert sharedKeyStr back to [32]byte
+	decodedBytes, err := hex.DecodeString(sharedKeyStr)
+	if err != nil {
+		return [32]byte{}, pl.WrapError(err, "failed to decode shared key string")
+	}
+
+	if len(decodedBytes) != 32 {
+		return [32]byte{}, pl.NewError("decoded key has incorrect length")
+	}
+
+	var sharedKey [32]byte
+	copy(sharedKey[:], decodedBytes)
+
+	return sharedKey, nil
+}

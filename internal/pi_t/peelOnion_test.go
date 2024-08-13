@@ -59,7 +59,7 @@ func TestPeelOnion22(t *testing.T) {
 		metadata[i] = onion_model.Metadata{Example: fmt.Sprintf("example%d", i)}
 	}
 
-	onions, err := FORMONION(nodes[0].publicKeyPEM, nodes[0].privateKeyPEM, string(payload), routingPath[:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys, metadata, d)
+	onions, _, err := FORMONION(nodes[0].publicKeyPEM, nodes[0].privateKeyPEM, string(payload), routingPath[:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys, metadata, d)
 	if err != nil {
 		slog.Error("", err)
 		t.Fatalf("failed")

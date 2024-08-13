@@ -7,6 +7,7 @@ go 1.21
 require (
 	github.com/HannahMarsh/PrettyLogger v0.0.0-20240627173212-7d95e93b93d0
 	github.com/emirpasic/gods v1.18.1
+	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.12.0
 	github.com/ilyakaznacheev/cleanenv v1.3.0
 	github.com/jfcg/sorty/v2 v2.1.1
@@ -29,7 +30,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/stretchr/testify v1.8.1 // indirect
-	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	google.golang.org/genproto v0.0.0-20221014213838-99cd37c6964a // indirect

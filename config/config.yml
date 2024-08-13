@@ -3,7 +3,7 @@ l1: 3         # Number of planned mixers in a routing path
 l2: 2         # Number of planned gatekeepers in a routing path
 x: 8          # Server load (x = Ω(polylog λ)) i.e. the expected number of onions per intermediary hop
 tau: 0.8      # (τ < (1 − γ)(1 − X)) Fraction of checkpoints needed to progress local clock
-L: 5          # (L = l1 + l2 + 1) Number of rounds
+L: 6          # (L = l1 + l2 + 1) Number of rounds
 N: 5          # Number of active nodes at the start of the protocol
 R: 2          # Number of clients registered with intent-to-send at the start the protocol.
 h: 5          # Heartbeat interval in seconds

@@ -32,8 +32,8 @@ type Node struct {
 	BulletinBoardUrl    string
 	lastUpdate          time.Time
 	status              *structs.NodeStatus
-	checkpoints         map[int]int
-	expectedCheckpoints [][]int
+	checkpointsReceived map[int]int
+	expectedNonces      [][]string
 }
 
 // NewNode creates a new node
@@ -41,6 +41,10 @@ func NewNode(id int, host string, port int, bulletinBoardUrl string, isMixer boo
 	if privateKey, publicKey, err := keys.KeyGen(); err != nil {
 		return nil, pl.WrapError(err, "node.NewClient(): failed to generate key pair")
 	} else {
+		expectedCheckpoints := make([][]string, config.GlobalConfig.L)
+		for i := range expectedCheckpoints {
+			expectedCheckpoints[i] = make([]string, 0)
+		}
 		n := &Node{
 			ID:                  id,
 			Host:                host,
@@ -50,8 +54,8 @@ func NewNode(id int, host string, port int, bulletinBoardUrl string, isMixer boo
 			BulletinBoardUrl:    bulletinBoardUrl,
 			isMixer:             isMixer,
 			status:              structs.NewNodeStatus(id, fmt.Sprintf("http://%s:%d", host, port), publicKey, isMixer),
-			checkpoints:         make(map[int]int),
-			expectedCheckpoints: make([][]int, 0),
+			checkpointsReceived: make(map[int]int),
+			expectedNonces:      expectedCheckpoints,
 		}
 		if err2 := n.RegisterWithBulletinBoard(); err2 != nil {
 			return nil, pl.WrapError(err2, "node.NewNode(): failed to register with bulletin board")
@@ -94,20 +98,20 @@ func (n *Node) startRun(start structs.NodeStartRunApi) (didParticipate bool, e e
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	n.expectedCheckpoints = start.Checkpoints
-
-	for _, c := range n.checkpoints {
-		n.status.AddExpectedCheckpoint(c)
+	for _, c := range start.Checkpoints {
+		n.expectedNonces[c.Layer] = append(n.expectedNonces[c.Layer], c.Nonce)
+		n.status.AddExpectedCheckpoint(c.Layer)
 	}
 
-	//n.wg.Wait()
-	//n.wg.Add(1)
-	//defer n.wg.Done()
 	return true, nil
 }
 
-func (n *Node) Receive(from string, o string, sharedKey [32]byte) error {
-	layer, metadata, peeled, nextHop, err := pi_t.PeelOnion(o, sharedKey)
+func (n *Node) Receive(oApi structs.OnionApi) error {
+	sharedKey, err := keys.DecodeSharedKey(oApi.SharedKey)
+	if err != nil {
+		return pl.WrapError(err, "node.Receive(): failed to decode shared key")
+	}
+	layer, metadata, peeled, nextHop, err := pi_t.PeelOnion(oApi.Onion, sharedKey)
 	if err != nil {
 		return pl.WrapError(err, "node.Receive(): failed to remove layer")
 	}
@@ -115,11 +119,11 @@ func (n *Node) Receive(from string, o string, sharedKey [32]byte) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	if metadata.Nonce != -1 {
-		if utils.Contains(n.expectedCheckpoints[layer], func(i int) bool {
+	if metadata.Nonce != "" {
+		if utils.Contains(n.expectedNonces[layer], func(i string) bool {
 			return i == metadata.Nonce
 		}) { // nonce is verified
-			n.checkpoints[layer]++
+			n.checkpointsReceived[layer]++
 			if n.isMixer {
 				peeled.Sepal.RemoveBlock()
 			}
@@ -132,20 +136,21 @@ func (n *Node) Receive(from string, o string, sharedKey [32]byte) error {
 		n.status.AddCheckpointOnion(layer)
 	}
 
-	slog.Info("Received onion", "ischeckpoint?", metadata.Nonce != -1, "layer", layer, "nextHop", config.AddressToName(nextHop))
+	slog.Info("Received onion", "ischeckpoint?", metadata.Nonce != "", "layer", layer, "nextHop", config.AddressToName(nextHop))
 
-	n.status.AddOnion(from, fmt.Sprintf("http://%s:%d", n.Host, n.Port), nextHop, layer, metadata.Nonce != -1)
+	n.status.AddOnion(oApi.From, fmt.Sprintf("http://%s:%d", n.Host, n.Port), nextHop, layer, metadata.Nonce != "")
 
-	if err3 := n.sendToNode(nextHop, peeled); err != nil {
+	nextSharedKey := "" // TODO compute shared key with next hop
+	if err3 := n.sendToNode(nextHop, peeled, nextSharedKey); err != nil {
 		return pl.WrapError(err3, "node.Receive(): failed to send to next node")
 	}
 
 	return nil
 }
 
-func (n *Node) sendToNode(addr string, constructedOnion onion_model.Onion) error {
+func (n *Node) sendToNode(addr string, constructedOnion onion_model.Onion, sharedKey string) error {
 	go func() {
-		err := api_functions.SendOnion(addr, fmt.Sprintf("http://%s:%d", n.Host, n.Port), constructedOnion)
+		err := api_functions.SendOnion(addr, fmt.Sprintf("http://%s:%d", n.Host, n.Port), constructedOnion, sharedKey)
 		if err != nil {
 			slog.Error("Error sending onion", err)
 		}

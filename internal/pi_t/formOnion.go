@@ -3,6 +3,7 @@ package pi_t
 import (
 	_ "crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	_ "encoding/json"
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
@@ -30,7 +31,7 @@ const fixedLegnthOfMessage = 256
 //   - For 2 <= i <= l1, the list O_i contains i options, O_i = (O_i,0, ..., O_i,i-1), each O_i,j representing the i-th onion layer with j prior bruises.
 //   - For l1 + 1 <= i <= l1 + l2, the list O_i contains l1 + 1 options, depending on the total bruising from the mixers.
 //   - The last list O_(l1 + l2 + 1) contains just the innermost onion for the recipient.
-func FORMONION(publicKey, privateKey, m string, mixers []string, gatekeepers []string, recipient string, publicKeys []string, metadata []onion_model.Metadata, d int) ([][]onion_model.Onion, error) {
+func FORMONION(publicKey, privateKey, m string, mixers, gatekeepers []string, recipient string, publicKeys []string, metadata []onion_model.Metadata, d int) ([][]onion_model.Onion, string, error) {
 
 	message := padMessage(m)
 
@@ -51,7 +52,7 @@ func FORMONION(publicKey, privateKey, m string, mixers []string, gatekeepers []s
 	// Construct first sepal for M1
 	A, S, err := onion_model.FormSepals(masterKey, d, layerKeys, l, l1, l2, Hash)
 	if err != nil {
-		return nil, pl.WrapError(err, "failed to create sepal")
+		return nil, "", pl.WrapError(err, "failed to create sepal")
 	}
 
 	// build penultimate onion layer
@@ -59,7 +60,7 @@ func FORMONION(publicKey, privateKey, m string, mixers []string, gatekeepers []s
 	// form content
 	C, err := onion_model.FormContent(layerKeys, l, message, K)
 	if err != nil {
-		return nil, pl.WrapError(err, "failed to form content")
+		return nil, "", pl.WrapError(err, "failed to form content")
 	}
 
 	// form header
@@ -78,7 +79,12 @@ func FORMONION(publicKey, privateKey, m string, mixers []string, gatekeepers []s
 		})
 	}
 
-	return onionLayers, nil
+	sharedKeyBytes, err := keys.ComputeSharedKey(privateKey, publicKeys[0])
+	if err != nil {
+		return nil, "", pl.WrapError(err, "failed to compute shared key")
+	}
+	sharedKey := hex.EncodeToString(sharedKeyBytes[:])
+	return onionLayers, sharedKey, nil
 }
 
 func Hash(s string) string {

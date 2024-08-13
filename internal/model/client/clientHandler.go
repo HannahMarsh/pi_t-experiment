@@ -42,7 +42,7 @@ func (c *Client) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 
 func (c *Client) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Starting run")
-	var start structs.StartRunApi
+	var start structs.ClientStartRunApi
 	if err := json.NewDecoder(r.Body).Decode(&start); err != nil {
 		slog.Error("Error decoding active nodes", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)

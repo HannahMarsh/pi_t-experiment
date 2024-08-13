@@ -1,0 +1,15 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="run" type="CompoundRunConfigurationType">
+    <toRun name="bulletin board" type="GoApplicationRunConfiguration" />
+    <toRun name="client 1" type="GoApplicationRunConfiguration" />
+    <toRun name="client 2" type="GoApplicationRunConfiguration" />
+    <toRun name="metrics" type="GoApplicationRunConfiguration" />
+    <toRun name="node 1" type="GoApplicationRunConfiguration" />
+    <toRun name="node 2" type="GoApplicationRunConfiguration" />
+    <toRun name="node 3" type="GoApplicationRunConfiguration" />
+    <toRun name="node 4" type="GoApplicationRunConfiguration" />
+    <toRun name="node 5" type="GoApplicationRunConfiguration" />
+    <toRun name="node 6" type="GoApplicationRunConfiguration" />
+    <method v="2" />
+  </configuration>
+</component>

@@ -80,7 +80,7 @@ type item struct {
 //}
 
 // sendOnion sends an onion to the specified address with compression and timeout
-func SendOnion(to, from string, o onion_model.Onion) error {
+func SendOnion(to, from string, o onion_model.Onion, sharedKey string) error {
 	slog.Info(pl.GetFuncName()+": Sending onion...", "from", config.AddressToName(from), "to", config.AddressToName(to))
 	url := fmt.Sprintf("%s/receive", to)
 
@@ -109,9 +109,10 @@ func SendOnion(to, from string, o onion_model.Onion) error {
 	oStr := base64.StdEncoding.EncodeToString(data)
 
 	onion := structs.OnionApi{
-		To:    to,
-		From:  from,
-		Onion: oStr,
+		To:        to,
+		From:      from,
+		Onion:     oStr,
+		SharedKey: sharedKey,
 	}
 
 	payload, err := json.Marshal(onion)
@@ -154,7 +155,7 @@ func SendOnion(to, from string, o onion_model.Onion) error {
 	return nil
 }
 
-func HandleReceiveOnion(w http.ResponseWriter, r *http.Request, receiveFunction func(string) error) {
+func HandleReceiveOnion(w http.ResponseWriter, r *http.Request, receiveFunction func(api structs.OnionApi) error) {
 
 	var body []byte
 	var err error
@@ -194,7 +195,7 @@ func HandleReceiveOnion(w http.ResponseWriter, r *http.Request, receiveFunction 
 		return
 	}
 
-	if err = receiveFunction(o.Onion); err != nil {
+	if err = receiveFunction(o); err != nil {
 		slog.Error("Error receiving onion", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

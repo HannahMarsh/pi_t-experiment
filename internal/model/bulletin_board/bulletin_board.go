@@ -108,51 +108,86 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 		return n.Address != "" && !n.IsMixer
 	})
 
-	vs := structs.StartRunApi{
-		ParticipatingClients: activeClients,
-		Mixers:               mixers,
-		Gatekeepers:          gatekeepers,
-		NumMessagesPerClient: numMessages,
+	checkpoints := GetCheckpoints(activeNodes, activeClients, config.GlobalConfig.L, numMessages)
+
+	clientStartSignals := make(map[structs.PublicNodeApi]structs.ClientStartRunApi)
+
+	for _, client := range activeClients {
+		csr := structs.ClientStartRunApi{
+			Clients:              activeClients,
+			Mixers:               mixers,
+			Gatekeepers:          gatekeepers,
+			NumMessagesPerClient: numMessages,
+			Checkpoints:          checkpoints[client.ID],
+		}
+		clientStartSignals[client] = csr
 	}
 
-	if data, err := json.Marshal(vs); err != nil {
-		return PrettyLogger.WrapError(err, "failed to marshal start signal")
-	} else {
-		var wg sync.WaitGroup
-		all := utils.Copy(activeNodes)
-		all = append(all, activeClients...)
-		all = utils.Filter(all, func(n structs.PublicNodeApi) bool {
-			return n.Address != ""
+	nodeStartSignals := make(map[structs.PublicNodeApi]structs.NodeStartRunApi)
+	for _, node := range activeNodes {
+		nodeCheckpoints := utils.Filter(utils.MapFlatMap(checkpoints, func(_ int, cps []structs.Checkpoint) []structs.Checkpoint {
+			return cps
+		}), func(checkpoint structs.Checkpoint) bool {
+			return checkpoint.Receiver.ID == node.ID
 		})
-		for _, n := range all {
-			n := n
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				url := fmt.Sprintf("%s/start", n.Address)
-				if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
-					slog.Error("Error signaling node to start \n"+url, err2)
-				} else if err3 := resp.Body.Close(); err3 != nil {
-					fmt.Printf("Error closing response body: %v\n", err3)
-				}
-			}()
+		nsr := structs.NodeStartRunApi{
+			Clients:     activeClients,
+			Mixers:      mixers,
+			Gatekeepers: gatekeepers,
+			Checkpoints: nodeCheckpoints,
 		}
-		//for _, c := range activeClients {
-		//	c := c
-		//	wg.Add(1)
-		//	go func() {
-		//		defer wg.Done()
-		//		url := fmt.Sprintf("%s/start", c.Address)
-		//		if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
-		//			slog.Error("Error signaling client to start\n", err2)
-		//		} else if err3 := resp.Body.Close(); err3 != nil {
-		//			fmt.Printf("Error closing response body: %v\n", err3)
-		//		}
-		//	}()
-		//}
-		wg.Wait()
-		return nil
+		nodeStartSignals[node] = nsr
 	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(activeNodes) + len(activeClients))
+
+	var err error
+	for client, csr := range clientStartSignals {
+		go func(client structs.PublicNodeApi, csr structs.ClientStartRunApi) {
+			defer wg.Done()
+			if data, err2 := json.Marshal(csr); err2 != nil {
+				slog.Error("Error signaling client to start\n", err2)
+				err = PrettyLogger.WrapError(err2, "failed to marshal start signal")
+			} else {
+				url := fmt.Sprintf("%s/start", client.Address)
+				if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
+					slog.Error("Error signaling client to start\n", err2)
+					err = PrettyLogger.WrapError(err2, "failed to signal client to start")
+				} else if err3 := resp.Body.Close(); err3 != nil {
+					slog.Error("Error closing response body", err3)
+					err = PrettyLogger.WrapError(err3, "failed to close response body")
+				}
+			}
+		}(client, csr)
+	}
+
+	for node, nsr := range nodeStartSignals {
+		defer wg.Done()
+		node := node
+		nsr := nsr
+		go func() {
+			if data, err2 := json.Marshal(nsr); err2 != nil {
+				slog.Error("Error signaling node to start\n", err2)
+				err = PrettyLogger.WrapError(err2, "failed to marshal start signal")
+			} else {
+				url := fmt.Sprintf("%s/start", node.Address)
+				if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
+					slog.Error("Error signaling node to start\n", err2)
+					err = PrettyLogger.WrapError(err2, "failed to signal node to start")
+				} else if err3 := resp.Body.Close(); err3 != nil {
+					slog.Error("Error closing response body", err3)
+					err = PrettyLogger.WrapError(err3, "failed to close response body")
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+	if err != nil {
+		return PrettyLogger.WrapError(err, "error signaling nodes to start")
+	}
+	return nil
 }
 
 func (bb *BulletinBoard) StartRuns() error {
@@ -175,11 +210,11 @@ func (bb *BulletinBoard) StartRuns() error {
 func (bb *BulletinBoard) allNodesReady() bool {
 	bb.mu.RLock()
 	defer bb.mu.RUnlock()
-	activeNodes := utils.NewMapStream(bb.Network).Filter(func(_ int, node *NodeView) bool {
+	activeNodes := utils.Filter(utils.GetValues(bb.Network), func(node *NodeView) bool {
 		return node.IsActive()
-	}).GetValues()
+	})
 
-	if len(activeNodes.Array) < bb.config.MinNodes {
+	if len(activeNodes) < bb.config.MinNodes {
 		slog.Info("Not enough active nodes")
 		return false
 	}
