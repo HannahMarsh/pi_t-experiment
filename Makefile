@@ -3,27 +3,27 @@ export
 
 all: build test
 
-run: run-product run-counter run-barista run-kitchen run-proxy run-web
+run: run-bulletin-board run-node run-client run-metrics run-proxy run-web
 
-run-product:
-	cd cmd/product && go mod tidy && go mod download && \
-	CGO_ENABLED=0 go run github.com/HannahMarsh/pi_t-experiment/cmd/product
-.PHONY: run-product
+run-bulletin-board:
+	cd cmd/bulletin-board && go mod tidy && go mod download && \
+	CGO_ENABLED=0 go run github.com/HannahMarsh/pi_t-experiment/cmd/bulletin-board
+.PHONY: run-bulletin-board
 
-run-counter:
-	cd cmd/counter && go mod tidy && go mod download && \
-	CGO_ENABLED=0 go run -tags migrate github.com/HannahMarsh/pi_t-experiment/cmd/counter
-.PHONY: run-counter
+run-node:
+	cd cmd/node && go mod tidy && go mod download && \
+	CGO_ENABLED=0 go run -tags migrate github.com/HannahMarsh/pi_t-experiment/cmd/node
+.PHONY: run-node
 
-run-barista:
-	cd cmd/barista && go mod tidy && go mod download && \
-	CGO_ENABLED=0 go run -tags migrate github.com/HannahMarsh/pi_t-experiment/cmd/barista
-.PHONY: run-barista
+run-client:
+	cd cmd/client && go mod tidy && go mod download && \
+	CGO_ENABLED=0 go run -tags migrate github.com/HannahMarsh/pi_t-experiment/cmd/client
+.PHONY: run-client
 
-run-kitchen:
-	cd cmd/kitchen && go mod tidy && go mod download && \
-	CGO_ENABLED=0 go run -tags migrate github.com/HannahMarsh/pi_t-experiment/cmd/kitchen
-.PHONY: run-kitchen
+run-metrics:
+	cd cmd/metrics && go mod tidy && go mod download && \
+	CGO_ENABLED=0 go run -tags migrate github.com/HannahMarsh/pi_t-experiment/cmd/metrics
+.PHONY: run-metrics
 
 run-proxy:
 	cd cmd/proxy && go mod tidy && go mod download && \
@@ -62,10 +62,10 @@ docker-compose-build:
 .PHONY: docker-compose-build
 
 wire:
-	cd internal/barista/app && wire && cd - && \
-	cd internal/counter/app && wire && cd - && \
-	cd internal/kitchen/app && wire && cd - && \
-	cd internal/product/app && wire && cd -
+	cd internal/client/app && wire && cd - && \
+	cd internal/node/app && wire && cd - && \
+	cd internal/metrics/app && wire && cd - && \
+	cd internal/bulletin-board/app && wire && cd -
 .PHONY: wire
 
 sqlc:

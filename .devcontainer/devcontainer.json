@@ -1,5 +1,5 @@
 {
-    "name": "go-coffeeshop",
+    "name": "pi_t-experiment",
     "build": {
         "dockerfile": "Dockerfile-dev",
         "args": {
