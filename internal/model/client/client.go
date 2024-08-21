@@ -33,6 +33,7 @@ type Client struct {
 	mu               sync.RWMutex
 	BulletinBoardUrl string
 	status           *structs.ClientStatus
+	wg               sync.WaitGroup
 }
 
 // NewNode creates a new client instance
@@ -54,6 +55,7 @@ func NewClient(id int, host string, port int, bulletinBoardUrl string) (*Client,
 			OtherClients:     make([]structs.PublicNodeApi, 0),
 			status:           structs.NewClientStatus(id, fmt.Sprintf("http://%s:%d", host, port), publicKey),
 		}
+		c.wg.Add(1)
 
 		if err2 := c.RegisterWithBulletinBoard(); err2 != nil {
 			return nil, pl.WrapError(err2, "%s: failed to register with bulletin board", pl.GetFuncName(id, host, port, bulletinBoardUrl))
@@ -111,6 +113,7 @@ func (c *Client) getRecipient() (string, int) {
 
 // StartGeneratingMessages continuously generates and sends messages to other clients
 func (c *Client) StartGeneratingMessages() {
+	defer c.wg.Done()
 	slog.Info("Client starting to generate messages", "id", c.ID)
 
 	recipientAddress, recipientId := c.getRecipient()
@@ -253,7 +256,7 @@ func (c *Client) processCheckpoint(checkpointOnion structs.CheckpointOnion, clie
 		return node.PublicKey
 	}), clientReceiver.PublicKey)
 
-	dummyMsg := structs.NewMessage(c.Address, clientReceiver.Address, "checkpoint onion")
+	dummyMsg := structs.NewMessage(c.Address, clientReceiver.Address, "")
 	dummyPayload, err := json.Marshal(dummyMsg)
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to marshal dummy message")

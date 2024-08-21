@@ -9,6 +9,7 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/onion_model"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/tools/keys"
+	"github.com/HannahMarsh/pi_t-experiment/pkg/cm"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"io"
 	"net/http"
@@ -25,15 +26,17 @@ type Node struct {
 	ID                  int
 	Host                string
 	Port                int
+	Address             string
 	PrivateKey          string
 	PublicKey           string
 	mu                  sync.RWMutex
 	BulletinBoardUrl    string
 	lastUpdate          time.Time
 	status              *structs.NodeStatus
-	checkpointsReceived map[int]int
-	expectedNonces      [][]string
+	checkpointsReceived *cm.ConcurrentMap[int, int]
+	expectedNonces      []map[string]bool
 	isCorrupted         bool
+	wg                  sync.WaitGroup
 }
 
 // NewNode creates a new node
@@ -41,9 +44,9 @@ func NewNode(id int, host string, port int, bulletinBoardUrl string) (*Node, err
 	if privateKey, publicKey, err := keys.KeyGen(); err != nil {
 		return nil, pl.WrapError(err, "node.NewClient(): failed to generate key pair")
 	} else {
-		expectedCheckpoints := make([][]string, config.GlobalConfig.L1+config.GlobalConfig.L2+1)
+		expectedCheckpoints := make([]map[string]bool, config.GlobalConfig.L1+config.GlobalConfig.L2+1)
 		for i := range expectedCheckpoints {
-			expectedCheckpoints[i] = make([]string, 0)
+			expectedCheckpoints[i] = make(map[string]bool)
 		}
 
 		// determine if node is corrupted
@@ -56,15 +59,17 @@ func NewNode(id int, host string, port int, bulletinBoardUrl string) (*Node, err
 		n := &Node{
 			ID:                  id,
 			Host:                host,
+			Address:             fmt.Sprintf("http://%s:%d", host, port),
 			Port:                port,
 			PublicKey:           publicKey,
 			PrivateKey:          privateKey,
 			BulletinBoardUrl:    bulletinBoardUrl,
 			status:              structs.NewNodeStatus(id, fmt.Sprintf("http://%s:%d", host, port), publicKey),
-			checkpointsReceived: make(map[int]int),
+			checkpointsReceived: &cm.ConcurrentMap[int, int]{},
 			expectedNonces:      expectedCheckpoints,
 			isCorrupted:         isCorrupted,
 		}
+		n.wg.Add(1)
 		if err2 := n.RegisterWithBulletinBoard(); err2 != nil {
 			return nil, pl.WrapError(err2, "node.NewNode(): failed to register with bulletin board")
 		}
@@ -82,7 +87,7 @@ func (n *Node) GetStatus() string {
 func (n *Node) getPublicNodeInfo() structs.PublicNodeApi {
 	return structs.PublicNodeApi{
 		ID:        n.ID,
-		Address:   fmt.Sprintf("http://%s:%d", n.Host, n.Port),
+		Address:   n.Address,
 		PublicKey: n.PublicKey,
 		Time:      time.Now(),
 	}
@@ -104,9 +109,10 @@ func (n *Node) StartPeriodicUpdates(interval time.Duration) {
 func (n *Node) startRun(start structs.NodeStartRunApi) (didParticipate bool, e error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+	defer n.wg.Done()
 
 	for _, c := range start.Checkpoints {
-		n.expectedNonces[c.Layer] = append(n.expectedNonces[c.Layer], c.Nonce)
+		n.expectedNonces[c.Layer][c.Nonce] = true
 		n.status.AddExpectedCheckpoint(c.Layer)
 	}
 
@@ -114,28 +120,22 @@ func (n *Node) startRun(start structs.NodeStartRunApi) (didParticipate bool, e e
 }
 
 func (n *Node) Receive(oApi structs.OnionApi) error {
+	n.wg.Wait()
+
 	role, layer, metadata, peeled, nextHop, err := pi_t.PeelOnion(oApi.Onion, n.PrivateKey)
 	if err != nil {
 		return pl.WrapError(err, "node.Receive(): failed to remove layer")
 	}
 
-	n.mu.Lock()
-	//defer n.mu.Unlock()
-
 	wasBruised := false
 	isCheckpoint := false
 
-	//if role == onion_model.MIXER {
-	//	slog.Debug("Mixer: Nonce was verified, dropping null block.")
-	//	peeled.Sepal = peeled.Sepal.RemoveBlock()
-	//}
-	//
 	if metadata.Nonce != "" {
 		isCheckpoint = true
-		if utils.Contains(n.expectedNonces[layer], func(i string) bool {
-			return i == metadata.Nonce
-		}) { // nonce is verified
-			n.checkpointsReceived[layer]++
+		if _, present := n.expectedNonces[layer][metadata.Nonce]; present { // nonce is verified
+			n.checkpointsReceived.GetAndSet(layer, func(i int) int {
+				return i + 1
+			})
 			if role == onion_model.MIXER {
 				slog.Debug("Mixer: Nonce was verified, dropping null block.")
 				peeled.Sepal = peeled.Sepal.RemoveBlock()
@@ -152,27 +152,23 @@ func (n *Node) Receive(oApi structs.OnionApi) error {
 	} else if role == onion_model.MIXER {
 		peeled.Sepal = peeled.Sepal.RemoveBlock()
 	}
-	n.mu.Unlock()
 
 	slog.Info("Received onion", "ischeckpoint?", metadata.Nonce != "", "layer", layer, "nextHop", config.AddressToName(nextHop))
 
-	n.status.AddOnion(oApi.From, fmt.Sprintf("http://%s:%d", n.Host, n.Port), nextHop, layer, isCheckpoint, !wasBruised)
+	n.status.AddOnion(oApi.From, n.Address, nextHop, layer, isCheckpoint, !wasBruised)
 
-	if err3 := n.sendToNode(nextHop, peeled); err != nil {
-		return pl.WrapError(err3, "node.Receive(): failed to send to next node")
-	}
+	n.sendToNode(nextHop, peeled)
 
 	return nil
 }
 
-func (n *Node) sendToNode(addr string, constructedOnion onion_model.Onion) error {
+func (n *Node) sendToNode(addr string, constructedOnion onion_model.Onion) {
 	go func(addr string, constructedOnion onion_model.Onion) {
-		err := api_functions.SendOnion(addr, fmt.Sprintf("http://%s:%d", n.Host, n.Port), constructedOnion)
+		err := api_functions.SendOnion(addr, n.Address, constructedOnion)
 		if err != nil {
 			slog.Error("Error sending onion", err)
 		}
 	}(addr, constructedOnion)
-	return nil
 }
 
 func (n *Node) RegisterWithBulletinBoard() error {
@@ -210,7 +206,7 @@ func (n *Node) updateBulletinBoard(endpoint string, expectedStatusCode int) erro
 	t := time.Now()
 	if data, err := json.Marshal(structs.PublicNodeApi{
 		ID:        n.ID,
-		Address:   fmt.Sprintf("http://%s:%d", n.Host, n.Port),
+		Address:   n.Address,
 		PublicKey: n.PublicKey,
 		Time:      t,
 	}); err != nil {
