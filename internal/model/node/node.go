@@ -120,11 +120,16 @@ func (n *Node) Receive(oApi structs.OnionApi) error {
 	}
 
 	n.mu.Lock()
-	defer n.mu.Unlock()
+	//defer n.mu.Unlock()
 
 	wasBruised := false
 	isCheckpoint := false
 
+	//if role == onion_model.MIXER {
+	//	slog.Debug("Mixer: Nonce was verified, dropping null block.")
+	//	peeled.Sepal = peeled.Sepal.RemoveBlock()
+	//}
+	//
 	if metadata.Nonce != "" {
 		isCheckpoint = true
 		if utils.Contains(n.expectedNonces[layer], func(i string) bool {
@@ -144,7 +149,10 @@ func (n *Node) Receive(oApi structs.OnionApi) error {
 		}
 
 		n.status.AddCheckpointOnion(layer)
+	} else if role == onion_model.MIXER {
+		peeled.Sepal = peeled.Sepal.RemoveBlock()
 	}
+	n.mu.Unlock()
 
 	slog.Info("Received onion", "ischeckpoint?", metadata.Nonce != "", "layer", layer, "nextHop", config.AddressToName(nextHop))
 

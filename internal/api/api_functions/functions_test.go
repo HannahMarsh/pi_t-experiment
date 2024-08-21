@@ -528,7 +528,7 @@ func TestReceiveOnionMultipleLayers2(t *testing.T) {
 				mux.HandleFunc("/receive", func(w http.ResponseWriter, r *http.Request) {
 					HandleReceiveOnion(w, r, func(oApi structs.OnionApi) error {
 						onionStr := oApi.Onion
-						layer, _, peeled, nextDestination, err2 := pi_t.PeelOnion(onionStr, nodes[i].privateKeyPEM)
+						_, layer, _, peeled, nextDestination, err2 := pi_t.PeelOnion(onionStr, nodes[i].privateKeyPEM)
 						if err2 != nil {
 							slog.Error("PeelOnion() error", err2)
 							t.Errorf("PeelOnion() error = %v", err2)
@@ -582,7 +582,7 @@ func TestReceiveOnionMultipleLayers2(t *testing.T) {
 				HandleReceiveOnion(w, r, func(oApi structs.OnionApi) error {
 					onionStr := oApi.Onion
 					defer wg.Done()
-					layer, _, peeled, _, err2 := pi_t.PeelOnion(onionStr, nodes[l].privateKeyPEM)
+					_, layer, _, peeled, _, err2 := pi_t.PeelOnion(onionStr, nodes[l].privateKeyPEM)
 					if err2 != nil {
 						slog.Error("PeelOnion() error", err2)
 						t.Errorf("PeelOnion() error = %v", err2)

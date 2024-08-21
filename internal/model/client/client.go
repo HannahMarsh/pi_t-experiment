@@ -2,7 +2,6 @@ package client
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
@@ -203,7 +202,7 @@ func (c *Client) processMessage(msg structs.Message, destination structs.PublicN
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to marshal message")
 	}
-	msgString := base64.StdEncoding.EncodeToString(msgBytes)
+	//msgString := base64.StdEncoding.EncodeToString(msgBytes)
 
 	mixers, gatekeepers, err := DetermineRoutingPath(nodes)
 	if err != nil {
@@ -226,7 +225,7 @@ func (c *Client) processMessage(msg structs.Message, destination structs.PublicN
 		metadata[i] = onion_model.Metadata{Nonce: ""}
 	}
 
-	o, err := pi_t.FORMONION(c.PrivateKey, msgString, mixersAddr, gatekeepersAddr, destination.Address, publicKeys, metadata, config.GlobalConfig.D)
+	o, err := pi_t.FORMONION(c.PrivateKey, string(msgBytes), mixersAddr, gatekeepersAddr, destination.Address, publicKeys, metadata, config.GlobalConfig.D)
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to create onion")
 	}
@@ -259,7 +258,6 @@ func (c *Client) processCheckpoint(checkpointOnion structs.CheckpointOnion, clie
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to marshal dummy message")
 	}
-	mString := base64.StdEncoding.EncodeToString(dummyPayload)
 
 	metadata := utils.Map(checkpointOnion.Path, func(cp structs.Checkpoint) onion_model.Metadata {
 		return onion_model.Metadata{
@@ -276,7 +274,7 @@ func (c *Client) processCheckpoint(checkpointOnion structs.CheckpointOnion, clie
 		return node.Address
 	})
 
-	o, err := pi_t.FORMONION(c.PrivateKey, mString, mixersAddr, gatekeepersAddr, clientReceiver.Address, checkpointPublicKeys, metadata, config.GlobalConfig.D)
+	o, err := pi_t.FORMONION(c.PrivateKey, string(dummyPayload), mixersAddr, gatekeepersAddr, clientReceiver.Address, checkpointPublicKeys, metadata, config.GlobalConfig.D)
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to create checkpoint onion")
 	}
@@ -335,20 +333,20 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 }
 
 func (c *Client) Receive(oApi structs.OnionApi) error {
-	if _, _, _, peeled, _, err := pi_t.PeelOnion(oApi.Onion, c.PrivateKey); err != nil {
+	role, layer, _, peeled, nextHop, err := pi_t.PeelOnion(oApi.Onion, c.PrivateKey)
+	if err != nil {
 		return pl.WrapError(err, "node.Receive(): failed to remove layer")
-	} else {
-		slog.Info("Client received onion", "bruises", peeled)
-
-		var msg structs.Message
-		if err2 := json.Unmarshal([]byte(peeled.Content), &msg); err2 != nil {
-			return pl.WrapError(err2, "node.Receive(): failed to unmarshal message")
-		}
-		slog.Info("Received message", "from", msg.From, "to", msg.To, "msg", msg.Msg)
-
-		c.status.AddReceived(msg)
-
 	}
+	slog.Info("Client received onion", "role", role, "layer", layer, "nextHop", nextHop)
+
+	var msg structs.Message
+	if err2 := json.Unmarshal([]byte(peeled.Content), &msg); err2 != nil {
+		return pl.WrapError(err2, "node.Receive(): failed to unmarshal message")
+	}
+	slog.Info("Received message", "from", msg.From, "to", msg.To, "msg", msg.Msg)
+
+	c.status.AddReceived(msg)
+
 	return nil
 }
 
