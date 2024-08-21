@@ -227,10 +227,20 @@ func GetValues[K comparable, V any](m map[K]V) []V {
 	return values
 }
 
-func MapToMap[K comparable, V any, O any](m map[K]V, f func(K, V) O) map[K]O {
-	result := make(map[K]O)
+func MapToMap[K comparable, V any, K2 comparable, V2 any](m map[K]V, f func(K, V) (K2, V2)) map[K2]V2 {
+	result := make(map[K2]V2)
 	for k, v := range m {
-		result[k] = f(k, v)
+		k2, v2 := f(k, v)
+		result[k2] = v2
+	}
+	return result
+}
+
+func MapArrayToMap[O any, K comparable, V any](items []O, f func(O) (K, V)) map[K]V {
+	result := make(map[K]V)
+	for _, item := range items {
+		k, v := f(item)
+		result[k] = v
 	}
 	return result
 }
@@ -430,9 +440,12 @@ func Flatten[T any](items [][]T) []T {
 }
 
 func FlatMap[T any, O any](items []T, f func(T) []O) []O {
-	var result []O
+	result := make([]O, 0)
 	for _, item := range items {
-		result = append(result, f(item)...)
+		arr := f(item)
+		if arr != nil && len(arr) > 0 {
+			result = append(result, arr...)
+		}
 	}
 	return result
 }
@@ -591,6 +604,18 @@ func Count[T comparable](items []T, value T) int {
 		}
 	}
 	return count
+}
+
+func GroupBy[K comparable, V any](items []V, f func(V) K) map[K][]V {
+	groups := make(map[K][]V)
+	for _, item := range items {
+		key := f(item)
+		if groups[key] == nil {
+			groups[key] = make([]V, 0)
+		}
+		groups[key] = append(groups[key], item)
+	}
+	return groups
 }
 
 func CountAny[T any](items []T, f func(T) bool) int {

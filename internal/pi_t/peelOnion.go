@@ -8,37 +8,36 @@ import (
 	"strings"
 )
 
-func PeelOnion(onion string, privateKey string) (layer int, metadata *om.Metadata, peeled om.Onion, nextDestination string, err error) {
+func PeelOnion(onion string, privateKey string) (role string, layer int, metadata *om.Metadata, peeled om.Onion, nextDestination string, err error) {
 
 	onionBytes, err := base64.StdEncoding.DecodeString(onion)
 	if err != nil {
-		return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decode onion")
+		return "", -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decode onion")
 	}
 	var o om.Onion
 	if err = json.Unmarshal(onionBytes, &o); err != nil {
-		return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to unmarshal onion")
+		return "", -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to unmarshal onion")
 	}
 	cypherText, nextHop, nextHeader, err := o.Header.DecodeHeader(privateKey)
 	if err != nil {
-		return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decode header")
+		return "", -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decode header")
 	}
 
 	layerKey, err := base64.StdEncoding.DecodeString(cypherText.Key)
 
 	var decryptedContent om.Content
 
-	if cypherText.Recipient != "lastGatekeeper" && cypherText.Recipient != "gatekeeper" && cypherText.Recipient != "mixer" {
+	if cypherText.Recipient != om.LAST_GATEKEEPER && cypherText.Recipient != om.GATEKEEPER && cypherText.Recipient != om.MIXER {
 		decryptedContent, err = o.Content.DecryptContent(layerKey)
 		if err != nil {
-			return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decrypt content")
+			return "", -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decrypt content")
 		}
 		contentBytes, err := base64.StdEncoding.DecodeString(string(decryptedContent))
 		if err != nil {
-			return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decode content")
+			return "", -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decode content")
 		}
 		decryptedContent = om.Content(string(contentBytes))
 		decryptedContent = om.Content(strings.TrimRight(string(contentBytes), "\x00"))
-		//decryptedContent = om.Content(base64.StdEncoding.EncodeToString([]byte(decryptedContent)))
 		layer = cypherText.Layer
 		nextDestination = nextHop
 		metadata = &cypherText.Metadata
@@ -47,27 +46,30 @@ func PeelOnion(onion string, privateKey string) (layer int, metadata *om.Metadat
 			Sepal:   om.Sepal{},
 			Content: decryptedContent,
 		}
-		return layer, metadata, peeled, nextDestination, nil
+		return cypherText.Recipient, layer, metadata, peeled, nextDestination, nil
 	}
 	peeledSepal, err := o.Sepal.PeelSepal(layerKey)
 	if err != nil {
-		return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to peel sepal")
+		return "", -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to peel sepal")
 	}
 
-	if cypherText.Recipient == "lastGatekeeper" {
+	if cypherText.Recipient == om.LAST_GATEKEEPER {
 		masterKey := peeledSepal.Blocks[0]
+		if masterKey == "" || masterKey == "null" {
+			return "", -1, nil, om.Onion{}, "", pl.WrapError(err, "null master key, onion was likely bruised too many times")
+		}
 		K, err := base64.StdEncoding.DecodeString(masterKey)
 		if err != nil {
-			return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decode master key")
+			return "", -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decode master key")
 		}
 		decryptedContent, err = o.Content.DecryptContent(K)
 		if err != nil {
-			return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decrypt content")
+			return "", -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decrypt content")
 		}
 	} else {
 		decryptedContent, err = o.Content.DecryptContent(layerKey)
 		if err != nil {
-			return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decrypt content")
+			return "", -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decrypt content")
 		}
 	}
 
@@ -80,5 +82,5 @@ func PeelOnion(onion string, privateKey string) (layer int, metadata *om.Metadat
 		Content: decryptedContent,
 	}
 
-	return layer, metadata, peeled, nextDestination, nil
+	return cypherText.Recipient, layer, metadata, peeled, nextDestination, nil
 }

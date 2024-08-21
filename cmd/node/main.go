@@ -67,13 +67,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("⚡ init newNode", "heartbeat_interval", cfg.HeartbeatInterval, "id", *id)
+	slog.Info("⚡ init newNode", "id", *id)
 
 	baddress := fmt.Sprintf("http://%s:%d", cfg.BulletinBoard.Host, cfg.BulletinBoard.Port)
 
 	var newNode *node.Node
 	for {
-		if n, err := node.NewNode(nodeConfig.ID, nodeConfig.Host, nodeConfig.Port, baddress, nodeConfig.IsMixer); err != nil {
+		if n, err := node.NewNode(nodeConfig.ID, nodeConfig.Host, nodeConfig.Port, baddress); err != nil {
 			slog.Error("failed to create newNode. Trying again in 5 seconds. ", err)
 			time.Sleep(5 * time.Second)
 			continue

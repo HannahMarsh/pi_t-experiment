@@ -6,7 +6,7 @@ import (
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
-	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/onion_model"
+	om "github.com/HannahMarsh/pi_t-experiment/internal/pi_t/onion_model"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/tools/keys"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"golang.org/x/exp/slog"
@@ -54,9 +54,9 @@ func TestPeelOnion22(t *testing.T) {
 	publicKeys := utils.Map(nodes[1:], func(n node) string { return n.publicKeyPEM })
 	routingPath := utils.Map(nodes[1:], func(n node) string { return n.address })
 
-	metadata := make([]onion_model.Metadata, l+1)
+	metadata := make([]om.Metadata, l+1)
 	for i := 0; i < l+1; i++ {
-		metadata[i] = onion_model.Metadata{Example: fmt.Sprintf("example%d", i)}
+		metadata[i] = om.Metadata{Example: fmt.Sprintf("example%d", i)}
 	}
 
 	onions, err := FORMONION(nodes[0].privateKeyPEM, string(payload), routingPath[:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys, metadata, d)
@@ -73,7 +73,7 @@ func TestPeelOnion22(t *testing.T) {
 				slog.Error("failed to marshal onion", err)
 				t.Fatalf("failed to marshal onion")
 			}
-			layer, metadata_, peeled, nextDestination, err := PeelOnion(base64.StdEncoding.EncodeToString(oBytes), nodes[i+1].privateKeyPEM)
+			role, layer, metadata_, peeled, nextDestination, err := PeelOnion(base64.StdEncoding.EncodeToString(oBytes), nodes[i+1].privateKeyPEM)
 
 			if err != nil {
 				slog.Error("failed to peel onion", err)
@@ -91,6 +91,17 @@ func TestPeelOnion22(t *testing.T) {
 
 			if metadata_.Example != metadata[i+1].Example {
 				t.Fatalf("metadata does not match. Expected %s, got %s", metadata[i+1].Example, metadata_.Example)
+			}
+
+			if i < l1 {
+				if role != om.MIXER {
+					t.Fatalf("role does not match. Expected %s, got %s", om.MIXER, role)
+				}
+			} else if i < l-2 && role != om.GATEKEEPER {
+				t.Fatalf("role does not match. Expected %s, got %s", om.GATEKEEPER, role)
+			}
+			if i == l-2 && role != om.LAST_GATEKEEPER {
+				t.Fatalf("role does not match. Expected %s, got %s", om.LAST_GATEKEEPER, role)
 			}
 
 			if i == l-1 {

@@ -1,18 +1,17 @@
 package structs
 
 type ClientStartRunApi struct {
-	Mixers               []PublicNodeApi
-	Gatekeepers          []PublicNodeApi
-	Clients              []PublicNodeApi
-	NumMessagesPerClient int
-	Checkpoints          []Checkpoint
+	Relays           []PublicNodeApi
+	Clients          []PublicNodeApi
+	CheckpointOnions []CheckpointOnion
 }
 
 type NodeStartRunApi struct {
-	Mixers      []PublicNodeApi
-	Gatekeepers []PublicNodeApi
-	Clients     []PublicNodeApi
 	Checkpoints []Checkpoint
+}
+
+type CheckpointOnion struct {
+	Path []Checkpoint
 }
 
 type Checkpoint struct {

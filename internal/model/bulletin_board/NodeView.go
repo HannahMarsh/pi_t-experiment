@@ -13,7 +13,6 @@ type NodeView struct {
 	mu                       sync.RWMutex
 	LastHeartbeat            time.Time
 	MaxTimeBetweenHeartbeats time.Duration
-	IsMixer                  bool
 }
 
 func NewNodeView(n structs.PublicNodeApi, maxTimeBetweenHeartbeats time.Duration) *NodeView {
@@ -23,7 +22,6 @@ func NewNodeView(n structs.PublicNodeApi, maxTimeBetweenHeartbeats time.Duration
 		PublicKey:                n.PublicKey,
 		LastHeartbeat:            n.Time,
 		MaxTimeBetweenHeartbeats: maxTimeBetweenHeartbeats,
-		IsMixer:                  n.IsMixer,
 	}
 }
 

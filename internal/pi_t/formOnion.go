@@ -32,6 +32,10 @@ const fixedLegnthOfMessage = 256
 //   - The last list O_(l1 + l2 + 1) contains just the innermost onion for the recipient.
 func FORMONION(privateKey, m string, mixers, gatekeepers []string, recipient string, publicKeys []string, metadata []onion_model.Metadata, d int) ([][]onion_model.Onion, error) {
 
+	//slog.Info(mixers[0])
+	//if strings.HasPrefix(mixers[0][len(mixers[0])-4:], "81") {
+	//	pl.LogNewError("Mixers should not start with 81")
+	//}
 	message := padMessage(m)
 
 	path := append(append(append([]string{""}, mixers...), gatekeepers...), recipient)

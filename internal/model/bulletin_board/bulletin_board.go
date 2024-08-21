@@ -82,7 +82,6 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 			Address:   nv.Address,
 			PublicKey: nv.PublicKey,
 			Time:      nv.LastHeartbeat,
-			IsMixer:   nv.IsMixer,
 		}
 	})
 
@@ -96,47 +95,32 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 		}
 	})
 
-	numMessages := utils.MaxValue(utils.MapEntries(bb.Clients, func(_ int, client *ClientView) int {
-		return len(client.MessageQueue)
-	})) + 2
-
-	mixers := utils.Filter(activeNodes, func(n structs.PublicNodeApi) bool {
-		return n.Address != "" && n.IsMixer
-	})
-
-	gatekeepers := utils.Filter(activeNodes, func(n structs.PublicNodeApi) bool {
-		return n.Address != "" && !n.IsMixer
-	})
-
-	checkpoints := GetCheckpoints(activeNodes, activeClients, config.GlobalConfig.L, numMessages)
+	checkpoints := GetCheckpoints(activeNodes, activeClients)
 
 	clientStartSignals := make(map[structs.PublicNodeApi]structs.ClientStartRunApi)
 
 	for _, client := range activeClients {
 		csr := structs.ClientStartRunApi{
-			Clients:              activeClients,
-			Mixers:               mixers,
-			Gatekeepers:          gatekeepers,
-			NumMessagesPerClient: numMessages,
-			Checkpoints:          checkpoints[client.ID],
+			Clients:          activeClients,
+			Relays:           activeNodes,
+			CheckpointOnions: checkpoints[client.ID],
 		}
 		clientStartSignals[client] = csr
 	}
 
+	allCheckpoints := utils.GroupBy(utils.Flatten(utils.MapMap(checkpoints, func(_ int, cos []structs.CheckpointOnion) []structs.Checkpoint {
+		return utils.FlatMap(cos, func(co structs.CheckpointOnion) []structs.Checkpoint {
+			return co.Path
+		})
+	})), func(checkpoint structs.Checkpoint) int {
+		return checkpoint.Receiver.ID
+	})
+
 	nodeStartSignals := make(map[structs.PublicNodeApi]structs.NodeStartRunApi)
 	for _, node := range activeNodes {
-		nodeCheckpoints := utils.Filter(utils.MapFlatMap(checkpoints, func(_ int, cps []structs.Checkpoint) []structs.Checkpoint {
-			return cps
-		}), func(checkpoint structs.Checkpoint) bool {
-			return checkpoint.Receiver.ID == node.ID
-		})
-		nsr := structs.NodeStartRunApi{
-			Clients:     activeClients,
-			Mixers:      mixers,
-			Gatekeepers: gatekeepers,
-			Checkpoints: nodeCheckpoints,
+		nodeStartSignals[node] = structs.NodeStartRunApi{
+			Checkpoints: allCheckpoints[node.ID],
 		}
-		nodeStartSignals[node] = nsr
 	}
 
 	var wg sync.WaitGroup
@@ -210,21 +194,21 @@ func (bb *BulletinBoard) StartRuns() error {
 func (bb *BulletinBoard) allNodesReady() bool {
 	bb.mu.RLock()
 	defer bb.mu.RUnlock()
-	activeNodes := utils.Filter(utils.GetValues(bb.Network), func(node *NodeView) bool {
+	activeNodes := utils.CountAny(utils.GetValues(bb.Network), func(node *NodeView) bool {
 		return node.IsActive()
 	})
 
-	if len(activeNodes) < bb.config.MinNodes {
-		slog.Info("Not enough active nodes")
+	if activeNodes < len(config.GlobalConfig.Nodes) {
+		slog.Info("Not all nodes are registered")
 		return false
 	}
 
-	totalMessages := utils.Sum(utils.MapEntries(bb.Clients, func(_ int, client *ClientView) int {
-		return len(client.MessageQueue)
-	}))
+	registeredClients := utils.CountAny(utils.GetValues(bb.Clients), func(client *ClientView) bool {
+		return client.MessageQueue != nil && len(client.MessageQueue) > 0
+	})
 
-	if totalMessages < bb.config.MinTotalMessages {
-		slog.Info("Not enough messages", "totalMessages", totalMessages, "Min", bb.config.MinTotalMessages)
+	if registeredClients < len(config.GlobalConfig.Clients) {
+		slog.Info("Not all clients are registered")
 		return false
 	}
 

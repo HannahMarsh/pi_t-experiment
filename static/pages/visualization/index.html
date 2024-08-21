@@ -172,7 +172,8 @@
 
             Object.entries(data.Nodes).forEach(([nodeAddress, status]) => {
                 let node = status.Node.ID
-                let onions = onionsPerRound[round][node] || [];
+                let opr = onionsPerRound[round] || {};
+                let onions = opr[node] || [];
 
                 if (onions.length > 0) {
                     const firstOnion = onions[0];

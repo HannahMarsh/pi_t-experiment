@@ -8,7 +8,6 @@ type PublicNodeApi struct {
 	ID        int
 	Address   string
 	PublicKey string
-	IsMixer   bool
 	Time      time.Time
 }
 

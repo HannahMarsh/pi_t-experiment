@@ -152,6 +152,18 @@ func swap(arr []bool, i, j int) {
 	arr[i], arr[j] = arr[j], arr[i]
 }
 
+// DeterministicShuffle returns a shuffled slice of ints from a to b using a fixed seed
+func DeterministicShuffle[T any](arr []T, seed int64) {
+	// Initialize the PRNG with the fixed seed
+	src := rng.NewSource(seed)
+	r := rng.New(src)
+
+	// Shuffle the slice
+	r.Shuffle(len(arr), func(i, j int) {
+		arr[i], arr[j] = arr[j], arr[i]
+	})
+}
+
 // Recursive function to generate all unique permutations
 func generatePermutations(arr []bool, start int, result *[][]bool) {
 	if start == len(arr)-1 {
@@ -186,6 +198,21 @@ func RandomSubset[T any](array []T, size int) []T {
 		return elements
 	}
 	rng.Shuffle(len(elements), func(i, j int) {
+		elements[i], elements[j] = elements[j], elements[i]
+	})
+	return elements[:size]
+}
+
+func PseudoRandomSubset[T any](array []T, size int, seed int64) []T {
+	// Initialize the PRNG with the fixed seed
+	src := rng.NewSource(seed)
+	r := rng.New(src)
+
+	elements := Copy(array)
+	if size >= len(elements) {
+		return elements
+	}
+	r.Shuffle(len(elements), func(i, j int) {
 		elements[i], elements[j] = elements[j], elements[i]
 	})
 	return elements[:size]

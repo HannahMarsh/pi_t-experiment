@@ -36,7 +36,6 @@ func NewClientStatus(id int, address, publicKey string) *ClientStatus {
 			Address:   address,
 			PublicKey: publicKey,
 			Time:      time.Now(),
-			IsMixer:   false,
 		},
 	}
 }

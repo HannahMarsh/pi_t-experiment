@@ -14,6 +14,12 @@ type Header struct {
 	NextHeader string   // encryption under the layerKey of CypherTextWrapper
 }
 
+const (
+	GATEKEEPER      = "gatekeeper"
+	MIXER           = "mixer"
+	LAST_GATEKEEPER = "lastGatekeeper"
+)
+
 type CypherText struct {
 	Tag       string
 	Recipient string
@@ -64,11 +70,11 @@ func FormHeaders(l int, l1 int, C []Content, A [][]string, publicKeys []string, 
 	}
 
 	for i := l - 1; i >= 1; i-- {
-		role := "mixer"
+		role := MIXER
 		if i == l-1 {
-			role = "lastGatekeeper"
+			role = LAST_GATEKEEPER
 		} else if i > l1 {
-			role = "gatekeeper"
+			role = GATEKEEPER
 		}
 		E[i], err = enc(sharedSecrets[i], tags[i], role, i, layerKeys[i], metadata[i])
 		nextHeader := H[i+1]

@@ -116,11 +116,11 @@ func TestFormHeader(t *testing.T) {
 			}
 			//slog.Info("", "", nextHeader)
 
-			if i-1 < l1 && cypherText.Recipient != "mixer" {
+			if i-1 < l1 && cypherText.Recipient != MIXER {
 				t.Fatalf("Expected mixer")
-			} else if i-1 >= l1 && i < l1+l2-1 && cypherText.Recipient != "gatekeeper" {
+			} else if i-1 >= l1 && i < l1+l2-1 && cypherText.Recipient != GATEKEEPER {
 				t.Fatalf("Expected gatekeeper")
-			} else if i-1 == l1+l2-1 && cypherText.Recipient != "lastGatekeeper" {
+			} else if i-1 == l1+l2-1 && cypherText.Recipient != LAST_GATEKEEPER {
 				t.Fatalf("Expected lastGatekeeper")
 			} else if i-1 == l1+l2 && cypherText.Recipient != recipient {
 				t.Fatalf("Expected recipient")

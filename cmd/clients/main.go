@@ -7,7 +7,6 @@ import (
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/model/client"
-	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/exp/slog"
 	"net/http"
@@ -68,7 +67,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("⚡ init newClient", "heartbeat_interval", cfg.HeartbeatInterval, "id", *id)
+	slog.Info("⚡ init newClient", "id", *id)
 
 	baddress := fmt.Sprintf("http://%s:%d", cfg.BulletinBoard.Host, cfg.BulletinBoard.Port)
 
@@ -97,11 +96,7 @@ func main() {
 
 	slog.Info("🌏 start newClient...", "address", fmt.Sprintf("http://%s:%d", clientConfig.Host, clientConfig.Port))
 
-	clientAddresses := utils.Map(cfg.Clients, func(n config.Client) string {
-		return fmt.Sprintf("http://%s:%d", n.Host, n.Port)
-	})
-
-	go newClient.StartGeneratingMessages(clientAddresses)
+	go newClient.StartGeneratingMessages()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)

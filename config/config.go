@@ -24,7 +24,6 @@ type Node struct {
 	Host    string `yaml:"host"`
 	Port    int    `yaml:"port"`
 	Address string
-	IsMixer bool `yaml:"is_mixer"`
 }
 
 type Client struct {
@@ -41,22 +40,16 @@ type Metrics struct {
 }
 
 type Config struct {
-	ServerLoad        int           `yaml:"server_load"`
-	D                 int           `yaml:"d"`
-	HeartbeatInterval int           `yaml:"heartbeat_interval"`
-	MinNodes          int           `yaml:"min_nodes"`
-	Epsilon           float64       `yaml:"epsilon"`
-	Delta             float64       `yaml:"delta"`
-	L1                int           `yaml:"l1"`
-	L2                int           `yaml:"l2"`
-	L                 int           `yaml:"L"`
-	Rounds            int           `yaml:"num_rounds"`
-	MinTotalMessages  int           `yaml:"min_total_messages"`
-	BulletinBoard     BulletinBoard `yaml:"bulletin_board"`
-	Nodes             []Node        `yaml:"nodes"`
-	Metrics           Metrics       `yaml:"metrics"`
-	Clients           []Client      `yaml:"clients"`
-	MaxBruises        int           `yaml:"max_bruises"`
+	ServerLoad    int           `yaml:"x"`
+	D             int           `yaml:"d"`
+	Delta         float64       `yaml:"delta"`
+	L1            int           `yaml:"l1"`
+	L2            int           `yaml:"l2"`
+	Chi           float64       `yaml:"chi"`
+	BulletinBoard BulletinBoard `yaml:"bulletin_board"`
+	Nodes         []Node        `yaml:"nodes"`
+	Metrics       Metrics       `yaml:"metrics"`
+	Clients       []Client      `yaml:"clients"`
 }
 
 var GlobalConfig *Config
