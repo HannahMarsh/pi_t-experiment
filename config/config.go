@@ -50,6 +50,7 @@ type Config struct {
 	Nodes         []Node        `yaml:"nodes"`
 	Metrics       Metrics       `yaml:"metrics"`
 	Clients       []Client      `yaml:"clients"`
+	Vis           bool          `yaml:"vis"`
 }
 
 var GlobalConfig *Config

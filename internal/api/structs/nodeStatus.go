@@ -2,6 +2,7 @@ package structs
 
 import (
 	"encoding/json"
+	"github.com/HannahMarsh/pi_t-experiment/config"
 	"golang.org/x/exp/slog"
 	"sync"
 	"time"
@@ -43,39 +44,49 @@ func NewNodeStatus(id int, address, publicKey string) *NodeStatus {
 }
 
 func (ns *NodeStatus) AddCheckpointOnion(layer int) {
-	ns.mu.Lock()
-	defer ns.mu.Unlock()
-	ns.CheckpointOnionsReceived[layer]++
+	if config.GlobalConfig.Vis {
+		ns.mu.Lock()
+		defer ns.mu.Unlock()
+		ns.CheckpointOnionsReceived[layer]++
+	}
 }
 
 func (ns *NodeStatus) AddExpectedCheckpoint(layer int) {
-	ns.mu.Lock()
-	defer ns.mu.Unlock()
-	ns.ExpectedCheckpoints[layer]++
+	if config.GlobalConfig.Vis {
+		ns.mu.Lock()
+		defer ns.mu.Unlock()
+		ns.ExpectedCheckpoints[layer]++
+	}
 }
 
 func (ns *NodeStatus) AddOnion(lastHop, thisAddress, nextHop string, layer int, isCheckPointOnion bool, wasBruised bool) {
-	ns.mu.Lock()
-	defer ns.mu.Unlock()
-	ns.Received = append(ns.Received, OnionStatus{
-		LastHop:           lastHop,
-		ThisAddress:       thisAddress,
-		NextHop:           nextHop,
-		Layer:             layer,
-		IsCheckPointOnion: isCheckPointOnion,
-		TimeReceived:      time.Now(),
-		NonceVerification: wasBruised,
-	})
-	ns.TotalOnionsReceived[layer]++
+	if config.GlobalConfig.Vis {
+		ns.mu.Lock()
+		defer ns.mu.Unlock()
+		ns.Received = append(ns.Received, OnionStatus{
+			LastHop:           lastHop,
+			ThisAddress:       thisAddress,
+			NextHop:           nextHop,
+			Layer:             layer,
+			IsCheckPointOnion: isCheckPointOnion,
+			TimeReceived:      time.Now(),
+			NonceVerification: wasBruised,
+		})
+		ns.TotalOnionsReceived[layer]++
+	}
 }
 
 func (ns *NodeStatus) GetStatus() string {
-	ns.mu.RLock()
-	defer ns.mu.RUnlock()
-	if str, err := json.Marshal(ns); err != nil {
-		slog.Error("Error marshalling client status", err)
-		return ""
+	if config.GlobalConfig.Vis {
+		ns.mu.RLock()
+		defer ns.mu.RUnlock()
+		if str, err := json.Marshal(ns); err != nil {
+			slog.Error("Error marshalling client status", err)
+			return ""
+		} else {
+			return string(str)
+		}
 	} else {
-		return string(str)
+		return ""
 	}
 }

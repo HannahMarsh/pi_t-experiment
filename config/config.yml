@@ -5,6 +5,7 @@ tau: 0.8      # (τ < (1 − γ)(1 − X)) Fraction of checkpoints needed to pro
 d: 2          # Threshold for number of bruises before an onion is discarded by a gatekeeper
 delta: 1e-5   # The probability of differential privacy violation due to the adversary's actions.
 chi: 0.3      # Fraction of corrupted relays (which perform no mixing)
+vis: true     # Visualize the network
 
 
 metrics:
