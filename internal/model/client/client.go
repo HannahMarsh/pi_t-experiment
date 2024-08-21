@@ -247,9 +247,8 @@ func (c *Client) formOnions(start structs.ClientStartRunApi) ([]queuedOnion, err
 }
 
 type queuedOnion struct {
-	to        string
-	onion     onion_model.Onion
-	sharedKey string // TODO remove this
+	to    string
+	onion onion_model.Onion
 }
 
 // processMessage processes a single message to form its onion
@@ -282,15 +281,14 @@ func (c *Client) processMessage(msg structs.Message, destination structs.PublicN
 		metadata[i] = onion_model.Metadata{Nonce: ""}
 	}
 
-	o, sharedKey, err := pi_t.FORMONION(c.PublicKey, c.PrivateKey, msgString, mixersAddr, gatekeepersAddr, destination.Address, publicKeys, metadata, config.GlobalConfig.D)
+	o, err := pi_t.FORMONION(c.PrivateKey, msgString, mixersAddr, gatekeepersAddr, destination.Address, publicKeys, metadata, config.GlobalConfig.D)
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to create onion")
 	}
 
 	onions = append(onions, queuedOnion{
-		onion:     o[0][0],
-		to:        mixersAddr[0],
-		sharedKey: sharedKey,
+		onion: o[0][0],
+		to:    mixersAddr[0],
 	})
 
 	c.status.AddSent(destination, routingPath, msg)
@@ -359,15 +357,14 @@ func (c *Client) processCheckpoint(checkpoint structs.Checkpoint, nodes, clients
 	}
 	metadata = utils.InsertAtIndex(metadata, 0, onion_model.Metadata{})
 
-	o, sharedKey, err := pi_t.FORMONION(c.PublicKey, c.PrivateKey, mString, mixersAddr, gatekeepersAddr, receiver.Address, checkpointPublicKeys, metadata, config.GlobalConfig.D)
+	o, err := pi_t.FORMONION(c.PrivateKey, mString, mixersAddr, gatekeepersAddr, receiver.Address, checkpointPublicKeys, metadata, config.GlobalConfig.D)
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to create checkpoint onion")
 	}
 
 	onions = append(onions, queuedOnion{
-		onion:     o[0][0],
-		to:        mixersAddr[0],
-		sharedKey: sharedKey,
+		onion: o[0][0],
+		to:    mixersAddr[0],
 	})
 
 	c.status.AddSent(utils.GetLast(path), path, dummyMsg)
@@ -408,7 +405,7 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 			onion := onion
 			go func() {
 				defer wg.Done()
-				if err = api_functions.SendOnion(onion.to, c.Address, onion.onion, onion.sharedKey); err != nil {
+				if err = api_functions.SendOnion(onion.to, c.Address, onion.onion); err != nil {
 					slog.Error("failed to send onions", err)
 				}
 			}()
@@ -422,11 +419,7 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 }
 
 func (c *Client) Receive(oApi structs.OnionApi) error {
-	sharedKey, err := keys.DecodeSharedKey(oApi.SharedKey)
-	if err != nil {
-		return pl.WrapError(err, "node.Receive(): failed to decode shared key")
-	}
-	if _, _, peeled, _, err := pi_t.PeelOnion(oApi.Onion, sharedKey); err != nil {
+	if _, _, peeled, _, err := pi_t.PeelOnion(oApi.Onion, c.PrivateKey); err != nil {
 		return pl.WrapError(err, "node.Receive(): failed to remove layer")
 	} else {
 		slog.Info("Client received onion", "bruises", peeled)

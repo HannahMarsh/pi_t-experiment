@@ -135,7 +135,7 @@ func TestBruiseSepal(t *testing.T) {
 		t.Fatalf("formSepals() expected %d blocks, got %d", l1+1, len(sepal.Blocks))
 	}
 
-	bruised, err := bruiseSepal(sepal, layerKeys, d-1, l1, l, d)
+	bruised, err := bruiseSepal(sepal, layerKeys, d-1, l1)
 	if err != nil {
 		slog.Error("failed to bruise sepal", err)
 		t.Fatalf("bruiseSepal() error: %v", err)
@@ -173,7 +173,7 @@ func TestBruiseSepal(t *testing.T) {
 	}
 
 	// bruise it d times
-	bruised, err = bruiseSepal(sepal, layerKeys, d, l1, l, d)
+	bruised, err = bruiseSepal(sepal, layerKeys, d, l1)
 	if err != nil {
 		slog.Error("failed to bruise sepal", err)
 		t.Fatalf("bruiseSepal() error: %v", err)
@@ -197,7 +197,7 @@ func TestBruiseSepal(t *testing.T) {
 	}
 }
 
-func bruiseSepal(sepal Sepal, layerKeys [][]byte, numBruises int, l1 int, l int, d int) (s Sepal, err error) {
+func bruiseSepal(sepal Sepal, layerKeys [][]byte, numBruises int, l1 int) (s Sepal, err error) {
 	randomBools := make([]bool, l1)
 	for i := range randomBools {
 		if i < numBruises {
@@ -216,9 +216,9 @@ func bruiseSepal(sepal Sepal, layerKeys [][]byte, numBruises int, l1 int, l int,
 		}
 		sepal, err = sepal.PeelSepal(layerKeys[i])
 		if dobruiseSepal {
-			sepal.AddBruise()
+			sepal = sepal.AddBruise()
 		} else {
-			sepal.RemoveBlock()
+			sepal = sepal.RemoveBlock()
 		}
 		if err != nil {
 			return Sepal{}, pl.WrapError(err, "failed to peel sepal")
@@ -268,7 +268,7 @@ func TestSepalHashes(t *testing.T) {
 			slog.Error("failed to peel sepal", err)
 			t.Fatalf("PeelSepal() error: %v", err)
 		}
-		sepal.RemoveBlock()
+		sepal = sepal.RemoveBlock()
 		h = Hash(strings.Join(sepal.Blocks, ""))
 		if !utils.Contains(A[i], func(str string) bool {
 			return str == h

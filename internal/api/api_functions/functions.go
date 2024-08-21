@@ -18,7 +18,7 @@ import (
 )
 
 // sendOnion sends an onion to the specified address with compression and timeout
-func SendOnion(to, from string, o onion_model.Onion, sharedKey string) error {
+func SendOnion(to, from string, o onion_model.Onion) error {
 	slog.Info(pl.GetFuncName()+": Sending onion...", "from", config.AddressToName(from), "to", config.AddressToName(to))
 	url := fmt.Sprintf("%s/receive", to)
 
@@ -47,10 +47,9 @@ func SendOnion(to, from string, o onion_model.Onion, sharedKey string) error {
 	oStr := base64.StdEncoding.EncodeToString(data)
 
 	onion := structs.OnionApi{
-		To:        to,
-		From:      from,
-		Onion:     oStr,
-		SharedKey: sharedKey,
+		To:    to,
+		From:  from,
+		Onion: oStr,
 	}
 
 	payload, err := json.Marshal(onion)

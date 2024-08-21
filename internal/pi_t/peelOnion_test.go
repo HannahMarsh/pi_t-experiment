@@ -59,7 +59,7 @@ func TestPeelOnion22(t *testing.T) {
 		metadata[i] = onion_model.Metadata{Example: fmt.Sprintf("example%d", i)}
 	}
 
-	onions, _, err := FORMONION(nodes[0].publicKeyPEM, nodes[0].privateKeyPEM, string(payload), routingPath[:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys, metadata, d)
+	onions, err := FORMONION(nodes[0].privateKeyPEM, string(payload), routingPath[:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys, metadata, d)
 	if err != nil {
 		slog.Error("", err)
 		t.Fatalf("failed")
@@ -73,12 +73,7 @@ func TestPeelOnion22(t *testing.T) {
 				slog.Error("failed to marshal onion", err)
 				t.Fatalf("failed to marshal onion")
 			}
-			sharedKey, err := keys.ComputeSharedKey(nodes[i+1].privateKeyPEM, nodes[0].publicKeyPEM)
-			if err != nil {
-				slog.Error("failed to compute shared key", err)
-				t.Fatalf("failed to compute shared key")
-			}
-			layer, metadata_, _, nextDestination, err := PeelOnion(base64.StdEncoding.EncodeToString(oBytes), sharedKey)
+			layer, metadata_, peeled, nextDestination, err := PeelOnion(base64.StdEncoding.EncodeToString(oBytes), nodes[i+1].privateKeyPEM)
 
 			if err != nil {
 				slog.Error("failed to peel onion", err)
@@ -88,13 +83,33 @@ func TestPeelOnion22(t *testing.T) {
 			if layer != i+1 {
 				t.Fatalf("layer does not match. Expected %d, got %d", i+1, layer)
 			}
-
-			if nextDestination != nodes[i+2].address {
-				t.Fatalf("next destination does not match. Expected %s, got %s", nodes[i+2].address, nextDestination)
+			if i+2 < len(nodes) {
+				if nextDestination != nodes[i+2].address {
+					t.Fatalf("next destination does not match. Expected %s, got %s", nodes[i+2].address, nextDestination)
+				}
 			}
 
 			if metadata_.Example != metadata[i+1].Example {
 				t.Fatalf("metadata does not match. Expected %s, got %s", metadata[i+1].Example, metadata_.Example)
+			}
+
+			if i == l-1 {
+				var receivedMessage structs.Message
+				err := json.Unmarshal([]byte(peeled.Content), &receivedMessage)
+				if err != nil {
+					slog.Error("failed to unmarshal message", err)
+					t.Fatalf("failed to unmarshal message")
+				}
+
+				if receivedMessage.Msg != secretMessage {
+					t.Fatalf("message does not match. Expected %s, got %s", secretMessage, receivedMessage.Msg)
+				}
+				if receivedMessage.From != nodes[0].address {
+					t.Fatalf("from does not match. Expected %s, got %s", nodes[0].address, receivedMessage.From)
+				}
+				if receivedMessage.To != nodes[l].address {
+					t.Fatalf("to does not match. Expected %s, got %s", nodes[l].address, receivedMessage.To)
+				}
 			}
 		}
 	}

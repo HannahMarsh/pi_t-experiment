@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func PeelOnion(onion string, sharedKey [32]byte) (layer int, metadata *om.Metadata, peeled om.Onion, nextDestination string, err error) {
+func PeelOnion(onion string, privateKey string) (layer int, metadata *om.Metadata, peeled om.Onion, nextDestination string, err error) {
 
 	onionBytes, err := base64.StdEncoding.DecodeString(onion)
 	if err != nil {
@@ -18,7 +18,7 @@ func PeelOnion(onion string, sharedKey [32]byte) (layer int, metadata *om.Metada
 	if err = json.Unmarshal(onionBytes, &o); err != nil {
 		return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to unmarshal onion")
 	}
-	cypherText, nextHop, nextHeader, err := o.Header.DecodeHeader(sharedKey)
+	cypherText, nextHop, nextHeader, err := o.Header.DecodeHeader(privateKey)
 	if err != nil {
 		return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decode header")
 	}
@@ -38,7 +38,7 @@ func PeelOnion(onion string, sharedKey [32]byte) (layer int, metadata *om.Metada
 		}
 		decryptedContent = om.Content(string(contentBytes))
 		decryptedContent = om.Content(strings.TrimRight(string(contentBytes), "\x00"))
-		decryptedContent = om.Content(base64.StdEncoding.EncodeToString([]byte(decryptedContent)))
+		//decryptedContent = om.Content(base64.StdEncoding.EncodeToString([]byte(decryptedContent)))
 		layer = cypherText.Layer
 		nextDestination = nextHop
 		metadata = &cypherText.Metadata
@@ -64,17 +64,6 @@ func PeelOnion(onion string, sharedKey [32]byte) (layer int, metadata *om.Metada
 		if err != nil {
 			return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decrypt content")
 		}
-		//
-		//result, _, err := keys.DecryptStringWithAES(K, nextHeader.E)
-		//if err != nil {
-		//	return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decrypt with AES")
-		//}
-		//slog.Info("", "", result)
-		//decryptedContent, err = o.Content.DecryptContent(K)
-		//if err != nil {
-		//	return -1, nil, om.Onion{}, "", pl.WrapError(err, "failed to decrypt content")
-		//}
-
 	} else {
 		decryptedContent, err = o.Content.DecryptContent(layerKey)
 		if err != nil {
@@ -92,8 +81,4 @@ func PeelOnion(onion string, sharedKey [32]byte) (layer int, metadata *om.Metada
 	}
 
 	return layer, metadata, peeled, nextDestination, nil
-}
-
-func BruiseOnion(onion string, privateKeyPEM string) {
-
 }

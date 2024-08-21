@@ -310,6 +310,9 @@ func MapEntries[K comparable, V any, O any](m map[K]V, f func(K, V) O) []O {
 }
 
 func Contains[T any](items []T, f func(T) bool) bool {
+	if items == nil {
+		return false
+	}
 	for _, item := range items {
 		if f(item) {
 			return true

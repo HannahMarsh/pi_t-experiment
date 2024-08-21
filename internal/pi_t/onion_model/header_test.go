@@ -54,10 +54,15 @@ func TestFormHeader(t *testing.T) {
 	routingPath := utils.Map(nodes[1:], func(n node) string { return n.address })
 
 	message := padMessage(base64.StdEncoding.EncodeToString(payload))
+
 	// Generate keys for each layer and the master key
 	layerKeys := make([][]byte, l+1)
 	for i := range layerKeys {
-		layerKey, _ := keys.GenerateSymmetricKey()
+		layerKey, err := keys.GenerateSymmetricKey()
+		if err != nil {
+			slog.Error("failed to generate symmetric key", err)
+			t.Fatalf("GenerateSymmetricKey() error: %v", err)
+		}
 		layerKeys[i] = layerKey //base64.StdEncoding.EncodeToString(layerKey)
 	}
 	K, err := keys.GenerateSymmetricKey()
@@ -89,46 +94,43 @@ func TestFormHeader(t *testing.T) {
 	}
 
 	// form header
-	H, err := FormHeaders(l, l1, C, A, nodes[0].privateKeyPEM, publicKeys, recipient, layerKeys, K, append([]string{""}, routingPath...), Hash, metadata)
+	H, err := FormHeaders(l, l1, C, A, publicKeys, recipient, layerKeys, append([]string{""}, routingPath...), Hash, metadata)
 
-	for i, h := range H[1:] {
-		sharedKey, err := keys.ComputeSharedKey(nodes[i+1].privateKeyPEM, nodes[0].publicKeyPEM)
-		if err != nil {
-			slog.Error("failed to compute shared key", err)
-			t.Fatalf("failed to compute shared key")
-		}
-		cypherText, nextHop, nextHeader, err := h.DecodeHeader(sharedKey)
-		if err != nil {
-			slog.Error("failed to decode header", err)
-			t.Fatalf("failed to decode header")
-		}
-		if i < len(H)-2 {
-			if nextHeader.NextHeader != H[i+2].NextHeader {
-				t.Fatalf("Expected next header to match")
+	for i, h := range H {
+		if i >= 1 {
+			cypherText, nextHop, nextHeader, err := h.DecodeHeader(nodes[i].privateKeyPEM)
+			if err != nil {
+				slog.Error("failed to decode header", err)
+				t.Fatalf("failed to decode header")
 			}
-			if nextHeader.E != H[i+2].E {
-				t.Fatalf("Expected E to match")
+			if i+1 < len(H) {
+				if nextHeader.NextHeader != H[i+1].NextHeader {
+					t.Fatalf("Expected next header to match")
+				}
+				if nextHeader.E != H[i+1].E {
+					t.Fatalf("Expected E to match")
+				}
+				if strings.Join(nextHeader.A, "") != strings.Join(H[i+1].A, "") {
+					t.Fatalf("Expected A to match")
+				}
 			}
-			if strings.Join(nextHeader.A, "") != strings.Join(H[i+2].A, "") {
-				t.Fatalf("Expected A to match")
-			}
-		}
-		//slog.Info("", "", nextHeader)
+			//slog.Info("", "", nextHeader)
 
-		if i < l1 && cypherText.Recipient != "mixer" {
-			t.Fatalf("Expected mixer")
-		} else if i >= l1 && i < l1+l2-1 && cypherText.Recipient != "gatekeeper" {
-			t.Fatalf("Expected gatekeeper")
-		} else if i == l1+l2-1 && cypherText.Recipient != "lastGatekeeper" {
-			t.Fatalf("Expected lastGatekeeper")
-		} else if i == l1+l2 && cypherText.Recipient != recipient {
-			t.Fatalf("Expected recipient")
-		}
-		if cypherText.Layer != i+1 {
-			t.Fatalf("Expected layer to match")
-		}
-		if i != l1+l2 && nextHop != routingPath[i+1] {
-			t.Fatalf("Expected address to match")
+			if i-1 < l1 && cypherText.Recipient != "mixer" {
+				t.Fatalf("Expected mixer")
+			} else if i-1 >= l1 && i < l1+l2-1 && cypherText.Recipient != "gatekeeper" {
+				t.Fatalf("Expected gatekeeper")
+			} else if i-1 == l1+l2-1 && cypherText.Recipient != "lastGatekeeper" {
+				t.Fatalf("Expected lastGatekeeper")
+			} else if i-1 == l1+l2 && cypherText.Recipient != recipient {
+				t.Fatalf("Expected recipient")
+			}
+			if cypherText.Layer != i {
+				t.Fatalf("Expected layer to match")
+			}
+			if i-1 != l1+l2 && nextHop != routingPath[i] {
+				t.Fatalf("Expected address to match")
+			}
 		}
 	}
 }

@@ -38,12 +38,16 @@ func (s Sepal) PeelSepal(layerKey []byte) (peeledSepal Sepal, err error) {
 	return peeledSepal, nil
 }
 
-func (s Sepal) AddBruise() {
-	s.Blocks = utils.DropFirstElement(s.Blocks) //peeledSepal.Blocks[1:]
+func (s Sepal) AddBruise() Sepal {
+	return Sepal{
+		Blocks: utils.DropFirstElement(s.Blocks),
+	}
 }
 
-func (s Sepal) RemoveBlock() {
-	s.Blocks = utils.DropLastElement(s.Blocks) //peeledSepal.Blocks[1:]
+func (s Sepal) RemoveBlock() Sepal {
+	return Sepal{
+		Blocks: utils.DropLastElement(s.Blocks),
+	}
 }
 
 func FormSepals(masterKey string, d int, layerKeys [][]byte, l int, l1 int, l2 int, hash func(string) string) (A [][]string, S_i [][]Sepal, err error) {

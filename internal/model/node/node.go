@@ -2,7 +2,6 @@ package node
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/HannahMarsh/pi_t-experiment/config"
@@ -136,11 +135,7 @@ func (n *Node) startRun(start structs.NodeStartRunApi) (didParticipate bool, e e
 }
 
 func (n *Node) Receive(oApi structs.OnionApi) error {
-	sharedKey, err := keys.DecodeSharedKey(oApi.SharedKey)
-	if err != nil {
-		return pl.WrapError(err, "node.Receive(): failed to decode shared key")
-	}
-	layer, metadata, peeled, nextHop, err := pi_t.PeelOnion(oApi.Onion, sharedKey)
+	layer, metadata, peeled, nextHop, err := pi_t.PeelOnion(oApi.Onion, n.PrivateKey)
 	if err != nil {
 		return pl.WrapError(err, "node.Receive(): failed to remove layer")
 	}
@@ -154,11 +149,11 @@ func (n *Node) Receive(oApi structs.OnionApi) error {
 		}) { // nonce is verified
 			n.checkpointsReceived[layer]++
 			if n.isMixer {
-				peeled.Sepal.RemoveBlock()
+				peeled.Sepal = peeled.Sepal.RemoveBlock()
 			}
 		} else {
 			if n.isMixer {
-				peeled.Sepal.AddBruise()
+				peeled.Sepal = peeled.Sepal.AddBruise()
 			}
 		}
 
@@ -169,21 +164,16 @@ func (n *Node) Receive(oApi structs.OnionApi) error {
 
 	n.status.AddOnion(oApi.From, fmt.Sprintf("http://%s:%d", n.Host, n.Port), nextHop, layer, metadata.Nonce != "")
 
-	nextSharedKeyBytes, err := keys.ComputeSharedKey(n.PrivateKey, n.system[nextHop].PublicKey)
-	if err != nil {
-		return pl.WrapError(err, "node.Receive(): failed to compute shared key")
-	}
-	nextSharedKey := hex.EncodeToString(nextSharedKeyBytes[:])
-	if err3 := n.sendToNode(nextHop, peeled, nextSharedKey); err != nil {
+	if err3 := n.sendToNode(nextHop, peeled); err != nil {
 		return pl.WrapError(err3, "node.Receive(): failed to send to next node")
 	}
 
 	return nil
 }
 
-func (n *Node) sendToNode(addr string, constructedOnion onion_model.Onion, sharedKey string) error {
+func (n *Node) sendToNode(addr string, constructedOnion onion_model.Onion) error {
 	go func() {
-		err := api_functions.SendOnion(addr, fmt.Sprintf("http://%s:%d", n.Host, n.Port), constructedOnion, sharedKey)
+		err := api_functions.SendOnion(addr, fmt.Sprintf("http://%s:%d", n.Host, n.Port), constructedOnion)
 		if err != nil {
 			slog.Error("Error sending onion", err)
 		}

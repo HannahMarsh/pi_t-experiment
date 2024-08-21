@@ -59,7 +59,7 @@ func TestFORMONION(t *testing.T) {
 		metadata[i] = onion_model.Metadata{Example: fmt.Sprintf("example%d", i)}
 	}
 
-	onions, _, err := FORMONION(nodes[0].publicKeyPEM, nodes[0].privateKeyPEM, string(payload), routingPath[1:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys[1:], metadata, d)
+	onions, err := FORMONION(nodes[0].privateKeyPEM, string(payload), routingPath[1:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys[1:], metadata, d)
 	if err != nil {
 		slog.Error("", err)
 		t.Fatalf("failed")
@@ -72,7 +72,7 @@ func TestFORMONION(t *testing.T) {
 	for i, layer := range onions {
 		for j, onion := range layer {
 			h := Hash(strings.Join(onion.Sepal.Blocks, ""))
-			if !utils.Contains(onion.Header.A, func(str string) bool {
+			if onion.Header.A != nil && !utils.Contains(onion.Header.A, func(str string) bool {
 				return str == h
 			}) {
 				t.Fatalf("Expected Hash to match i=%d, j = %d", i, j)
