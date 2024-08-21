@@ -14,70 +14,8 @@ import (
 	"golang.org/x/exp/slog"
 	"io"
 	"net/http"
-	"sync"
 	"time"
 )
-
-var (
-	queue         map[string][]item = make(map[string][]item)
-	mu            sync.Mutex
-	channel       chan bool = make(chan bool)
-	startedWorker bool
-)
-
-type item struct {
-	to     string
-	from   string
-	onion  string
-	result chan error
-}
-
-//func workerThread() {
-//	mu.Lock()
-//	var wg sync.WaitGroup
-//	for {
-//		for len(queue) == 0 {
-//			mu.Unlock()
-//			<-channel
-//			wg.Wait()
-//			mu.Lock()
-//		}
-//		for to, items := range queue {
-//			items := items
-//			delete(queue, to)
-//			for _, i := range items {
-//				wg.Add(1)
-//				go func() {
-//					defer wg.Done()
-//
-//					if err := SendOnion2(i.to, i.from, i.onion); err != nil {
-//						slog.Error("Error sending onion", err)
-//						i.result <- err
-//					} else {
-//						i.result <- nil
-//					}
-//				}()
-//			}
-//		}
-//	}
-//}
-//
-//func SendOnion(to, from, onionStr string) error {
-//	var result chan error = make(chan error)
-//	mu.Lock()
-//	if !startedWorker {
-//		startedWorker = true
-//		go workerThread()
-//	}
-//	if _, present := queue[to]; !present {
-//		queue[to] = make([]item, 0)
-//	}
-//	queue[to] = append(queue[to], item{to: to, from: from, onion: onionStr, result: result})
-//	result = queue[to][len(queue[to])-1].result
-//	mu.Unlock()
-//	channel <- true
-//	return <-result
-//}
 
 // sendOnion sends an onion to the specified address with compression and timeout
 func SendOnion(to, from string, o onion_model.Onion, sharedKey string) error {

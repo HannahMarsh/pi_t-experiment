@@ -2,6 +2,7 @@ package node
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/HannahMarsh/pi_t-experiment/config"
@@ -34,6 +35,7 @@ type Node struct {
 	status              *structs.NodeStatus
 	checkpointsReceived map[int]int
 	expectedNonces      [][]string
+	system              map[string]structs.PublicNodeApi
 }
 
 // NewNode creates a new node
@@ -56,6 +58,7 @@ func NewNode(id int, host string, port int, bulletinBoardUrl string, isMixer boo
 			status:              structs.NewNodeStatus(id, fmt.Sprintf("http://%s:%d", host, port), publicKey, isMixer),
 			checkpointsReceived: make(map[int]int),
 			expectedNonces:      expectedCheckpoints,
+			system:              make(map[string]structs.PublicNodeApi),
 		}
 		if err2 := n.RegisterWithBulletinBoard(); err2 != nil {
 			return nil, pl.WrapError(err2, "node.NewNode(): failed to register with bulletin board")
@@ -97,6 +100,32 @@ func (n *Node) StartPeriodicUpdates(interval time.Duration) {
 func (n *Node) startRun(start structs.NodeStartRunApi) (didParticipate bool, e error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+	if len(start.Mixers) == 0 {
+		return false, pl.NewError("%s: no mixers", pl.GetFuncName())
+	}
+	if len(start.Gatekeepers) == 0 {
+		return false, pl.NewError("%s: no gatekeepers", pl.GetFuncName())
+	}
+	if len(start.Clients) == 0 {
+		return false, pl.NewError("%s: no participating clients", pl.GetFuncName())
+	}
+
+	if n.isMixer && !utils.Contains(start.Mixers, func(node structs.PublicNodeApi) bool {
+		return node.ID == n.ID
+	}) {
+		slog.Info("Did not participate as a mixer this run.")
+		return false, nil
+	}
+	if !n.isMixer && !utils.Contains(start.Gatekeepers, func(node structs.PublicNodeApi) bool {
+		return node.ID == n.ID
+	}) {
+		slog.Info("Did not participate as a gatekeeper this run.")
+		return false, nil
+	}
+
+	for _, node := range append(start.Clients, append(start.Mixers, start.Gatekeepers...)...) {
+		n.system[node.Address] = node
+	}
 
 	for _, c := range start.Checkpoints {
 		n.expectedNonces[c.Layer] = append(n.expectedNonces[c.Layer], c.Nonce)
@@ -140,7 +169,11 @@ func (n *Node) Receive(oApi structs.OnionApi) error {
 
 	n.status.AddOnion(oApi.From, fmt.Sprintf("http://%s:%d", n.Host, n.Port), nextHop, layer, metadata.Nonce != "")
 
-	nextSharedKey := "" // TODO compute shared key with next hop
+	nextSharedKeyBytes, err := keys.ComputeSharedKey(n.PrivateKey, n.system[nextHop].PublicKey)
+	if err != nil {
+		return pl.WrapError(err, "node.Receive(): failed to compute shared key")
+	}
+	nextSharedKey := hex.EncodeToString(nextSharedKeyBytes[:])
 	if err3 := n.sendToNode(nextHop, peeled, nextSharedKey); err != nil {
 		return pl.WrapError(err3, "node.Receive(): failed to send to next node")
 	}

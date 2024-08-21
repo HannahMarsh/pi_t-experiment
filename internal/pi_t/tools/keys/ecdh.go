@@ -148,6 +148,10 @@ func ComputeSharedKey(privKeyHex, pubKeyHex string) ([32]byte, error) {
 	return sharedKey, nil
 }
 
+func EncodeSharedKey(sharedKey [32]byte) string {
+	return hex.EncodeToString(sharedKey[:])
+}
+
 func DecodeSharedKey(sharedKeyStr string) ([32]byte, error) {
 	// Convert sharedKeyStr back to [32]byte
 	decodedBytes, err := hex.DecodeString(sharedKeyStr)

@@ -6,7 +6,6 @@
       <excludeFolder url="file://$MODULE_DIR$/.devcontainer" />
       <excludeFolder url="file://$MODULE_DIR$/.github" />
       <excludeFolder url="file://$MODULE_DIR$/img" />
-      <excludeFolder url="file://$MODULE_DIR$/internal" />
       <excludeFolder url="file://$MODULE_DIR$/static" />
     </content>
     <orderEntry type="inheritedJdk" />
