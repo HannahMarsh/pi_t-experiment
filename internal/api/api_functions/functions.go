@@ -19,7 +19,7 @@ import (
 
 // sendOnion sends an onion to the specified address with compression and timeout
 func SendOnion(to, from string, o onion_model.Onion) error {
-	slog.Info("Sending onion...", "from", config.AddressToName(from), "to", config.AddressToName(to))
+	slog.Debug("Sending onion...", "from", config.AddressToName(from), "to", config.AddressToName(to))
 	url := fmt.Sprintf("%s/receive", to)
 
 	//data, err := base64.StdEncoding.DecodeString(onionStr)
@@ -88,7 +88,7 @@ func SendOnion(to, from string, o onion_model.Onion) error {
 		return pl.NewError("%s: failed to send to first node(url=%s), status code: %d, status: %s", pl.GetFuncName(), url, resp.StatusCode, resp.Status)
 	}
 
-	slog.Info("✅ Successfully sent onion. ", "from", config.AddressToName(from), "to", config.AddressToName(to))
+	slog.Debug("✅ Successfully sent onion. ", "from", config.AddressToName(from), "to", config.AddressToName(to))
 	return nil
 }
 
