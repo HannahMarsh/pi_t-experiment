@@ -30,3 +30,15 @@ go.work
 
 .terraform
 *tfstate*
+
+node_modules
+node_modules/
+node_modules/*
+node_modules/**
+
+.ai-commit.json
+
+.idea
+.idea/
+.idea/*
+.idea/**/*
