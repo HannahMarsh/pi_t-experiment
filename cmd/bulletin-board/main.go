@@ -84,8 +84,8 @@ func main() {
 	select {
 	case v := <-quit:
 		config.GlobalCancel()
-		slog.Info("signal.Notify", v)
+		slog.Info("", "signal.Notify", v)
 	case done := <-config.GlobalCtx.Done():
-		slog.Info("ctx.Done", done)
+		slog.Info("", "ctx.Done", done)
 	}
 }

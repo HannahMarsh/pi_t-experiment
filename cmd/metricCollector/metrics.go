@@ -42,11 +42,11 @@ func main() {
 	}
 
 	nodePromAddresses := utils.Map(config.GlobalConfig.Nodes, func(n config.Node) string {
-		return fmt.Sprintf("http://%s:%s/metrics", n.Host, n.PrometheusPort)
+		return fmt.Sprintf("http://%s:%d/metrics", n.Host, n.PrometheusPort)
 	})
 
 	clientPromAddresses := utils.Map(config.GlobalConfig.Clients, func(c config.Client) string {
-		return fmt.Sprintf("http://%s:%s/metrics", c.Host, c.PrometheusPort)
+		return fmt.Sprintf("http://%s:%d/metrics", c.Host, c.PrometheusPort)
 	})
 
 	slog.Info("⚡ init metrics", "nodePromAddresses", nodePromAddresses, "clientPromAddresses", clientPromAddresses)
