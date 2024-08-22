@@ -519,6 +519,7 @@ Run tests:
 go test -v ./...
 ```
 
+
 Usage
 -----  
 
@@ -527,26 +528,43 @@ All configurations are set in the [`config/config.yaml`](config/config/yaml) fil
 ### Running the Bulletin Board
 
 ```bash  
-go run cmd/bulletin-board/main.go
+go run cmd/bulletin-board/main.go -logLevel=<string>
 ```  
+- Options:
+  - `-logLevel`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
 
 ### Running a Node
 
 ```bash  
-go run cmd/node/main.go -id=1
+go run cmd/node/main.go -id=<int> -logLevel=<string>
 ```  
+- Options:
+  - `-id`: The unique identifier for the node.
+  - `-logLevel`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
 
 ### Running a Client
 
 ```bash  
-go run cmd/client/main.go -id=1
+go run cmd/client/main.go -id=<int> -logLevel=<string>
 ```  
+- Options:
+  - `-id`: The unique identifier for the node.
+  - `-logLevel`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
 
-### Serving Metrics
+### Running the Metric Collector (Scrapes Prometheus endpoints for Clients and relays)
+```bash
+go run cmd/metricCollector/metrics.go -logLevel=<string>
+```
+- Options:
+  - `-logLevel`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
+
+### Running the Browser-Based Visualization Server
 
 ```bash  
-go run cmd/metrics/main.go -port 8200
+go run cmd/metrics/metrics.go -port <int>
 ```  
+- Options:
+  - `-port`: The port number for the visualization server.
 
 ## Endpoints
 
