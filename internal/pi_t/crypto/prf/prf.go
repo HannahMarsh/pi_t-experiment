@@ -4,7 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/binary"
-	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/tools/keys"
+	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/crypto/keys"
 	"log/slog"
 )
 

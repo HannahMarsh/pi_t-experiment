@@ -76,15 +76,13 @@ view when Alice sends a message to Carol instead.
 - **$\ell_1$**: The number of mixers in each routing path.
 - **$\ell_2$**: The number of gatekeepers in each routing path.
 - **$L$**: The number of rounds (also the length of the routing path, equal to $`\ell_1 + \ell_2 + 1`$ ).
-- **$N$**: The number of active nodes in the network at the start of the protocol.
-- **$R$**: The number of clients registered with intent-to-send at the start the protocol.
+- **$R$**: The number of participating relays.
+- **$N$**: The number of participating clients.
 - **$d$**: The number of non-null key-blocks in $S_1$. (thus $d$ is the threshold for number of bruises before an onion is discard by a gatekeeper).
-- **$h$**: The heartbeat interval in seconds.
 - **$\tau$**: ( $\tau \lt \(1 − \gamma\)\(1 − \chi\)$ ) The fraction of expected checkpoint onions needed for a node to progress its local clock.
 - **$\epsilon$**: The privacy loss in the worst case scenario.
 - **$\delta = 10^{-4}$**: The fixed probability of differential privacy violation.
-- **$\lambda$**: The security parameter. We assume every quantity of the system, including $`N`$, $`R`$, $`L`$, and $`x`$, are polynomially bounded by $`\lambda`$. 
-- **$\gamma$**: Fraction of (indistinguishable) onions that A can drop.
+- **$\lambda$**: The security parameter. We assume every quantity of the system, including $`N`$, $`R`$, $`L`$ are polynomially bounded by $`\lambda`$.
 - **$\theta$**: The maximum fraction of bruisable layers that can be bruised before the innermost tulip bulb becomes 
   unrecoverable. Note that $d = \theta \cdot \ell_1$
 - **$\chi$**: The fraction of $N$ nodes that can be corrupted and controlled by the adversary (the subset is chosen prior to execution). Note that $\chi \lt \theta - 0.5$ and $\chi \lt \frac{d}{\ell_1} - 0.5$
