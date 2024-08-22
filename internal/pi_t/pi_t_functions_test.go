@@ -97,20 +97,20 @@ package pi_t
 //
 //	numNodes := 10
 //
-//	type node struct {
+//	type relay struct {
 //		privateKeyPEM string
 //		publicKeyPEM  string
 //		address       string
 //	}
 //
-//	nodes := make([]node, numNodes)
+//	nodes := make([]relay, numNodes)
 //
 //	for i := 0; i < numNodes; i++ {
 //		privateKeyPEM, publicKeyPEM, err := keys.KeyGen()
 //		if err != nil {
 //			t.Fatalf("KeyGen() error: %v", err)
 //		}
-//		nodes[i] = node{privateKeyPEM, publicKeyPEM, fmt.Sprintf("node%d", i)}
+//		nodes[i] = relay{privateKeyPEM, publicKeyPEM, fmt.Sprintf("relay%d", i)}
 //	}
 //
 //	secretMessage := "secret message"
@@ -125,8 +125,8 @@ package pi_t
 //		t.Fatalf("json.Marshal() error: %v", err)
 //	}
 //
-//	publicKeys := utils.Map(nodes, func(n node) string { return n.publicKeyPEM })
-//	routingPath := utils.Map(nodes, func(n node) string { return n.address })
+//	publicKeys := utils.Map(nodes, func(n relay) string { return n.publicKeyPEM })
+//	routingPath := utils.Map(nodes, func(n relay) string { return n.address })
 //
 //	_, onionStr, _, err := FormOnion(nodes[0].privateKeyPEM, nodes[0].publicKeyPEM, payload, publicKeys[1:], routingPath[1:], -1, nodes[0].address)
 //	if err != nil {

@@ -6,7 +6,7 @@ type ClientStartRunApi struct {
 	CheckpointOnions []CheckpointOnion
 }
 
-type NodeStartRunApi struct {
+type RelayStartRunApi struct {
 	Checkpoints []Checkpoint
 }
 

@@ -85,7 +85,7 @@ func SendOnion(to, from string, o onion_model.Onion) error {
 	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		return pl.NewError("%s: failed to send to first node(url=%s), status code: %d, status: %s", pl.GetFuncName(), url, resp.StatusCode, resp.Status)
+		return pl.NewError("%s: failed to send to first relay(url=%s), status code: %d, status: %s", pl.GetFuncName(), url, resp.StatusCode, resp.Status)
 	}
 
 	slog.Debug("✅ Successfully sent onion. ", "from", config.AddressToName(from), "to", config.AddressToName(to))

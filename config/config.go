@@ -19,7 +19,7 @@ type BulletinBoard struct {
 	Address string
 }
 
-type Node struct {
+type Relay struct {
 	ID             int    `yaml:"id"`
 	Host           string `yaml:"host"`
 	Port           int    `yaml:"port"`
@@ -49,8 +49,8 @@ type Config struct {
 	L2             int           `yaml:"l2"`
 	Chi            float64       `yaml:"chi"`
 	BulletinBoard  BulletinBoard `yaml:"bulletin_board"`
-	Nodes          []Node        `yaml:"nodes"`
-	Metrics        Metrics       `yaml:"metrics"`
+	Relays         []Relay       `yaml:"relays"`
+	Metrics        Metrics       `yaml:"visualizer"`
 	Clients        []Client      `yaml:"clients"`
 	Vis            bool          `yaml:"vis"`
 	ScrapeInterval int           `yaml:"scrapeInterval"`
@@ -82,9 +82,9 @@ func InitGlobal() error {
 	} else if err3 := cleanenv.ReadEnv(GlobalConfig); err3 != nil {
 		return PrettyLogger.WrapError(err3, "config.NewConfig(): global config error")
 	}
-	// Update node addresses
-	for i := range GlobalConfig.Nodes {
-		GlobalConfig.Nodes[i].Address = fmt.Sprintf("http://%s:%d", GlobalConfig.Nodes[i].Host, GlobalConfig.Nodes[i].Port)
+	// Update relay addresses
+	for i := range GlobalConfig.Relays {
+		GlobalConfig.Relays[i].Address = fmt.Sprintf("http://%s:%d", GlobalConfig.Relays[i].Host, GlobalConfig.Relays[i].Port)
 	}
 
 	// Update client addresses
@@ -116,10 +116,10 @@ func AddressToName(address string) string {
 	if name, ok := Names.Load(address); ok {
 		return name.(string)
 	}
-	for _, node := range GlobalConfig.Nodes {
+	for _, node := range GlobalConfig.Relays {
 		if address == node.Address {
-			name := fmt.Sprintf("%sNode %d%s", PurpleColor, node.ID, ResetColor)
-			//name := fmt.Sprintf("Node %d", node.ID)
+			name := fmt.Sprintf("%sRelay %d%s", PurpleColor, node.ID, ResetColor)
+			//name := fmt.Sprintf("Relay %d", relay.ID)
 			Names.Store(address, name)
 			return name
 		}

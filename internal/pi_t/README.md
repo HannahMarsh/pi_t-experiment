@@ -54,8 +54,8 @@ if err != nil {
 }
 // `peeled`: The OnionPayload obtained from peeling the onion layer. It contains the decrypted payload and metadata about the current layer.
 // `bruises + 1`: The new bruise counter value.
-// `privateKeyPEM1`: The PEM-encoded private key of the current node. This key is used to decrypt the shared key and re-encrypt the payload.
-// `publicKeyPEM1`: The PEM-encoded public key of the current node. This key is included in the header as the sender's public key for the next node.
+// `privateKeyPEM1`: The PEM-encoded private key of the current relay. This key is used to decrypt the shared key and re-encrypt the payload.
+// `publicKeyPEM1`: The PEM-encoded public key of the current relay. This key is included in the header as the sender's public key for the next relay.
 ```
 
 

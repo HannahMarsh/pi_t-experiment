@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-type NodeView struct {
+type RelayView struct {
 	ID                       int
 	Address                  string
 	PublicKey                string
@@ -15,8 +15,8 @@ type NodeView struct {
 	MaxTimeBetweenHeartbeats time.Duration
 }
 
-func NewNodeView(n structs.PublicNodeApi, maxTimeBetweenHeartbeats time.Duration) *NodeView {
-	return &NodeView{
+func NewNodeView(n structs.PublicNodeApi, maxTimeBetweenHeartbeats time.Duration) *RelayView {
+	return &RelayView{
 		ID:                       n.ID,
 		Address:                  n.Address,
 		PublicKey:                n.PublicKey,
@@ -25,7 +25,7 @@ func NewNodeView(n structs.PublicNodeApi, maxTimeBetweenHeartbeats time.Duration
 	}
 }
 
-func (nv *NodeView) UpdateNode(c structs.PublicNodeApi) {
+func (nv *RelayView) UpdateNode(c structs.PublicNodeApi) {
 	nv.mu.Lock()
 	defer nv.mu.Unlock()
 	if nv.LastHeartbeat.After(c.Time) {
@@ -35,7 +35,7 @@ func (nv *NodeView) UpdateNode(c structs.PublicNodeApi) {
 	}
 }
 
-func (nv *NodeView) IsActive() bool {
+func (nv *RelayView) IsActive() bool {
 	nv.mu.RLock()
 	defer nv.mu.RUnlock()
 	return time.Since(nv.LastHeartbeat) < nv.MaxTimeBetweenHeartbeats

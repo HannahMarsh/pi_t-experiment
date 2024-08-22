@@ -61,7 +61,7 @@ func main() {
 		}
 	}()
 
-	http.HandleFunc("/registerNode", bulletinBoard.HandleRegisterNode)
+	http.HandleFunc("/registerRelay", bulletinBoard.HandleRegisterRelay)
 	http.HandleFunc("/registerClient", bulletinBoard.HandleRegisterClient)
 	http.HandleFunc("/registerIntentToSend", bulletinBoard.HandleRegisterIntentToSend)
 	http.HandleFunc("/updateNode", bulletinBoard.HandleUpdateNodeInfo)

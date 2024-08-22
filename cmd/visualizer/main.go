@@ -20,7 +20,6 @@ import (
 )
 
 func main() {
-	//isMixer := flag.Bool("mixer", false, "Included if this node is a mixer")
 	logLevel := flag.String("log-level", "debug", "Log level")
 
 	flag.Usage = func() {
@@ -47,7 +46,7 @@ func main() {
 
 	cfg := config.GlobalConfig
 
-	slog.Info("⚡ init metrics", "host", cfg.Metrics.Host, "port", cfg.Metrics.Port)
+	slog.Info("⚡ init visualizer", "host", cfg.Metrics.Host, "port", cfg.Metrics.Port)
 
 	time.Sleep(1 * time.Second)
 	http.HandleFunc("/data", serveData)
@@ -66,7 +65,7 @@ func main() {
 		}
 	}()
 
-	slog.Info("🌏 start metrics...", "address", fmt.Sprintf(" %s:%d ", cfg.Metrics.Host, cfg.Metrics.Port))
+	slog.Info("🌏 start visualizer...", "address", fmt.Sprintf(" %s:%d ", cfg.Metrics.Host, cfg.Metrics.Port))
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
@@ -129,7 +128,7 @@ func serveData(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	for _, node := range config.GlobalConfig.Nodes {
+	for _, node := range config.GlobalConfig.Relays {
 		addr := fmt.Sprintf("http://%s:%d/status", node.Host, node.Port)
 		resp, err := http.Get(addr)
 		if err != nil {

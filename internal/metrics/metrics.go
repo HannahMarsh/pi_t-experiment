@@ -99,13 +99,13 @@ func ServeMetrics(prometheusPort int, collectorIds ...string) (shutdown func()) 
 			pl.LogNewError("Failed to find collector with id: " + id)
 		}
 	}
-	// Create a new ServeMux and register the /metrics endpoint
+	// Create a new ServeMux and register the /visualizer endpoint
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", prometheusPort), // Bind to the specified port
-		Handler: mux,                                // Use the mux with the /metrics endpoint
+		Handler: mux,                                // Use the mux with the /visualizer endpoint
 	}
 
 	// Run the first server in a goroutine

@@ -1,4 +1,4 @@
-package node
+package relay
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-func (n *Node) HandleReceiveOnion(w http.ResponseWriter, r *http.Request) {
+func (n *Relay) HandleReceiveOnion(w http.ResponseWriter, r *http.Request) {
 	api_functions.HandleReceiveOnion(w, r, n.Receive)
 	//var o structs.OnionApi
 	//if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
@@ -30,16 +30,16 @@ func (n *Node) HandleReceiveOnion(w http.ResponseWriter, r *http.Request) {
 	//w.WriteHeader(http.StatusOK)
 }
 
-func (n *Node) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
+func (n *Relay) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write([]byte(n.GetStatus())); err != nil {
 		slog.Error("Error writing response", err)
 	}
 }
 
-func (n *Node) HandleStartRun(w http.ResponseWriter, r *http.Request) {
+func (n *Relay) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Starting run")
-	var start structs.NodeStartRunApi
+	var start structs.RelayStartRunApi
 	if err := json.NewDecoder(r.Body).Decode(&start); err != nil {
 		slog.Error("Error decoding active nodes", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -57,7 +57,7 @@ func (n *Node) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 }
 
 //
-//func (n *Node) HandleClientRequest(w http.ResponseWriter, r *http.Request) {
+//func (n *Relay) HandleClientRequest(w http.ResponseWriter, r *http.Request) {
 //
 //	var msgs []api.Message
 //	if err := json.NewDecoder(r.Body).Decode(&msgs); err != nil {

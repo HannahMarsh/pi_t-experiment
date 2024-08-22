@@ -47,7 +47,7 @@ func getAvailablePort() int {
 
 func TestReceiveOnionMultipleLayers(t *testing.T) {
 	for nnn := 0; nnn < 10; nnn++ {
-		pl.SetUpLogrusAndSlog("warn")
+		pl.SetUpLogrusAndSlog("Error")
 
 		if err := config.InitGlobal(); err != nil {
 			slog.Error("failed to init config", err)

@@ -16,7 +16,7 @@ import (
 
 const fixedLegnthOfMessage = 256
 
-// FormOnion creates a forward onion from a message m, a path P, public keys pk, and metadata y.
+// FORMONION creates a forward onion from a message m, a path P, public keys pk, and metadata y.
 // Parameters:
 // - m: a fixed length message
 // - P: a routing path (sequence of addresses representing l1 mixers and l2 gatekeepers such that len(P) = l1 + l2 + 1)

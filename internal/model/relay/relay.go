@@ -1,4 +1,4 @@
-package node
+package relay
 
 import (
 	"bytes"
@@ -22,8 +22,8 @@ import (
 	"log/slog"
 )
 
-// Node represents a node in the onion routing network
-type Node struct {
+// Relay represents a relay in the onion routing network
+type Relay struct {
 	ID                  int
 	Host                string
 	Port                int
@@ -40,24 +40,24 @@ type Node struct {
 	wg                  sync.WaitGroup
 }
 
-// NewNode creates a new node
-func NewNode(id int, host string, port int, bulletinBoardUrl string) (*Node, error) {
+// NewRelay creates a new relay
+func NewRelay(id int, host string, port int, bulletinBoardUrl string) (*Relay, error) {
 	if privateKey, publicKey, err := keys.KeyGen(); err != nil {
-		return nil, pl.WrapError(err, "node.NewClient(): failed to generate key pair")
+		return nil, pl.WrapError(err, "relay.NewClient(): failed to generate key pair")
 	} else {
 		expectedCheckpoints := make([]map[string]bool, config.GlobalConfig.L1+config.GlobalConfig.L2+1)
 		for i := range expectedCheckpoints {
 			expectedCheckpoints[i] = make(map[string]bool)
 		}
 
-		// determine if node is corrupted
-		numCorrupted := int(config.GlobalConfig.Chi * float64(len(config.GlobalConfig.Nodes)))
-		corruptedNodes := utils.PseudoRandomSubset(config.GlobalConfig.Nodes, numCorrupted, 42)
-		isCorrupted := utils.Contains(corruptedNodes, func(node config.Node) bool {
+		// determine if relay is corrupted
+		numCorrupted := int(config.GlobalConfig.Chi * float64(len(config.GlobalConfig.Relays)))
+		corruptedNodes := utils.PseudoRandomSubset(config.GlobalConfig.Relays, numCorrupted, 42)
+		isCorrupted := utils.Contains(corruptedNodes, func(node config.Relay) bool {
 			return node.ID == id
 		})
 
-		n := &Node{
+		n := &Relay{
 			ID:                  id,
 			Host:                host,
 			Address:             fmt.Sprintf("http://%s:%d", host, port),
@@ -72,7 +72,7 @@ func NewNode(id int, host string, port int, bulletinBoardUrl string) (*Node, err
 		}
 		n.wg.Add(1)
 		if err2 := n.RegisterWithBulletinBoard(); err2 != nil {
-			return nil, pl.WrapError(err2, "node.NewNode(): failed to register with bulletin board")
+			return nil, pl.WrapError(err2, "relay.NewRelay(): failed to register with bulletin board")
 		}
 
 		go n.StartPeriodicUpdates(time.Second * 3)
@@ -81,11 +81,11 @@ func NewNode(id int, host string, port int, bulletinBoardUrl string) (*Node, err
 	}
 }
 
-func (n *Node) GetStatus() string {
+func (n *Relay) GetStatus() string {
 	return n.status.GetStatus()
 }
 
-func (n *Node) getPublicNodeInfo() structs.PublicNodeApi {
+func (n *Relay) getPublicNodeInfo() structs.PublicNodeApi {
 	return structs.PublicNodeApi{
 		ID:        n.ID,
 		Address:   n.Address,
@@ -94,7 +94,7 @@ func (n *Node) getPublicNodeInfo() structs.PublicNodeApi {
 	}
 }
 
-func (n *Node) StartPeriodicUpdates(interval time.Duration) {
+func (n *Relay) StartPeriodicUpdates(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	go func() {
 		for range ticker.C {
@@ -107,7 +107,7 @@ func (n *Node) StartPeriodicUpdates(interval time.Duration) {
 	}()
 }
 
-func (n *Node) startRun(start structs.NodeStartRunApi) (didParticipate bool, e error) {
+func (n *Relay) startRun(start structs.RelayStartRunApi) (didParticipate bool, e error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	defer n.wg.Done()
@@ -120,14 +120,14 @@ func (n *Node) startRun(start structs.NodeStartRunApi) (didParticipate bool, e e
 	return true, nil
 }
 
-func (n *Node) Receive(oApi structs.OnionApi) error {
+func (n *Relay) Receive(oApi structs.OnionApi) error {
 	n.wg.Wait()
 
 	timeReceived := time.Now()
 
 	role, layer, metadata, peeled, nextHop, err := pi_t.PeelOnion(oApi.Onion, n.PrivateKey)
 	if err != nil {
-		return pl.WrapError(err, "node.Receive(): failed to remove layer")
+		return pl.WrapError(err, "relay.Receive(): failed to remove layer")
 	}
 
 	wasBruised := false
@@ -168,7 +168,7 @@ func (n *Node) Receive(oApi structs.OnionApi) error {
 	return nil
 }
 
-func (n *Node) sendToNode(addr string, constructedOnion onion_model.Onion) {
+func (n *Relay) sendToNode(addr string, constructedOnion onion_model.Onion) {
 	go func(addr string, constructedOnion onion_model.Onion) {
 		err := api_functions.SendOnion(addr, n.Address, constructedOnion)
 		if err != nil {
@@ -177,12 +177,12 @@ func (n *Node) sendToNode(addr string, constructedOnion onion_model.Onion) {
 	}(addr, constructedOnion)
 }
 
-func (n *Node) RegisterWithBulletinBoard() error {
-	slog.Info("Sending node registration request.", "id", n.ID)
-	return n.updateBulletinBoard("/registerNode", http.StatusCreated)
+func (n *Relay) RegisterWithBulletinBoard() error {
+	slog.Info("Sending relay registration request.", "id", n.ID)
+	return n.updateBulletinBoard("/registerRelay", http.StatusCreated)
 }
 
-func (n *Node) GetActiveNodes() ([]structs.PublicNodeApi, error) {
+func (n *Relay) GetActiveNodes() ([]structs.PublicNodeApi, error) {
 	url := fmt.Sprintf("%s/nodes", n.BulletinBoardUrl)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -206,7 +206,7 @@ func (n *Node) GetActiveNodes() ([]structs.PublicNodeApi, error) {
 	return activeNodes, nil
 }
 
-func (n *Node) updateBulletinBoard(endpoint string, expectedStatusCode int) error {
+func (n *Relay) updateBulletinBoard(endpoint string, expectedStatusCode int) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	t := time.Now()
@@ -216,20 +216,20 @@ func (n *Node) updateBulletinBoard(endpoint string, expectedStatusCode int) erro
 		PublicKey: n.PublicKey,
 		Time:      t,
 	}); err != nil {
-		return pl.WrapError(err, "node.UpdateBulletinBoard(): failed to marshal node info")
+		return pl.WrapError(err, "relay.UpdateBulletinBoard(): failed to marshal relay info")
 	} else {
 		url := n.BulletinBoardUrl + endpoint
-		//slog.Info("Sending node registration request.", "url", url, "id", n.ID)
+		//slog.Info("Sending relay registration request.", "url", url, "id", n.ID)
 		if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
-			return pl.WrapError(err2, "node.UpdateBulletinBoard(): failed to send POST request to bulletin board")
+			return pl.WrapError(err2, "relay.UpdateBulletinBoard(): failed to send POST request to bulletin board")
 		} else {
 			defer func(Body io.ReadCloser) {
 				if err3 := Body.Close(); err3 != nil {
-					fmt.Printf("node.UpdateBulletinBoard(): error closing response body: %v\n", err2)
+					fmt.Printf("relay.UpdateBulletinBoard(): error closing response body: %v\n", err2)
 				}
 			}(resp.Body)
 			if resp.StatusCode != expectedStatusCode {
-				return pl.NewError("failed to %s node, status code: %d, %s", endpoint, resp.StatusCode, resp.Status)
+				return pl.NewError("failed to %s relay, status code: %d, %s", endpoint, resp.StatusCode, resp.Status)
 			} else {
 				n.lastUpdate = t
 			}

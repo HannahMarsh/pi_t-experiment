@@ -7,7 +7,7 @@ import (
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/metrics"
-	"github.com/HannahMarsh/pi_t-experiment/internal/model/node"
+	"github.com/HannahMarsh/pi_t-experiment/internal/model/relay"
 	"go.uber.org/automaxprocs/maxprocs"
 	"log/slog"
 	"net/http"
@@ -21,7 +21,7 @@ import (
 
 func main() {
 	// Define command-line flags
-	id := flag.Int("id", -1, "ID of the newNode (required)")
+	id := flag.Int("id", -1, "ID of the new relay (required)")
 	logLevel := flag.String("log-level", "debug", "Log level")
 
 	flag.Usage = func() {
@@ -55,43 +55,43 @@ func main() {
 
 	cfg := config.GlobalConfig
 
-	var nodeConfig *config.Node
-	for _, n := range cfg.Nodes {
+	var relayConfig *config.Relay
+	for _, n := range cfg.Relays {
 		if n.ID == *id {
-			nodeConfig = &n
+			relayConfig = &n
 			break
 		}
 	}
 
-	if nodeConfig == nil {
-		slog.Error("invalid id", errors.New(fmt.Sprintf("failed to get newNode config for id=%d", *id)))
+	if relayConfig == nil {
+		slog.Error("invalid id", errors.New(fmt.Sprintf("failed to get newRelay config for id=%d", *id)))
 		os.Exit(1)
 	}
 
-	slog.Info("⚡ init newNode", "id", *id)
+	slog.Info("⚡ init newRelay", "id", *id)
 
 	baddress := fmt.Sprintf("http://%s:%d", cfg.BulletinBoard.Host, cfg.BulletinBoard.Port)
 
-	var newNode *node.Node
+	var newRelay *relay.Relay
 	for {
-		if n, err := node.NewNode(nodeConfig.ID, nodeConfig.Host, nodeConfig.Port, baddress); err != nil {
-			slog.Error("failed to create newNode. Trying again in 5 seconds. ", err)
+		if n, err := relay.NewRelay(relayConfig.ID, relayConfig.Host, relayConfig.Port, baddress); err != nil {
+			slog.Error("failed to create newRelay. Trying again in 5 seconds. ", err)
 			time.Sleep(5 * time.Second)
 			continue
 		} else {
-			newNode = n
+			newRelay = n
 			break
 		}
 	}
 
-	http.HandleFunc("/receive", newNode.HandleReceiveOnion)
-	http.HandleFunc("/start", newNode.HandleStartRun)
-	http.HandleFunc("/status", newNode.HandleGetStatus)
+	http.HandleFunc("/receive", newRelay.HandleReceiveOnion)
+	http.HandleFunc("/start", newRelay.HandleStartRun)
+	http.HandleFunc("/status", newRelay.HandleGetStatus)
 
-	shutdownMetrics := metrics.ServeMetrics(nodeConfig.PrometheusPort, metrics.PROCESSING_TIME, metrics.ONION_COUNT)
+	shutdownMetrics := metrics.ServeMetrics(relayConfig.PrometheusPort, metrics.PROCESSING_TIME, metrics.ONION_COUNT)
 
 	go func() {
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", nodeConfig.Port), nil); err != nil {
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", relayConfig.Port), nil); err != nil {
 			if errors.Is(err, http.ErrServerClosed) {
 				slog.Info("HTTP server closed")
 			} else {
@@ -100,7 +100,7 @@ func main() {
 		}
 	}()
 
-	slog.Info("🌏 start newNode...", "address", fmt.Sprintf("http://%s:%d", nodeConfig.Host, nodeConfig.Port))
+	slog.Info("🌏 start newRelay...", "address", fmt.Sprintf("http://%s:%d", relayConfig.Host, relayConfig.Port))
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)

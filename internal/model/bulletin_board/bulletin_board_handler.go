@@ -8,17 +8,17 @@ import (
 	"net/http"
 )
 
-func (bb *BulletinBoard) HandleRegisterNode(w http.ResponseWriter, r *http.Request) {
-	//	slog.Info("Received node registration request")
+func (bb *BulletinBoard) HandleRegisterRelay(w http.ResponseWriter, r *http.Request) {
+	//	slog.Info("Received relay registration request")
 	var node structs.PublicNodeApi
 	if err := json.NewDecoder(r.Body).Decode(&node); err != nil {
-		slog.Error("Error decoding node registration request", err)
+		slog.Error("Error decoding relay registration request", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	slog.Info("Registering node with", "id", node.ID)
+	slog.Info("Registering relay with", "id", node.ID)
 	if err := bb.UpdateNode(node); err != nil {
-		slog.Error("Error updating node", err)
+		slog.Error("Error updating relay", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -59,16 +59,16 @@ func (bb *BulletinBoard) HandleRegisterIntentToSend(w http.ResponseWriter, r *ht
 }
 
 func (bb *BulletinBoard) HandleUpdateNodeInfo(w http.ResponseWriter, r *http.Request) {
-	//slog.Info("Received node info update request")
+	//slog.Info("Received relay info update request")
 	var nodeInfo structs.PublicNodeApi
 	if err := json.NewDecoder(r.Body).Decode(&nodeInfo); err != nil {
-		slog.Error("Error decoding node info update request", err)
+		slog.Error("Error decoding relay info update request", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	//	slog.Info("Updating node with", "id", nodeInfo.ID)
+	//	slog.Info("Updating relay with", "id", nodeInfo.ID)
 	if err := bb.UpdateNode(nodeInfo); err != nil {
-		fmt.Printf("Error updating node %d: %v\n", nodeInfo.ID, err)
+		fmt.Printf("Error updating relay %d: %v\n", nodeInfo.ID, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

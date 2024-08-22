@@ -40,7 +40,7 @@ clients:
     host: 'localhost'
     port: 8106
     prometheus_port: 9106
-nodes:
+relays:
   - id: 1
     host: 'localhost'
     port: 8081

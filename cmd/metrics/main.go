@@ -41,7 +41,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	nodePromAddresses := utils.Map(config.GlobalConfig.Nodes, func(n config.Node) string {
+	nodePromAddresses := utils.Map(config.GlobalConfig.Relays, func(n config.Relay) string {
 		return fmt.Sprintf("http://%s:%d/metrics", n.Host, n.PrometheusPort)
 	})
 
@@ -49,7 +49,7 @@ func main() {
 		return fmt.Sprintf("http://%s:%d/metrics", c.Host, c.PrometheusPort)
 	})
 
-	slog.Info("⚡ init metrics", "nodePromAddresses", nodePromAddresses, "clientPromAddresses", clientPromAddresses)
+	slog.Info("⚡ init visualizer", "nodePromAddresses", nodePromAddresses, "clientPromAddresses", clientPromAddresses)
 
 	scrapeInterval := time.Duration(config.GlobalConfig.ScrapeInterval) * time.Millisecond
 
@@ -84,7 +84,7 @@ func main() {
 func scrapeMetrics(address string) {
 	resp, err := http.Get(address)
 	if err != nil {
-		slog.Error("failed to scrape metrics", err)
+		slog.Error("failed to scrape visualizer", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -100,5 +100,5 @@ func scrapeMetrics(address string) {
 		return
 	}
 
-	slog.Debug("scraped metrics", "address", address, "response", string(body))
+	slog.Debug("scraped visualizer", "address", address, "response", string(body))
 }

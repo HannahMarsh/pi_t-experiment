@@ -28,7 +28,7 @@ type Client struct {
 	PrivateKey       string
 	PublicKey        string
 	SessionKeys      map[string][]byte
-	ActiveNodes      []structs.PublicNodeApi
+	ActiveRelays     []structs.PublicNodeApi
 	OtherClients     []structs.PublicNodeApi
 	Messages         []structs.Message
 	mu               sync.RWMutex
@@ -40,7 +40,7 @@ type Client struct {
 // NewNode creates a new client instance
 func NewClient(id int, host string, port int, bulletinBoardUrl string) (*Client, error) {
 	if privateKey, publicKey, err := keys.KeyGen(); err != nil {
-		return nil, pl.WrapError(err, "node.NewClient(): failed to generate key pair")
+		return nil, pl.WrapError(err, "relay.NewClient(): failed to generate key pair")
 	} else {
 		c := &Client{
 			ID:               id,
@@ -50,7 +50,7 @@ func NewClient(id int, host string, port int, bulletinBoardUrl string) (*Client,
 			PublicKey:        publicKey,
 			PrivateKey:       privateKey,
 			SessionKeys:      make(map[string][]byte),
-			ActiveNodes:      make([]structs.PublicNodeApi, 0),
+			ActiveRelays:     make([]structs.PublicNodeApi, 0),
 			BulletinBoardUrl: bulletinBoardUrl,
 			Messages:         make([]structs.Message, 0),
 			OtherClients:     make([]structs.PublicNodeApi, 0),
@@ -346,12 +346,12 @@ func (c *Client) Receive(oApi structs.OnionApi) error {
 	timeReceived := time.Now()
 	_, layer, _, peeled, _, err := pi_t.PeelOnion(oApi.Onion, c.PrivateKey)
 	if err != nil {
-		return pl.WrapError(err, "node.Receive(): failed to remove layer")
+		return pl.WrapError(err, "relay.Receive(): failed to remove layer")
 	}
 
 	var msg structs.Message
 	if err2 := json.Unmarshal([]byte(peeled.Content), &msg); err2 != nil {
-		return pl.WrapError(err2, "node.Receive(): failed to unmarshal message")
+		return pl.WrapError(err2, "relay.Receive(): failed to unmarshal message")
 	}
 	slog.Info("Client received onion", "layer", layer, "from", config.AddressToName(msg.From), "message", msg.Msg)
 

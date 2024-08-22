@@ -1,7 +1,0 @@
-messages:
-  - from: 1               # id of client sender
-    to: 2                 # id of client receiver
-    content: 'Hello, 2!'  # content of message
-  - from: 1
-    to: 2
-    content: 'Hello, 2!'

@@ -17,7 +17,7 @@ import (
 
 // BulletinBoard represents the bulletin board that keeps track of active nodes and coordinates the start signal
 type BulletinBoard struct {
-	Network         map[int]*NodeView   // Maps node IDs
+	Network         map[int]*RelayView  // Maps relay IDs
 	Clients         map[int]*ClientView // Maps client IDs
 	mu              sync.RWMutex
 	config          *config.Config
@@ -28,7 +28,7 @@ type BulletinBoard struct {
 // NewBulletinBoard creates a new bulletin board
 func NewBulletinBoard(config *config.Config) *BulletinBoard {
 	return &BulletinBoard{
-		Network:         make(map[int]*NodeView),
+		Network:         make(map[int]*RelayView),
 		Clients:         make(map[int]*ClientView),
 		config:          config,
 		lastStartRun:    time.Now(),
@@ -36,7 +36,7 @@ func NewBulletinBoard(config *config.Config) *BulletinBoard {
 	}
 }
 
-// UpdateNode adds a node to the active nodes list
+// UpdateNode adds a relay to the active nodes list
 func (bb *BulletinBoard) UpdateNode(node structs.PublicNodeApi) error {
 	bb.mu.Lock()
 	defer bb.mu.Unlock()
@@ -74,9 +74,9 @@ func (bb *BulletinBoard) RegisterIntentToSend(its structs.IntentToSend) error {
 
 func (bb *BulletinBoard) signalNodesToStart() error {
 	slog.Info("Signaling nodes to start")
-	activeNodes := utils.MapEntries(utils.FilterMap(bb.Network, func(_ int, node *NodeView) bool {
+	activeNodes := utils.MapEntries(utils.FilterMap(bb.Network, func(_ int, node *RelayView) bool {
 		return node.IsActive() && node.Address != ""
-	}), func(_ int, nv *NodeView) structs.PublicNodeApi {
+	}), func(_ int, nv *RelayView) structs.PublicNodeApi {
 		return structs.PublicNodeApi{
 			ID:        nv.ID,
 			Address:   nv.Address,
@@ -116,9 +116,9 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 		return checkpoint.Receiver.ID
 	})
 
-	nodeStartSignals := make(map[structs.PublicNodeApi]structs.NodeStartRunApi)
+	nodeStartSignals := make(map[structs.PublicNodeApi]structs.RelayStartRunApi)
 	for _, node := range activeNodes {
-		nodeStartSignals[node] = structs.NodeStartRunApi{
+		nodeStartSignals[node] = structs.RelayStartRunApi{
 			Checkpoints: allCheckpoints[node.ID],
 		}
 	}
@@ -152,13 +152,13 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 		nsr := nsr
 		go func() {
 			if data, err2 := json.Marshal(nsr); err2 != nil {
-				slog.Error("Error signaling node to start\n", err2)
+				slog.Error("Error signaling relay to start\n", err2)
 				err = PrettyLogger.WrapError(err2, "failed to marshal start signal")
 			} else {
 				url := fmt.Sprintf("%s/start", node.Address)
 				if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
-					slog.Error("Error signaling node to start\n", err2)
-					err = PrettyLogger.WrapError(err2, "failed to signal node to start")
+					slog.Error("Error signaling relay to start\n", err2)
+					err = PrettyLogger.WrapError(err2, "failed to signal relay to start")
 				} else if err3 := resp.Body.Close(); err3 != nil {
 					slog.Error("Error closing response body", err3)
 					err = PrettyLogger.WrapError(err3, "failed to close response body")
@@ -194,11 +194,11 @@ func (bb *BulletinBoard) StartRuns() error {
 func (bb *BulletinBoard) allNodesReady() bool {
 	bb.mu.RLock()
 	defer bb.mu.RUnlock()
-	activeNodes := utils.CountAny(utils.GetValues(bb.Network), func(node *NodeView) bool {
+	activeNodes := utils.CountAny(utils.GetValues(bb.Network), func(node *RelayView) bool {
 		return node.IsActive()
 	})
 
-	if activeNodes < len(config.GlobalConfig.Nodes) {
+	if activeNodes < len(config.GlobalConfig.Relays) {
 		slog.Info("Not all nodes are registered")
 		return false
 	}
