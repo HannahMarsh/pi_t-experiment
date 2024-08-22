@@ -7,8 +7,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/tools/keys"
-	"golang.org/x/exp/slog"
 	"log"
+	"log/slog"
 	"testing"
 )
 

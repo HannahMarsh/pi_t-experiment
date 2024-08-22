@@ -11,15 +11,15 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/onion_model"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
-	"golang.org/x/exp/slog"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 )
 
 // sendOnion sends an onion to the specified address with compression and timeout
 func SendOnion(to, from string, o onion_model.Onion) error {
-	slog.Info(pl.GetFuncName()+": Sending onion...", "from", config.AddressToName(from), "to", config.AddressToName(to))
+	slog.Info("Sending onion...", "from", config.AddressToName(from), "to", config.AddressToName(to))
 	url := fmt.Sprintf("%s/receive", to)
 
 	//data, err := base64.StdEncoding.DecodeString(onionStr)

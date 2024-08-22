@@ -3,7 +3,7 @@ package structs
 import (
 	"encoding/json"
 	"github.com/HannahMarsh/pi_t-experiment/config"
-	"golang.org/x/exp/slog"
+	"log/slog"
 	"sync"
 	"time"
 )

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/api_functions"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
-	"golang.org/x/exp/slog"
+	"log/slog"
 	"net/http"
 )
 

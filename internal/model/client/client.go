@@ -13,8 +13,8 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/onion_model"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/tools/keys"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
-	"golang.org/x/exp/slog"
 	"io"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -344,17 +344,16 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 
 func (c *Client) Receive(oApi structs.OnionApi) error {
 	timeReceived := time.Now()
-	role, layer, _, peeled, nextHop, err := pi_t.PeelOnion(oApi.Onion, c.PrivateKey)
+	_, layer, _, peeled, _, err := pi_t.PeelOnion(oApi.Onion, c.PrivateKey)
 	if err != nil {
 		return pl.WrapError(err, "node.Receive(): failed to remove layer")
 	}
-	slog.Info("Client received onion", "role", role, "layer", layer, "nextHop", nextHop)
 
 	var msg structs.Message
 	if err2 := json.Unmarshal([]byte(peeled.Content), &msg); err2 != nil {
 		return pl.WrapError(err2, "node.Receive(): failed to unmarshal message")
 	}
-	slog.Info("Received message", "from", msg.From, "to", msg.To, "msg", msg.Msg)
+	slog.Info("Client received onion", "layer", layer, "from", config.AddressToName(msg.From), "message", msg.Msg)
 
 	c.status.AddReceived(msg)
 	metrics.Set(metrics.MSG_RECEIVED, float64(timeReceived.Unix()), msg.Hash)

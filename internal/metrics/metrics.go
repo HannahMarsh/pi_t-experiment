@@ -8,7 +8,7 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"golang.org/x/exp/slog"
+	"log/slog"
 	"net/http"
 	"time"
 )

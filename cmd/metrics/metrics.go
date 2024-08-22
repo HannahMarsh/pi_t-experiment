@@ -10,7 +10,7 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	_ "github.com/lib/pq"
 	"go.uber.org/automaxprocs/maxprocs"
-	"golang.org/x/exp/slog"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"

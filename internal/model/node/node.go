@@ -19,7 +19,7 @@ import (
 
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t"
-	"golang.org/x/exp/slog"
+	"log/slog"
 )
 
 // Node represents a node in the onion routing network

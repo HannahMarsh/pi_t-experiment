@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/tools/keys"
-	"golang.org/x/exp/slog"
+	"log/slog"
 )
 
 // PRF_F1 determines if a checkpoint onion is expected.

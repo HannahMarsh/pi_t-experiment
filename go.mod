@@ -5,7 +5,7 @@ go 1.21
 //toolchain go1.21.2
 
 require (
-	github.com/HannahMarsh/PrettyLogger v0.0.0-20240627173212-7d95e93b93d0
+	github.com/HannahMarsh/PrettyLogger v1.0.2
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.12.0
 	github.com/ilyakaznacheev/cleanenv v1.3.0
@@ -14,7 +14,7 @@ require (
 	github.com/prometheus/client_golang v1.20.1
 	go.uber.org/automaxprocs v1.5.1
 	golang.org/x/crypto v0.25.0
-	golang.org/x/exp v0.0.0-20221026153819-32f3d567a233
+	golang.org/x/exp v0.0.0-20220428152302-39d4317da171
 	google.golang.org/protobuf v1.34.2
 )
 
@@ -33,7 +33,7 @@ require (
 	github.com/prometheus/common v0.55.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	golang.org/x/sys v0.22.0 // indirect
+	golang.org/x/sys v0.24.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	google.golang.org/genproto v0.0.0-20221014213838-99cd37c6964a // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

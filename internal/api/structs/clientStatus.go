@@ -2,9 +2,8 @@ package structs
 
 import (
 	"encoding/json"
-	"github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
-	"golang.org/x/exp/slog"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -64,7 +63,7 @@ func (cs *ClientStatus) AddReceived(message Message) {
 			Message:      message,
 			TimeReceived: time.Now(),
 		})
-		slog.Info(PrettyLogger.GetFuncName(), "message", message)
+		//slog.Info("", "from", config.AddressToName(message.From), "to", config.AddressToName(message.To), "message", message.Msg)
 	}
 }
 

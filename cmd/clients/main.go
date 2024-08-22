@@ -9,7 +9,7 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/internal/metrics"
 	"github.com/HannahMarsh/pi_t-experiment/internal/model/client"
 	"go.uber.org/automaxprocs/maxprocs"
-	"golang.org/x/exp/slog"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"

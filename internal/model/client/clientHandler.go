@@ -6,8 +6,8 @@ import (
 	"github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/api_functions"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
-	"golang.org/x/exp/slog"
 	"io"
+	"log/slog"
 	"net/http"
 )
 

@@ -13,7 +13,7 @@ import (
 	"syscall"
 
 	"go.uber.org/automaxprocs/maxprocs"
-	"golang.org/x/exp/slog"
+	"log/slog"
 
 	_ "github.com/lib/pq"
 )

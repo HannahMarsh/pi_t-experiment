@@ -119,6 +119,7 @@ func AddressToName(address string) string {
 	for _, node := range GlobalConfig.Nodes {
 		if address == node.Address {
 			name := fmt.Sprintf("%sNode %d%s", PurpleColor, node.ID, ResetColor)
+			//name := fmt.Sprintf("Node %d", node.ID)
 			Names.Store(address, name)
 			return name
 		}
@@ -126,6 +127,7 @@ func AddressToName(address string) string {
 	for _, client := range GlobalConfig.Clients {
 		if address == client.Address {
 			name := fmt.Sprintf("%sClient %d%s", OrangeColor, client.ID, ResetColor)
+			//name := fmt.Sprintf("Client %d", client.ID)
 			Names.Store(address, name)
 			return name
 		}

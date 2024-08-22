@@ -12,7 +12,7 @@ import (
 
 	"github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
-	"golang.org/x/exp/slog"
+	"log/slog"
 )
 
 // BulletinBoard represents the bulletin board that keeps track of active nodes and coordinates the start signal
