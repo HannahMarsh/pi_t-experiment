@@ -20,17 +20,19 @@ type BulletinBoard struct {
 }
 
 type Node struct {
-	ID      int    `yaml:"id"`
-	Host    string `yaml:"host"`
-	Port    int    `yaml:"port"`
-	Address string
+	ID             int    `yaml:"id"`
+	Host           string `yaml:"host"`
+	Port           int    `yaml:"port"`
+	PrometheusPort int    `yaml:"prometheus_port"`
+	Address        string
 }
 
 type Client struct {
-	ID      int    `yaml:"id"`
-	Host    string `yaml:"host"`
-	Port    int    `yaml:"port"`
-	Address string
+	ID             int    `yaml:"id"`
+	Host           string `yaml:"host"`
+	Port           int    `yaml:"port"`
+	PrometheusPort int    `yaml:"prometheus_port"`
+	Address        string
 }
 
 type Metrics struct {
@@ -40,17 +42,18 @@ type Metrics struct {
 }
 
 type Config struct {
-	ServerLoad    int           `yaml:"x"`
-	D             int           `yaml:"d"`
-	Delta         float64       `yaml:"delta"`
-	L1            int           `yaml:"l1"`
-	L2            int           `yaml:"l2"`
-	Chi           float64       `yaml:"chi"`
-	BulletinBoard BulletinBoard `yaml:"bulletin_board"`
-	Nodes         []Node        `yaml:"nodes"`
-	Metrics       Metrics       `yaml:"metrics"`
-	Clients       []Client      `yaml:"clients"`
-	Vis           bool          `yaml:"vis"`
+	ServerLoad     int           `yaml:"x"`
+	D              int           `yaml:"d"`
+	Delta          float64       `yaml:"delta"`
+	L1             int           `yaml:"l1"`
+	L2             int           `yaml:"l2"`
+	Chi            float64       `yaml:"chi"`
+	BulletinBoard  BulletinBoard `yaml:"bulletin_board"`
+	Nodes          []Node        `yaml:"nodes"`
+	Metrics        Metrics       `yaml:"metrics"`
+	Clients        []Client      `yaml:"clients"`
+	Vis            bool          `yaml:"vis"`
+	ScrapeInterval int           `yaml:"scrapeInterval"`
 }
 
 var GlobalConfig *Config

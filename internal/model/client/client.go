@@ -8,6 +8,7 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/api_functions"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
+	"github.com/HannahMarsh/pi_t-experiment/internal/metrics"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/onion_model"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/tools/keys"
@@ -196,6 +197,7 @@ func (c *Client) formOnions(start structs.ClientStartRunApi) ([]queuedOnion, err
 type queuedOnion struct {
 	to    string
 	onion onion_model.Onion
+	msg   structs.Message
 }
 
 // processMessage processes a single message to form its onion
@@ -236,6 +238,7 @@ func (c *Client) processMessage(msg structs.Message, destination structs.PublicN
 	onions = append(onions, queuedOnion{
 		onion: o[0][0],
 		to:    mixersAddr[0],
+		msg:   msg,
 	})
 
 	c.status.AddSent(destination, routingPath, msg)
@@ -285,6 +288,7 @@ func (c *Client) processCheckpoint(checkpointOnion structs.CheckpointOnion, clie
 	onions = append(onions, queuedOnion{
 		onion: o[0][0],
 		to:    path[0].Address,
+		msg:   dummyMsg,
 	})
 
 	c.status.AddSent(utils.GetLast(path), path, dummyMsg)
@@ -322,9 +326,12 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 		for _, onion := range toSend {
 			go func(onion queuedOnion) {
 				defer wg.Done()
+				timeSent := time.Now()
 				if err = api_functions.SendOnion(onion.to, c.Address, onion.onion); err != nil {
 					slog.Error("failed to send onions", err)
 				}
+				metrics.Set(metrics.MSG_SENT, float64(timeSent.Unix()), onion.msg.Hash)
+
 			}(onion)
 		}
 
@@ -336,6 +343,7 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 }
 
 func (c *Client) Receive(oApi structs.OnionApi) error {
+	timeReceived := time.Now()
 	role, layer, _, peeled, nextHop, err := pi_t.PeelOnion(oApi.Onion, c.PrivateKey)
 	if err != nil {
 		return pl.WrapError(err, "node.Receive(): failed to remove layer")
@@ -349,6 +357,7 @@ func (c *Client) Receive(oApi structs.OnionApi) error {
 	slog.Info("Received message", "from", msg.From, "to", msg.To, "msg", msg.Msg)
 
 	c.status.AddReceived(msg)
+	metrics.Set(metrics.MSG_RECEIVED, float64(timeReceived.Unix()), msg.Hash)
 
 	return nil
 }

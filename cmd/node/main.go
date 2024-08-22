@@ -6,6 +6,7 @@ import (
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
+	"github.com/HannahMarsh/pi_t-experiment/internal/metrics"
 	"github.com/HannahMarsh/pi_t-experiment/internal/model/node"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/exp/slog"
@@ -87,6 +88,8 @@ func main() {
 	http.HandleFunc("/start", newNode.HandleStartRun)
 	http.HandleFunc("/status", newNode.HandleGetStatus)
 
+	shutdownMetrics := metrics.ServeMetrics(nodeConfig.PrometheusPort, metrics.PROCESSING_TIME, metrics.ONION_COUNT)
+
 	go func() {
 		if err := http.ListenAndServe(fmt.Sprintf(":%d", nodeConfig.Port), nil); err != nil {
 			if errors.Is(err, http.ErrServerClosed) {
@@ -105,6 +108,7 @@ func main() {
 	select {
 	case v := <-quit:
 		config.GlobalCancel()
+		shutdownMetrics()
 		slog.Info("signal.Notify", v)
 	case done := <-config.GlobalCtx.Done():
 		slog.Info("ctx.Done", done)

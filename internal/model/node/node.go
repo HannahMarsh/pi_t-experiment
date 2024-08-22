@@ -7,6 +7,7 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/api_functions"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
+	"github.com/HannahMarsh/pi_t-experiment/internal/metrics"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/onion_model"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/tools/keys"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/cm"
@@ -122,6 +123,8 @@ func (n *Node) startRun(start structs.NodeStartRunApi) (didParticipate bool, e e
 func (n *Node) Receive(oApi structs.OnionApi) error {
 	n.wg.Wait()
 
+	timeReceived := time.Now()
+
 	role, layer, metadata, peeled, nextHop, err := pi_t.PeelOnion(oApi.Onion, n.PrivateKey)
 	if err != nil {
 		return pl.WrapError(err, "node.Receive(): failed to remove layer")
@@ -156,6 +159,9 @@ func (n *Node) Receive(oApi structs.OnionApi) error {
 	slog.Info("Received onion", "ischeckpoint?", metadata.Nonce != "", "layer", layer, "nextHop", config.AddressToName(nextHop))
 
 	n.status.AddOnion(oApi.From, n.Address, nextHop, layer, isCheckpoint, !wasBruised)
+
+	metrics.Observe(metrics.PROCESSING_TIME, time.Since(timeReceived).Seconds())
+	metrics.Inc(metrics.ONION_COUNT, layer)
 
 	n.sendToNode(nextHop, peeled)
 

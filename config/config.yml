@@ -6,6 +6,7 @@ d: 2          # Threshold for number of bruises before an onion is discarded by 
 delta: 1e-5   # The probability of differential privacy violation due to the adversary's actions.
 chi: 0.3      # Fraction of corrupted relays (which perform no mixing)
 vis: true     # Visualize the network
+scrapeInterval: 1000 # Prometheus scrape interval in milliseconds
 
 
 metrics:
@@ -18,37 +19,49 @@ clients:
   - id: 1
     host: 'localhost'
     port: 8101
+    prometheus_port: 9101
   - id: 2
     host: 'localhost'
     port: 8102
+    prometheus_port: 9102
   - id: 3
     host: 'localhost'
     port: 8103
+    prometheus_port: 9103
   - id: 4
     host: 'localhost'
     port: 8104
+    prometheus_port: 9104
   - id: 5
     host: 'localhost'
     port: 8105
+    prometheus_port: 9105
   - id: 6
     host: 'localhost'
     port: 8106
+    prometheus_port: 9106
 nodes:
   - id: 1
     host: 'localhost'
     port: 8081
+    prometheus_port: 9201
   - id: 2
     host: 'localhost'
     port: 8082
+    prometheus_port: 9202
   - id: 3
     host: 'localhost'
     port: 8083
+    prometheus_port: 9203
   - id: 4
     host: 'localhost'
     port: 8084
+    prometheus_port: 9204
   - id: 5
     host: 'localhost'
     port: 8085
+    prometheus_port: 9205
   - id: 6
     host: 'localhost'
     port: 8086
+    prometheus_port: 9206
