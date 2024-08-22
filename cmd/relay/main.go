@@ -40,14 +40,16 @@ func main() {
 		os.Exit(2)
 	}
 
+	// Set up logrus with the specified log level.
 	pl.SetUpLogrusAndSlog(*logLevel)
 
-	// set GOMAXPROCS
+	// Automatically adjust the GOMAXPROCS setting based on the number of available CPU cores.
 	if _, err := maxprocs.Set(); err != nil {
 		slog.Error("failed set max procs", err)
 		os.Exit(1)
 	}
 
+	// Initialize global configurations by loading them from config/config.yml
 	if err := config.InitGlobal(); err != nil {
 		slog.Error("failed to init config", err)
 		os.Exit(1)
@@ -55,10 +57,11 @@ func main() {
 
 	cfg := config.GlobalConfig
 
+	// Find the relay configuration that matches the provided ID.
 	var relayConfig *config.Relay
-	for _, n := range cfg.Relays {
-		if n.ID == *id {
-			relayConfig = &n
+	for _, r := range cfg.Relays {
+		if r.ID == *id {
+			relayConfig = &r
 			break
 		}
 	}
@@ -70,26 +73,32 @@ func main() {
 
 	slog.Info("⚡ init newRelay", "id", *id)
 
-	baddress := fmt.Sprintf("http://%s:%d", cfg.BulletinBoard.Host, cfg.BulletinBoard.Port)
+	// Construct the full URL for the Bulletin Board
+	bulletinBoardAddress := fmt.Sprintf("http://%s:%d", cfg.BulletinBoard.Host, cfg.BulletinBoard.Port)
 
 	var newRelay *relay.Relay
+	// Attempt to create a new relay instance, retrying every 5 seconds upon failure (in case the bulletin board isn't ready yet).
 	for {
-		if n, err := relay.NewRelay(relayConfig.ID, relayConfig.Host, relayConfig.Port, baddress); err != nil {
+		if n, err := relay.NewRelay(relayConfig.ID, relayConfig.Host, relayConfig.Port, bulletinBoardAddress); err != nil {
 			slog.Error("failed to create newRelay. Trying again in 5 seconds. ", err)
 			time.Sleep(5 * time.Second)
 			continue
 		} else {
+			// If successful, assign the new relay instance and break out of the loop.
 			newRelay = n
 			break
 		}
 	}
 
+	// Set up HTTP handlers
 	http.HandleFunc("/receive", newRelay.HandleReceiveOnion)
 	http.HandleFunc("/start", newRelay.HandleStartRun)
 	http.HandleFunc("/status", newRelay.HandleGetStatus)
 
+	// Serve Prometheus metrics in a separate goroutine.
 	shutdownMetrics := metrics.ServeMetrics(relayConfig.PrometheusPort, metrics.PROCESSING_TIME, metrics.ONION_COUNT)
 
+	// Start the HTTP server
 	go func() {
 		if err := http.ListenAndServe(fmt.Sprintf(":%d", relayConfig.Port), nil); err != nil {
 			if errors.Is(err, http.ErrServerClosed) {
@@ -102,15 +111,18 @@ func main() {
 
 	slog.Info("🌏 start newRelay...", "address", fmt.Sprintf("http://%s:%d", relayConfig.Host, relayConfig.Port))
 
+	// Create a channel to receive OS signals (like SIGINT or SIGTERM) to handle graceful shutdowns.
 	quit := make(chan os.Signal, 1)
+	// Notify the quit channel when specific OS signals are received.
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
+	// Wait for either an OS signal to quit or the global context to be canceled
 	select {
-	case v := <-quit:
+	case v := <-quit: // OS signal is received
 		config.GlobalCancel()
 		shutdownMetrics()
 		slog.Info("", "signal.Notify", v)
-	case done := <-config.GlobalCtx.Done():
+	case done := <-config.GlobalCtx.Done(): // global context is canceled
 		slog.Info("", "ctx.Done", done)
 	}
 

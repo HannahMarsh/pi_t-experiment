@@ -11,28 +11,12 @@ import (
 	"net/http"
 )
 
+// HandleReceive handles incoming onions sent to the client by other nodes.
 func (c *Client) HandleReceive(w http.ResponseWriter, r *http.Request) {
 	api_functions.HandleReceiveOnion(w, r, c.Receive)
-	//var o structs.OnionApi
-	//if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
-	//	slog.Error("Error decoding onion", err)
-	//	http.Error(w, err.Error(), http.StatusBadRequest)
-	//	return
-	//}
-	//decompressed, err := api.Receive(o.Onion)
-	//if err != nil {
-	//	slog.Error("Error decompressing onion", err)
-	//	http.Error(w, err.Error(), http.StatusInternalServerError)
-	//	return
-	//}
-	//if err = c.Receive(decompressed); err != nil {
-	//	slog.Error("Error receiving onion", err)
-	//	http.Error(w, err.Error(), http.StatusInternalServerError)
-	//	return
-	//}
-	//w.WriteHeader(http.StatusOK)
 }
 
+// HandleGetStatus returns the current status of the client in response to an HTTP request.
 func (c *Client) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write([]byte(c.GetStatus())); err != nil {
@@ -40,6 +24,7 @@ func (c *Client) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// HandleStartRun handles the initiation of a run based on a start signal received via an HTTP request.
 func (c *Client) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Starting run")
 	var start structs.ClientStartRunApi
@@ -59,6 +44,7 @@ func (c *Client) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// GetActiveNodes retrieves the list of active nodes from the bulletin board.
 func (c *Client) GetActiveNodes() ([]structs.PublicNodeApi, error) {
 	url := fmt.Sprintf("%s/Clients", c.BulletinBoardUrl)
 	resp, err := http.Get(url)

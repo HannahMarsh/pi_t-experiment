@@ -30,7 +30,7 @@ func main() {
 
 	pl.SetUpLogrusAndSlog(*logLevel)
 
-	// set GOMAXPROCS
+	// Automatically adjust the GOMAXPROCS setting based on the number of available CPU cores.
 	if _, err := maxprocs.Set(); err != nil {
 		slog.Error("failed set max procs", err)
 		os.Exit(1)

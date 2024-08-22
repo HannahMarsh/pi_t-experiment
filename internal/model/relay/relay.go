@@ -22,35 +22,37 @@ import (
 	"log/slog"
 )
 
-// Relay represents a relay in the onion routing network
+// Relay represents a participating relay in the network.
 type Relay struct {
-	ID                  int
-	Host                string
-	Port                int
-	Address             string
-	PrivateKey          string
-	PublicKey           string
-	mu                  sync.RWMutex
-	BulletinBoardUrl    string
-	lastUpdate          time.Time
-	status              *structs.NodeStatus
-	checkpointsReceived *cm.ConcurrentMap[int, int]
-	expectedNonces      []map[string]bool
-	isCorrupted         bool
+	ID                  int                         // Unique identifier for the relay.
+	Host                string                      // Host address of the relay.
+	Port                int                         // Port number on which the relay listens.
+	Address             string                      // Full address of the relay in the form http://host:port.
+	PrivateKey          string                      // Relay's private key for decryption.
+	PublicKey           string                      // Relay's public key for encryption.
+	BulletinBoardUrl    string                      // URL of the bulletin board for relay registration and communication.
+	lastUpdate          time.Time                   // Timestamp of the last update sent to the bulletin board.
+	status              *structs.NodeStatus         // Relay status, including received onions and checkpoints.
+	checkpointsReceived *cm.ConcurrentMap[int, int] // Concurrent map to track the number of received checkpoints per layer.
+	expectedNonces      []map[string]bool           // List of expected nonces for each layer, used to verify received onions.
+	isCorrupted         bool                        // Flag indicating whether the relay is corrupted (meaning it does not perform any mixing).
 	wg                  sync.WaitGroup
+	mu                  sync.RWMutex
 }
 
-// NewRelay creates a new relay
+// NewRelay creates a new relay instance with a unique ID, host, and port.
 func NewRelay(id int, host string, port int, bulletinBoardUrl string) (*Relay, error) {
+	// Generate a key pair (private and public) for the relay.
 	if privateKey, publicKey, err := keys.KeyGen(); err != nil {
 		return nil, pl.WrapError(err, "relay.NewClient(): failed to generate key pair")
 	} else {
+		// Initialize a list of expected nonces for each layer.
 		expectedCheckpoints := make([]map[string]bool, config.GlobalConfig.L1+config.GlobalConfig.L2+1)
 		for i := range expectedCheckpoints {
 			expectedCheckpoints[i] = make(map[string]bool)
 		}
 
-		// determine if relay is corrupted
+		// Determine if the relay is corrupted based on the configuration's corruption rate (Chi).
 		numCorrupted := int(config.GlobalConfig.Chi * float64(len(config.GlobalConfig.Relays)))
 		corruptedNodes := utils.PseudoRandomSubset(config.GlobalConfig.Relays, numCorrupted, 42)
 		isCorrupted := utils.Contains(corruptedNodes, func(node config.Relay) bool {
@@ -71,20 +73,25 @@ func NewRelay(id int, host string, port int, bulletinBoardUrl string) (*Relay, e
 			isCorrupted:         isCorrupted,
 		}
 		n.wg.Add(1)
+
+		// Register the relay with the bulletin board.
 		if err2 := n.RegisterWithBulletinBoard(); err2 != nil {
 			return nil, pl.WrapError(err2, "relay.NewRelay(): failed to register with bulletin board")
 		}
 
+		// Start periodic updates to the bulletin board.
 		go n.StartPeriodicUpdates(time.Second * 3)
 
 		return n, nil
 	}
 }
 
+// GetStatus returns the current status of the relay, including received onions and checkpoints.
 func (n *Relay) GetStatus() string {
 	return n.status.GetStatus()
 }
 
+// getPublicNodeInfo returns the relay's public information in the form of a PublicNodeApi struct.
 func (n *Relay) getPublicNodeInfo() structs.PublicNodeApi {
 	return structs.PublicNodeApi{
 		ID:        n.ID,
@@ -94,11 +101,12 @@ func (n *Relay) getPublicNodeInfo() structs.PublicNodeApi {
 	}
 }
 
+// StartPeriodicUpdates periodically updates the relay's status on the bulletin board.
 func (n *Relay) StartPeriodicUpdates(interval time.Duration) {
-	ticker := time.NewTicker(interval)
+	ticker := time.NewTicker(interval) // Create a ticker that triggers updates at the specified interval.
 	go func() {
 		for range ticker.C {
-			//slog.Info("Updating bulletin board")
+			// Update the bulletin board with the relay's current status.
 			if err := n.updateBulletinBoard("/updateNode", http.StatusOK); err != nil {
 				fmt.Printf("Error updating bulletin board: %v\n", err)
 				return
@@ -107,11 +115,13 @@ func (n *Relay) StartPeriodicUpdates(interval time.Duration) {
 	}()
 }
 
+// startRun initializes a run based on the start signal received from the bulletin board.
 func (n *Relay) startRun(start structs.RelayStartRunApi) (didParticipate bool, e error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	defer n.wg.Done()
 
+	// Iterate over the checkpoints in the start signal to record the expected nonces.
 	for _, c := range start.Checkpoints {
 		n.expectedNonces[c.Layer][c.Nonce] = true
 		n.status.AddExpectedCheckpoint(c.Layer)
@@ -120,11 +130,13 @@ func (n *Relay) startRun(start structs.RelayStartRunApi) (didParticipate bool, e
 	return true, nil
 }
 
+// Receive processes an incoming onion, decrypts it, and forwards it to the next hop.
 func (n *Relay) Receive(oApi structs.OnionApi) error {
-	n.wg.Wait()
+	n.wg.Wait() // Wait for the expected nonces to be recorded by startRun
 
-	timeReceived := time.Now()
+	timeReceived := time.Now() // Record the time when the onion was received.
 
+	// Peel the onion to extract its contents, including the role, layer, and metadata.
 	role, layer, metadata, peeled, nextHop, err := pi_t.PeelOnion(oApi.Onion, n.PrivateKey)
 	if err != nil {
 		return pl.WrapError(err, "relay.Receive(): failed to remove layer")
@@ -133,17 +145,18 @@ func (n *Relay) Receive(oApi structs.OnionApi) error {
 	wasBruised := false
 	isCheckpoint := false
 
+	// If the onion contains a nonce, it is a checkpoint.
 	if metadata.Nonce != "" {
 		isCheckpoint = true
-		if _, present := n.expectedNonces[layer][metadata.Nonce]; present { // nonce is verified
+		if _, present := n.expectedNonces[layer][metadata.Nonce]; present { // Verify the nonce.
 			n.checkpointsReceived.GetAndSet(layer, func(i int) int {
 				return i + 1
 			})
 			if role == onion_model.MIXER {
 				slog.Debug("Mixer: Nonce was verified, dropping null block.")
-				peeled.Sepal = peeled.Sepal.RemoveBlock()
+				peeled.Sepal = peeled.Sepal.RemoveBlock() // Remove the null block from the onion.
 			}
-		} else { // nonce is not verified
+		} else { // If the nonce is not verified, add a bruise to the onion.
 			if role == onion_model.MIXER {
 				slog.Debug("Mixer: Nonce was not verified, dropping master key.")
 				peeled.Sepal = peeled.Sepal.AddBruise()
@@ -153,23 +166,25 @@ func (n *Relay) Receive(oApi structs.OnionApi) error {
 
 		n.status.AddCheckpointOnion(layer)
 	} else if role == onion_model.MIXER {
-		peeled.Sepal = peeled.Sepal.RemoveBlock()
+		peeled.Sepal = peeled.Sepal.RemoveBlock() // If not a checkpoint, remove the block from the onion.
 	}
 
 	slog.Info("Received onion", "ischeckpoint?", metadata.Nonce != "", "layer", layer, "nextHop", config.AddressToName(nextHop))
 
 	n.status.AddOnion(oApi.From, n.Address, nextHop, layer, isCheckpoint, !wasBruised)
 
-	metrics.Observe(metrics.PROCESSING_TIME, time.Since(timeReceived).Seconds())
-	metrics.Inc(metrics.ONION_COUNT, layer)
+	metrics.Observe(metrics.PROCESSING_TIME, time.Since(timeReceived).Seconds()) // Track the processing time.
+	metrics.Inc(metrics.ONION_COUNT, layer)                                      // Increment the count of processed onions for the layer.
 
-	n.sendToNode(nextHop, peeled)
+	n.sendToNode(nextHop, peeled) // Forward the onion to the next hop.
 
 	return nil
 }
 
+// sendToNode forwards the constructed onion to the specified address.
 func (n *Relay) sendToNode(addr string, constructedOnion onion_model.Onion) {
 	go func(addr string, constructedOnion onion_model.Onion) {
+		// Send the onion to the next hop using the API function.
 		err := api_functions.SendOnion(addr, n.Address, constructedOnion)
 		if err != nil {
 			slog.Error("Error sending onion", err)
@@ -177,39 +192,49 @@ func (n *Relay) sendToNode(addr string, constructedOnion onion_model.Onion) {
 	}(addr, constructedOnion)
 }
 
+// RegisterWithBulletinBoard registers the relay with the bulletin board.
 func (n *Relay) RegisterWithBulletinBoard() error {
 	slog.Info("Sending relay registration request.", "id", n.ID)
-	return n.updateBulletinBoard("/registerRelay", http.StatusCreated)
+	return n.updateBulletinBoard("/registerRelay", http.StatusCreated) // Register the relay with the expected status code.
 }
 
+// GetActiveNodes retrieves the list of active nodes from the bulletin board.
 func (n *Relay) GetActiveNodes() ([]structs.PublicNodeApi, error) {
+	// Construct the URL for the GET request to retrieve active nodes.
 	url := fmt.Sprintf("%s/nodes", n.BulletinBoardUrl)
+	// Send the GET request to the bulletin board.
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, pl.WrapError(err, fmt.Sprintf("error making GET request to %s", url))
+		return nil, pl.WrapError(err, fmt.Sprintf("error making GET request to %s", url)) // Wrap and return any errors that occur during the GET request.
 	}
 	defer func(Body io.ReadCloser) {
+		// Ensure the response body is closed to avoid resource leaks.
 		if err2 := Body.Close(); err2 != nil {
-			fmt.Printf("error closing response body: %v\n", err)
+			fmt.Printf("error closing response body: %v\n", err2)
 		}
 	}(resp.Body)
 
+	// Check if the response status code indicates success.
 	if resp.StatusCode != http.StatusOK {
-		return nil, pl.NewError("unexpected status code: %d", resp.StatusCode)
+		return nil, pl.NewError("unexpected status code: %d", resp.StatusCode) // Return an error if the status code is not OK.
 	}
 
-	var activeNodes []structs.PublicNodeApi
+	var activeNodes []structs.PublicNodeApi // Declare a slice to hold the decoded list of active nodes.
+	// Decode the response body into the activeNodes slice.
 	if err = json.NewDecoder(resp.Body).Decode(&activeNodes); err != nil {
-		return nil, pl.WrapError(err, "error decoding response body")
+		return nil, pl.WrapError(err, "error decoding response body") // Wrap and return any errors that occur during decoding.
 	}
 
-	return activeNodes, nil
+	return activeNodes, nil // Return the list of active nodes.
 }
 
+// updateBulletinBoard updates the relay's information on the bulletin board.
 func (n *Relay) updateBulletinBoard(endpoint string, expectedStatusCode int) error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	t := time.Now()
+	n.mu.Lock()         // Lock the mutex to ensure exclusive access to the relay's state during the update.
+	defer n.mu.Unlock() // Unlock the mutex when the function returns.
+	t := time.Now()     // Record the current time for the update.
+
+	// Marshal the relay's public information into JSON.
 	if data, err := json.Marshal(structs.PublicNodeApi{
 		ID:        n.ID,
 		Address:   n.Address,
@@ -218,20 +243,22 @@ func (n *Relay) updateBulletinBoard(endpoint string, expectedStatusCode int) err
 	}); err != nil {
 		return pl.WrapError(err, "relay.UpdateBulletinBoard(): failed to marshal relay info")
 	} else {
+		// Send a POST request to the bulletin board to update the relay's information.
 		url := n.BulletinBoardUrl + endpoint
-		//slog.Info("Sending relay registration request.", "url", url, "id", n.ID)
 		if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
 			return pl.WrapError(err2, "relay.UpdateBulletinBoard(): failed to send POST request to bulletin board")
 		} else {
 			defer func(Body io.ReadCloser) {
+				// Ensure the response body is closed to avoid resource leaks.
 				if err3 := Body.Close(); err3 != nil {
 					fmt.Printf("relay.UpdateBulletinBoard(): error closing response body: %v\n", err2)
 				}
 			}(resp.Body)
+			// Check if the update was successful based on the HTTP status code.
 			if resp.StatusCode != expectedStatusCode {
 				return pl.NewError("failed to %s relay, status code: %d, %s", endpoint, resp.StatusCode, resp.Status)
 			} else {
-				n.lastUpdate = t
+				n.lastUpdate = t // Update the last update timestamp.
 			}
 			return nil
 		}

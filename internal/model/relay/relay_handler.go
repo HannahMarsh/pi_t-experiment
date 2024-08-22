@@ -8,28 +8,12 @@ import (
 	"net/http"
 )
 
+// HandleReceiveOnion handles incoming onion requests sent to the relay.
 func (n *Relay) HandleReceiveOnion(w http.ResponseWriter, r *http.Request) {
 	api_functions.HandleReceiveOnion(w, r, n.Receive)
-	//var o structs.OnionApi
-	//if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
-	//	slog.Error("Error decoding onion", err)
-	//	http.Error(w, err.Error(), http.StatusBadRequest)
-	//	return
-	//}
-	//decompressed, err := api.Receive(o.Onion)
-	//if err != nil {
-	//	slog.Error("Error decompressing onion", err)
-	//	http.Error(w, err.Error(), http.StatusInternalServerError)
-	//	return
-	//}
-	//if err = n.Receive(decompressed); err != nil {
-	//	slog.Error("Error receiving onion", err)
-	//	http.Error(w, err.Error(), http.StatusInternalServerError)
-	//	return
-	//}
-	//w.WriteHeader(http.StatusOK)
 }
 
+// HandleGetStatus returns the current status of the relay in response to an HTTP request.
 func (n *Relay) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write([]byte(n.GetStatus())); err != nil {
@@ -37,15 +21,17 @@ func (n *Relay) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// HandleStartRun handles the initiation of a relay run based on a start signal received via an HTTP request.
 func (n *Relay) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Starting run")
 	var start structs.RelayStartRunApi
+	// Decode the JSON request body into the start signal struct.
 	if err := json.NewDecoder(r.Body).Decode(&start); err != nil {
-		slog.Error("Error decoding active nodes", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		slog.Error("Error decoding active nodes", err)    // Log any errors that occur during decoding.
+		http.Error(w, err.Error(), http.StatusBadRequest) // Respond with a Bad Request status if decoding fails.
 		return
 	}
-	//slog.Info("Active nodes", "start", start)
+
 	go func() {
 		if didParticipate, err := n.startRun(start); err != nil {
 			slog.Error("Error starting run", err)
@@ -55,23 +41,3 @@ func (n *Relay) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 	}()
 	w.WriteHeader(http.StatusOK)
 }
-
-//
-//func (n *Relay) HandleClientRequest(w http.ResponseWriter, r *http.Request) {
-//
-//	var msgs []api.Message
-//	if err := json.NewDecoder(r.Body).Decode(&msgs); err != nil {
-//		http.Error(w, err.Error(), http.StatusBadRequest)
-//		return
-//	}
-//	//slog.Info("Received client request", "num_messages", len(msgs), "destinations", utils.Map(msgs, func(m api.Message) int { return m.To }))
-//	//slog.Info("Enqueuing messages", "num_messages", len(msgs))
-//	for _, msg := range msgs {
-//		if err := n.QueueOnion(msg, 2); err != nil {
-//			slog.Error("Error queueing message", err)
-//			http.Error(w, err.Error(), http.StatusInternalServerError)
-//			return
-//		}
-//	}
-//	w.WriteHeader(http.StatusOK)
-//}
