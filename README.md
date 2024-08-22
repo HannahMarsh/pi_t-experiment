@@ -528,43 +528,43 @@ All configurations are set in the [`config/config.yaml`](config/config/yaml) fil
 ### Running the Bulletin Board
 
 ```bash  
-go run cmd/bulletin-board/main.go -logLevel=<string>
+go run cmd/bulletin-board/main.go -logLevel=<logLevel>
 ```  
 - Options:
-  - `-logLevel`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
+  - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
 
 ### Running a Node
 
 ```bash  
-go run cmd/node/main.go -id=<int> -logLevel=<string>
+go run cmd/node/main.go -id=<id> -logLevel=<logLevel>
 ```  
 - Options:
-  - `-id`: The unique identifier for the node.
-  - `-logLevel`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
+  - `<id>`: The unique identifier for the node.
+  - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
 
 ### Running a Client
 
 ```bash  
-go run cmd/client/main.go -id=<int> -logLevel=<string>
+go run cmd/client/main.go -id=<id> -logLevel=<logLevel>
 ```  
 - Options:
-  - `-id`: The unique identifier for the node.
-  - `-logLevel`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
+  - `<id>`: The unique identifier for the node.
+  - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
 
 ### Running the Metric Collector (Scrapes Prometheus endpoints for Clients and relays)
 ```bash
-go run cmd/metricCollector/metrics.go -logLevel=<string>
+go run cmd/metricCollector/metrics.go -logLevel=<slogLevel>
 ```
 - Options:
-  - `-logLevel`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
+  - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
 
 ### Running the Browser-Based Visualization Server
 
 ```bash  
-go run cmd/metrics/metrics.go -port <int>
+go run cmd/metrics/metrics.go -port <port>
 ```  
 - Options:
-  - `-port`: The port number for the visualization server.
+  - `<port>`: The port number for the visualization server. Access at `http://localhost:<port>`.
 
 ## Endpoints
 
