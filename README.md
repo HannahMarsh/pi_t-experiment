@@ -572,24 +572,16 @@ go run cmd/metrics/metrics.go -port <port>
 
 - **Register Client**: `POST /register`
 - **Register Node**: `POST /register`
-- **Get Active Nodes**: `GET /nodes`
 
 ### Node & Client
 
 - **Receive Onion**: `POST /receive`
 - **Get Status**: `GET /status`
 - **Start Run**: `POST /start`
+- **Prometheus Metrics**: `GET /metrics` - Note that this is served on a different port which is specified in the [config.yml](/config/config.yml) file
 
-### Metrics
-
-- **Messages**: `GET /messages`
-- **Nodes**: `GET /nodes`
-- **Clients**: `GET /clients`
-- **Checkpoint Onion Counts**: `GET /checkpoints`
-- **Visualize Onion Paths**: `GET /visualization`
-
-When implementing the onion routing protocol, it helps to run the metric collector locally which provides visualization 
-in real time of the messages and onions processes by each client and node. For a small number of clients/nodes, this makes 
+When implementing the onion routing protocol, it helps to run the visualization server
+in real time to view the messages and onions processes by each client and node. For a small number of clients/nodes, this makes 
 debugging the protocol easier.
 
 Obviously, it is not recommended to run the visualization program once we deploy the simulation in a distributed environment (with potentially hundreds of nodes and rounds). 
