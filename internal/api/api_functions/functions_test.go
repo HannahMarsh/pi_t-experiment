@@ -2,7 +2,6 @@ package api_functions
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -589,12 +588,7 @@ func TestReceiveOnionMultipleLayers2(t *testing.T) {
 						return err2
 					}
 
-					payload, err := base64.StdEncoding.DecodeString(string(peeled.Content))
-					if err != nil {
-						slog.Error("base64.StdEncoding.DecodeString() error", err)
-						t.Errorf("base64.StdEncoding.DecodeString() error: %v", err)
-						return pl.WrapError(err, "base64.StdEncoding.DecodeString() error")
-					}
+					payload := string(peeled.Content)
 
 					if layer != l {
 						t.Errorf("PeelOnion() expected layer %d, got %d", l, layer)
@@ -602,7 +596,7 @@ func TestReceiveOnionMultipleLayers2(t *testing.T) {
 					}
 
 					var Msg structs.Message
-					err = json.Unmarshal(payload, &Msg)
+					err = json.Unmarshal([]byte(payload), &Msg)
 					if err != nil {
 						slog.Error("json.Unmarshal() error", err)
 						t.Errorf("json.Unmarshal() error: %v", err)
