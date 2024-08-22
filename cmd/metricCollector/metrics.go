@@ -90,7 +90,7 @@ func scrapeMetrics(address string) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		pl.LogNewError("unexpected status code", "address", address, "status", resp.StatusCode)
+		pl.LogNewError("%s: unexpected status code %d", address, resp.StatusCode)
 		return
 	}
 
