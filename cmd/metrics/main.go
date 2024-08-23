@@ -41,7 +41,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	nodePromAddresses := utils.Map(config.GlobalConfig.Relays, func(n config.Relay) string {
+	relayPromAddresses := utils.Map(config.GlobalConfig.Relays, func(n config.Relay) string {
 		return fmt.Sprintf("http://%s:%d/metrics", n.Host, n.PrometheusPort)
 	})
 
@@ -49,7 +49,7 @@ func main() {
 		return fmt.Sprintf("http://%s:%d/metrics", c.Host, c.PrometheusPort)
 	})
 
-	slog.Info("⚡ init visualizer", "nodePromAddresses", nodePromAddresses, "clientPromAddresses", clientPromAddresses)
+	slog.Info("⚡ init visualizer", "relayPromAddresses", relayPromAddresses, "clientPromAddresses", clientPromAddresses)
 
 	scrapeInterval := time.Duration(config.GlobalConfig.ScrapeInterval) * time.Millisecond
 
@@ -57,9 +57,9 @@ func main() {
 	for {
 		nextScrape := time.Now().Add(scrapeInterval)
 		var wg sync.WaitGroup
-		wg.Add(len(nodePromAddresses) + len(clientPromAddresses))
+		wg.Add(len(relayPromAddresses) + len(clientPromAddresses))
 
-		for _, address := range nodePromAddresses {
+		for _, address := range relayPromAddresses {
 			go func(address string) {
 				defer wg.Done()
 				scrapeMetrics(address)

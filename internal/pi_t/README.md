@@ -2,7 +2,7 @@
 
 
 This directory contains the core implementation of the $\Pi_t$ onion routing protocol. The key components include functions
-for forming and peeling onion layers, as well as supporting cryptographic operations and onion structure management.
+for forming and peeling onion layers, as well as providing helper crypto methods.
 
 ## Directory Structure
 

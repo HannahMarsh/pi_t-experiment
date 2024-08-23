@@ -14,6 +14,7 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,6 +39,7 @@ type Relay struct {
 	isCorrupted         bool                        // Flag indicating whether the relay is corrupted (meaning it does not perform any mixing).
 	wg                  sync.WaitGroup
 	mu                  sync.RWMutex
+	addressToDropFrom   string
 }
 
 // NewRelay creates a new relay instance with a unique ID, host, and port.
@@ -55,9 +57,21 @@ func NewRelay(id int, host string, port int, bulletinBoardUrl string) (*Relay, e
 		// Determine if the relay is corrupted based on the configuration's corruption rate (Chi).
 		numCorrupted := int(config.GlobalConfig.Chi * float64(len(config.GlobalConfig.Relays)))
 		corruptedNodes := utils.PseudoRandomSubset(config.GlobalConfig.Relays, numCorrupted, 42)
+		slog.Debug("", "corrupted nodes", strings.Join(utils.Map(corruptedNodes, func(node config.Relay) string { return fmt.Sprintf("%d", node.ID) }), ", "))
 		isCorrupted := utils.Contains(corruptedNodes, func(node config.Relay) bool {
 			return node.ID == id
 		})
+
+		addressToDropFrom := ""
+
+		// If the relay is corrupted, set the address to drop all onions from (specified in the configuration)
+		if isCorrupted {
+			if c := utils.Find(config.GlobalConfig.Clients, func(client config.Client) bool {
+				return client.ID == config.GlobalConfig.DropAllOnionsFromClient
+			}); c != nil {
+				addressToDropFrom = c.Address
+			}
+		}
 
 		n := &Relay{
 			ID:                  id,
@@ -71,6 +85,7 @@ func NewRelay(id int, host string, port int, bulletinBoardUrl string) (*Relay, e
 			checkpointsReceived: &cm.ConcurrentMap[int, int]{},
 			expectedNonces:      expectedCheckpoints,
 			isCorrupted:         isCorrupted,
+			addressToDropFrom:   addressToDropFrom,
 		}
 		n.wg.Add(1)
 
@@ -107,7 +122,7 @@ func (n *Relay) StartPeriodicUpdates(interval time.Duration) {
 	go func() {
 		for range ticker.C {
 			// Update the bulletin board with the relay's current status.
-			if err := n.updateBulletinBoard("/updateNode", http.StatusOK); err != nil {
+			if err := n.updateBulletinBoard("/updateRelay", http.StatusOK); err != nil {
 				fmt.Printf("Error updating bulletin board: %v\n", err)
 				return
 			}
@@ -142,6 +157,17 @@ func (n *Relay) Receive(oApi structs.OnionApi) error {
 		return pl.WrapError(err, "relay.Receive(): failed to remove layer")
 	}
 
+	defer func() {
+		metrics.Observe(metrics.PROCESSING_TIME, time.Since(timeReceived).Seconds()) // Track the processing time.
+		metrics.Inc(metrics.ONION_COUNT, layer)                                      // Increment the count of processed onions for the layer.
+	}()
+
+	// If the relay is corrupted and the onion is from the specified client, drop the onion.
+	if n.isCorrupted && oApi.From == n.addressToDropFrom {
+		slog.Debug("Corrupted relay dropping onion from " + n.addressToDropFrom)
+		return nil
+	}
+
 	wasBruised := false
 	isCheckpoint := false
 
@@ -173,23 +199,18 @@ func (n *Relay) Receive(oApi structs.OnionApi) error {
 
 	n.status.AddOnion(oApi.From, n.Address, nextHop, layer, isCheckpoint, !wasBruised)
 
-	metrics.Observe(metrics.PROCESSING_TIME, time.Since(timeReceived).Seconds()) // Track the processing time.
-	metrics.Inc(metrics.ONION_COUNT, layer)                                      // Increment the count of processed onions for the layer.
-
-	n.sendToNode(nextHop, peeled) // Forward the onion to the next hop.
+	go n.sendToNode(nextHop, peeled) // Forward the onion to the next hop.
 
 	return nil
 }
 
 // sendToNode forwards the constructed onion to the specified address.
 func (n *Relay) sendToNode(addr string, constructedOnion onion_model.Onion) {
-	go func(addr string, constructedOnion onion_model.Onion) {
-		// Send the onion to the next hop using the API function.
-		err := api_functions.SendOnion(addr, n.Address, constructedOnion)
-		if err != nil {
-			slog.Error("Error sending onion", err)
-		}
-	}(addr, constructedOnion)
+	// Send the onion to the next hop using the API function.
+	err := api_functions.SendOnion(addr, n.Address, constructedOnion)
+	if err != nil {
+		slog.Error("Error sending onion", err)
+	}
 }
 
 // RegisterWithBulletinBoard registers the relay with the bulletin board.

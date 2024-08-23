@@ -195,28 +195,35 @@ func NewIntArray(start, end int) []int {
 }
 
 func RandomSubset[T any](array []T, size int) []T {
-	elements := Copy(array)
-	if size >= len(elements) {
-		return elements
+	if array == nil || len(array) == 0 {
+		return []T{}
 	}
+	elements := Copy(array)
 	rng.Shuffle(len(elements), func(i, j int) {
 		elements[i], elements[j] = elements[j], elements[i]
 	})
+	if size >= len(elements) {
+		return elements
+	}
 	return elements[:size]
 }
 
 func PseudoRandomSubset[T any](array []T, size int, seed int64) []T {
+	if array == nil || len(array) == 0 {
+		return []T{}
+	}
+
 	// Initialize the PRNG with the fixed seed
 	src := rng.NewSource(seed)
 	r := rng.New(src)
 
 	elements := Copy(array)
-	if size >= len(elements) {
-		return elements
-	}
 	r.Shuffle(len(elements), func(i, j int) {
 		elements[i], elements[j] = elements[j], elements[i]
 	})
+	if size >= len(elements) {
+		return elements
+	}
 	return elements[:size]
 }
 

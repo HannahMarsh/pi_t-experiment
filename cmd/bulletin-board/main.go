@@ -58,7 +58,7 @@ func main() {
 
 	// Start the Bulletin Board's main operations in a new goroutine
 	go func() {
-		err := bulletinBoard.StartRuns()
+		err := bulletinBoard.StartProtocol()
 		if err != nil {
 			slog.Error("failed to start runs", err)
 			config.GlobalCancel()
@@ -69,7 +69,7 @@ func main() {
 	http.HandleFunc("/registerRelay", bulletinBoard.HandleRegisterRelay)
 	http.HandleFunc("/registerClient", bulletinBoard.HandleRegisterClient)
 	http.HandleFunc("/registerIntentToSend", bulletinBoard.HandleRegisterIntentToSend)
-	http.HandleFunc("/updateNode", bulletinBoard.HandleUpdateNodeInfo)
+	http.HandleFunc("/updateRelay", bulletinBoard.HandleUpdateRelayInfo)
 
 	// Start the HTTP server
 	go func() {

@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"net/http"
 	"sync"
 	"time"
 
-	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"log/slog"
 )
@@ -34,21 +34,21 @@ func NewBulletinBoard() *BulletinBoard {
 	}
 }
 
-// UpdateNode adds or updates a relay in the active nodes list based on the provided PublicNodeApi data.
-func (bb *BulletinBoard) UpdateNode(node structs.PublicNodeApi) {
+// UpdateRelay adds or updates a relay in the active relays list based on the provided PublicNodeApi data.
+func (bb *BulletinBoard) UpdateRelay(relay structs.PublicNodeApi) {
 	bb.mu.Lock()
 	defer bb.mu.Unlock()
 
-	// If the node is not already present in the Network, create a new RelayView for it.
-	if _, present := bb.Network[node.ID]; !present {
-		bb.Network[node.ID] = NewNodeView(node, time.Second*10)
+	// If the relay is not already present in the Network, create a new RelayView for it.
+	if _, present := bb.Network[relay.ID]; !present {
+		bb.Network[relay.ID] = NewNodeView(relay, time.Second*10)
 	}
 
-	// Update the existing or newly created RelayView with the latest node information.
-	bb.Network[node.ID].UpdateNode(node)
+	// Update the existing or newly created RelayView with the latest relay information.
+	bb.Network[relay.ID].UpdateNode(relay)
 }
 
-// RegisterClient adds a client to the active clients list based on the provided PublicNodeApi data.
+// RegisterClient adds a client to the active client list based on the provided PublicNodeApi data.
 func (bb *BulletinBoard) RegisterClient(client structs.PublicNodeApi) {
 	bb.mu.Lock()
 	defer bb.mu.Unlock()
@@ -60,7 +60,7 @@ func (bb *BulletinBoard) RegisterClient(client structs.PublicNodeApi) {
 	return
 }
 
-// RegisterIntentToSend records a client's intent to send a message, updating the active clients list accordingly.
+// RegisterIntentToSend records a client's intent to send a message, updating the active client list accordingly.
 func (bb *BulletinBoard) RegisterIntentToSend(its structs.IntentToSend) error {
 	bb.mu.Lock()
 	defer bb.mu.Unlock()
@@ -69,7 +69,7 @@ func (bb *BulletinBoard) RegisterIntentToSend(its structs.IntentToSend) error {
 	if _, present := bb.Clients[its.From.ID]; !present {
 		bb.Clients[its.From.ID] = NewClientView(its.From, time.Second*10)
 	} else {
-		// Register any additional clients in the 'To' field of the IntentToSend.
+		// Register any additional client in the 'To' field of the IntentToSend.
 		for _, client := range its.To {
 			if _, present = bb.Clients[client.ID]; !present {
 				bb.Clients[client.ID] = NewClientView(client, time.Second*10)
@@ -81,7 +81,26 @@ func (bb *BulletinBoard) RegisterIntentToSend(its structs.IntentToSend) error {
 	return nil
 }
 
-// signalNodesToStart sends the start signal to all active nodes (clients and relays) in the network.
+// StartProtocol periodically checks if all nodes are ready and, if so, signals them to start a new run.
+func (bb *BulletinBoard) StartProtocol() error {
+	for {
+		// Check if the time since the last start run is greater than the required interval.
+		if time.Since(bb.lastStartRun) >= bb.timeBetweenRuns {
+			bb.lastStartRun = time.Now() // Update the timestamp for the last start run.
+			if bb.allNodesReady() {      // Check if all nodes are ready to start.
+				if err := bb.signalNodesToStart(); err != nil {
+					return pl.WrapError(err, "error signaling nodes to start")
+				} else {
+					return nil // If successful, exit the loop.
+				}
+			}
+		}
+
+		time.Sleep(time.Second * 5) // Wait 5 seconds before the next check.
+	}
+}
+
+// signalNodesToStart sends the start signal to all active nodes (client and relays) in the network.
 func (bb *BulletinBoard) signalNodesToStart() error {
 	slog.Info("Signaling nodes to start...")
 
@@ -97,7 +116,7 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 		}
 	})
 
-	// Filter and map active clients to their PublicNodeApi representations.
+	// Filter and map active client to their PublicNodeApi representations.
 	activeClients := utils.MapEntries(utils.FilterMap(bb.Clients, func(_ int, cl *ClientView) bool {
 		return cl.IsActive() && cl.Address != ""
 	}), func(_ int, cv *ClientView) structs.PublicNodeApi {
@@ -143,7 +162,7 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 	var wg sync.WaitGroup
 	wg.Add(len(activeNodes) + len(activeClients))
 
-	// Signal all active clients to start the run.
+	// Signal all active client to start the run.
 	for client, csr := range clientStartSignals {
 		go func(client structs.PublicNodeApi, csr structs.ClientStartRunApi) {
 			defer wg.Done()
@@ -188,26 +207,7 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 	return nil
 }
 
-// StartRuns periodically checks if all nodes are ready and, if so, signals them to start a new run.
-func (bb *BulletinBoard) StartRuns() error {
-	for {
-		// Check if the time since the last start run is greater than the required interval.
-		if time.Since(bb.lastStartRun) >= bb.timeBetweenRuns {
-			bb.lastStartRun = time.Now() // Update the timestamp for the last start run.
-			if bb.allNodesReady() {      // Check if all nodes are ready to start.
-				if err := bb.signalNodesToStart(); err != nil {
-					return pl.WrapError(err, "error signaling nodes to start")
-				} else {
-					return nil // If successful, exit the loop.
-				}
-			}
-		}
-
-		time.Sleep(time.Second * 5) // Wait 5 seconds before the next check.
-	}
-}
-
-// allNodesReady checks if all required nodes and clients are active and ready to start a run.
+// allNodesReady checks if all required nodes and client have registered and are ready to start a run.
 func (bb *BulletinBoard) allNodesReady() bool {
 	bb.mu.RLock()
 	defer bb.mu.RUnlock()
@@ -223,18 +223,18 @@ func (bb *BulletinBoard) allNodesReady() bool {
 		return false
 	}
 
-	// Count the number of clients that have registered intent to send messages.
+	// Count the number of client that have registered intent to send messages.
 	registeredClients := utils.CountAny(utils.GetValues(bb.Clients), func(client *ClientView) bool {
 		return client.MessageQueue != nil && len(client.MessageQueue) > 0
 	})
 
-	// If the number of registered clients is less than required, log and return false.
+	// If the number of registered client is less than required, log and return false.
 	if registeredClients < len(config.GlobalConfig.Clients) {
-		slog.Info("Not all clients are registered")
+		slog.Info("Not all client are registered")
 		return false
 	}
 
-	// If all nodes and clients are ready, log and return true.
+	// If all nodes and client are ready, log and return true.
 	slog.Info("All nodes ready")
 	return true
 }

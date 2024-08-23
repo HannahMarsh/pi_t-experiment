@@ -42,18 +42,19 @@ type Metrics struct {
 }
 
 type Config struct {
-	ServerLoad     int           `yaml:"x"`
-	D              int           `yaml:"d"`
-	Delta          float64       `yaml:"delta"`
-	L1             int           `yaml:"l1"`
-	L2             int           `yaml:"l2"`
-	Chi            float64       `yaml:"chi"`
-	BulletinBoard  BulletinBoard `yaml:"bulletin_board"`
-	Relays         []Relay       `yaml:"relays"`
-	Metrics        Metrics       `yaml:"visualizer"`
-	Clients        []Client      `yaml:"clients"`
-	Vis            bool          `yaml:"vis"`
-	ScrapeInterval int           `yaml:"scrapeInterval"`
+	ServerLoad              int           `yaml:"x"`
+	D                       int           `yaml:"d"`
+	Delta                   float64       `yaml:"delta"`
+	L1                      int           `yaml:"l1"`
+	L2                      int           `yaml:"l2"`
+	Chi                     float64       `yaml:"chi"`
+	BulletinBoard           BulletinBoard `yaml:"bulletin_board"`
+	Relays                  []Relay       `yaml:"relays"`
+	Metrics                 Metrics       `yaml:"visualizer"`
+	Clients                 []Client      `yaml:"clients"`
+	Vis                     bool          `yaml:"vis"`
+	ScrapeInterval          int           `yaml:"scrapeInterval"`
+	DropAllOnionsFromClient int           `yaml:"dropAllOnionsFromClient"`
 }
 
 var GlobalConfig *Config
@@ -116,9 +117,9 @@ func AddressToName(address string) string {
 	if name, ok := Names.Load(address); ok {
 		return name.(string)
 	}
-	for _, node := range GlobalConfig.Relays {
-		if address == node.Address {
-			name := fmt.Sprintf("%sRelay %d%s", PurpleColor, node.ID, ResetColor)
+	for _, relay := range GlobalConfig.Relays {
+		if address == relay.Address {
+			name := fmt.Sprintf("%sRelay %d%s", PurpleColor, relay.ID, ResetColor)
 			//name := fmt.Sprintf("Relay %d", relay.ID)
 			Names.Store(address, name)
 			return name

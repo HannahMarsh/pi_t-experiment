@@ -27,7 +27,7 @@ func (n *Relay) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 	var start structs.RelayStartRunApi
 	// Decode the JSON request body into the start signal struct.
 	if err := json.NewDecoder(r.Body).Decode(&start); err != nil {
-		slog.Error("Error decoding active nodes", err)    // Log any errors that occur during decoding.
+		slog.Error("Error decoding active relays", err)   // Log any errors that occur during decoding.
 		http.Error(w, err.Error(), http.StatusBadRequest) // Respond with a Bad Request status if decoding fails.
 		return
 	}

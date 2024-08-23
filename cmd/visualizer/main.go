@@ -44,19 +44,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	cfg := config.GlobalConfig
-
-	slog.Info("⚡ init visualizer", "host", cfg.Metrics.Host, "port", cfg.Metrics.Port)
+	slog.Info("⚡ init visualizer", "address", "http://localhost:8200")
 
 	time.Sleep(1 * time.Second)
 	http.HandleFunc("/data", serveData)
 	http.Handle("/", http.FileServer(http.Dir("./static")))
-	//http.Handle("/clients", http.FileServer(http.Dir("./static/client")))
+	//http.Handle("/client", http.FileServer(http.Dir("./static/client")))
 	//http.Handle("/nodes", http.FileServer(http.Dir("./static/nodes")))
 	//http.Handle("/nodes/rounds", http.FileServer(http.Dir("./static/nodes/rounds")))
 
 	go func() {
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", cfg.Metrics.Port), nil); err != nil {
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", 8200), nil); err != nil {
 			if errors.Is(err, http.ErrServerClosed) {
 				slog.Info("HTTP server closed")
 			} else {
@@ -65,7 +63,7 @@ func main() {
 		}
 	}()
 
-	slog.Info("🌏 start visualizer...", "address", fmt.Sprintf(" %s:%d ", cfg.Metrics.Host, cfg.Metrics.Port))
+	slog.Info("🌏 start visualizer...", "address", "http://localhost:8200")
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
@@ -128,8 +126,8 @@ func serveData(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	for _, node := range config.GlobalConfig.Relays {
-		addr := fmt.Sprintf("http://%s:%d/status", node.Host, node.Port)
+	for _, relay := range config.GlobalConfig.Relays {
+		addr := fmt.Sprintf("http://%s:%d/status", relay.Host, relay.Port)
 		resp, err := http.Get(addr)
 		if err != nil {
 			slog.Error("failed to get client status", err)

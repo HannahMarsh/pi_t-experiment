@@ -7,25 +7,16 @@ import (
 	"github.com/google/uuid"
 )
 
-// generateUUIDs creates a slice of UUID strings with a length of n.
-func generateUUIDs(n int) []string {
-	uuids := make([]string, n)
-	for i := 0; i < n; i++ {
-		uuids[i] = uuid.New().String()
-	}
-	return uuids
-}
-
-// GetCheckpoints generates checkpoint onions for each client based on the list of nodes and clients.
-func GetCheckpoints(nodes, clients []structs.PublicNodeApi) map[int][]structs.CheckpointOnion {
+// GetCheckpoints generates checkpoint onions for each client based on the list of nodes and client.
+func GetCheckpoints(relays, clients []structs.PublicNodeApi) map[int][]structs.CheckpointOnion {
 	// Initialize a map to store the checkpoint onions for each client, keyed by client ID.
 	checkpoints := make(map[int][]structs.CheckpointOnion)
 
 	numClients := len(clients)
-	numNodes := len(nodes)
+	numRelays := len(relays)
 
 	// Calculate the expected number of checkpoint onions each client should send based on the server load.
-	expectedToSend := int((float64(numNodes)*float64(config.GlobalConfig.ServerLoad))/float64(numClients)) - 1
+	expectedToSend := int((float64(numRelays)*float64(config.GlobalConfig.ServerLoad))/float64(numClients)) - 1
 
 	for _, client := range clients {
 		checkpoints[client.ID] = make([]structs.CheckpointOnion, 0)
@@ -36,9 +27,9 @@ func GetCheckpoints(nodes, clients []structs.PublicNodeApi) map[int][]structs.Ch
 			// Generate the relay path for the checkpoint onion, which includes L1 mixers and L2 gatekeepers.
 			for j := 0; j < config.GlobalConfig.L1+config.GlobalConfig.L2; j++ {
 				path = append(path, structs.Checkpoint{
-					Receiver: utils.RandomElement(nodes), // Randomly select a node as the receiver for this layer.
-					Nonce:    uuid.New().String(),        // Generate a new UUID to use as the nonce for this layer.
-					Layer:    j + 1,                      // Set the layer number, starting from 1.
+					Receiver: utils.RandomElement(relays), // Randomly select a node as the receiver for this layer.
+					Nonce:    uuid.New().String(),         // Generate a new UUID to use as the nonce for this layer.
+					Layer:    j + 1,                       // Set the layer number, starting from 1.
 				})
 			}
 

@@ -29,7 +29,7 @@ type Client struct {
 	PrivateKey       string                  // Client's long term private key for decryption.
 	PublicKey        string                  // Client's long term public key for encryption.
 	ActiveRelays     []structs.PublicNodeApi // List of active relays known to the client.
-	OtherClients     []structs.PublicNodeApi // List of other clients known to the client.
+	OtherClients     []structs.PublicNodeApi // List of other client known to the client.
 	Messages         []structs.Message       // Messages to be sent by the client.
 	BulletinBoardUrl string                  // URL of the bulletin board for client registration and communication.
 	status           *structs.ClientStatus   // Client status, including sent and received messages.
@@ -122,7 +122,7 @@ func (c *Client) getRecipient() (string, int) {
 	return fmt.Sprintf("http://%s:%d", recipient.Host, recipient.Port), recipient.ID // Return the recipient's address and ID.
 }
 
-// StartGeneratingMessages generates a single message to be sent to another clients.
+// StartGeneratingMessages generates a single message to be sent to another client.
 func (c *Client) StartGeneratingMessages() {
 	defer c.wg.Done() // Mark this operation as done in the WaitGroup when finished.
 	slog.Info("Client starting to generate messages", "id", c.ID)
@@ -171,8 +171,8 @@ func (c *Client) formOnions(start structs.ClientStartRunApi) ([]queuedOnion, err
 
 	// Iterate over the client's messages to form onions for each one.
 	for i := range c.Messages {
-		if destination := utils.Find(start.Clients, func(node structs.PublicNodeApi) bool {
-			return node.Address == c.Messages[i].To
+		if destination := utils.Find(start.Clients, func(relay structs.PublicNodeApi) bool {
+			return relay.Address == c.Messages[i].To
 		}); destination != nil {
 			wg.Add(1)
 			go func(destination structs.PublicNodeApi) {
@@ -215,7 +215,7 @@ type queuedOnion struct {
 }
 
 // processMessage processes a single message to form its onion.
-func (c *Client) processMessage(msg structs.Message, destination structs.PublicNodeApi, nodes []structs.PublicNodeApi) (onions []queuedOnion, err error) {
+func (c *Client) processMessage(msg structs.Message, destination structs.PublicNodeApi, relays []structs.PublicNodeApi) (onions []queuedOnion, err error) {
 	onions = make([]queuedOnion, 0)    // Initialize a slice to hold the formed onions for this message.
 	msgBytes, err := json.Marshal(msg) // Marshal the message into JSON.
 	if err != nil {
@@ -223,7 +223,7 @@ func (c *Client) processMessage(msg structs.Message, destination structs.PublicN
 	}
 
 	// Determine the routing path (mixers and gatekeepers) for this message.
-	mixers, gatekeepers, err := DetermineRoutingPath(nodes)
+	mixers, gatekeepers, err := DetermineRoutingPath(relays)
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to determine routing path")
 	}
@@ -233,11 +233,11 @@ func (c *Client) processMessage(msg structs.Message, destination structs.PublicN
 	publicKeys := utils.Map(routingPath, func(node structs.PublicNodeApi) string {
 		return node.PublicKey
 	})
-	mixersAddr := utils.Map(mixers, func(node structs.PublicNodeApi) string {
-		return node.Address
+	mixersAddr := utils.Map(mixers, func(mixer structs.PublicNodeApi) string {
+		return mixer.Address
 	})
-	gatekeepersAddr := utils.Map(gatekeepers, func(node structs.PublicNodeApi) string {
-		return node.Address
+	gatekeepersAddr := utils.Map(gatekeepers, func(gatekeeper structs.PublicNodeApi) string {
+		return gatekeeper.Address
 	})
 
 	// Prepare the metadata for each layer in the onion.
@@ -297,11 +297,11 @@ func (c *Client) processCheckpoint(checkpointOnion structs.CheckpointOnion, clie
 	metadata = append(metadata, onion_model.Metadata{})
 
 	// Extract the addresses of mixers and gatekeepers for the routing path.
-	mixersAddr := utils.Map(path[:config.GlobalConfig.L1], func(node structs.PublicNodeApi) string {
-		return node.Address
+	mixersAddr := utils.Map(path[:config.GlobalConfig.L1], func(mixer structs.PublicNodeApi) string {
+		return mixer.Address
 	})
-	gatekeepersAddr := utils.Map(path[config.GlobalConfig.L1:], func(node structs.PublicNodeApi) string {
-		return node.Address
+	gatekeepersAddr := utils.Map(path[config.GlobalConfig.L1:], func(gatekeeper structs.PublicNodeApi) string {
+		return gatekeeper.Address
 	})
 
 	// Form the checkpoint onion using the client's private key and the determined routing path.
@@ -324,19 +324,19 @@ func (c *Client) processCheckpoint(checkpointOnion structs.CheckpointOnion, clie
 
 // startRun initiates a communication run based on the start signal received from the bulletin board.
 func (c *Client) startRun(start structs.ClientStartRunApi) error {
-	slog.Info("Client starting run", "num clients", len(start.Clients), "num relays", len(start.Relays))
+	slog.Info("Client starting run", "num client", len(start.Clients), "num relays", len(start.Relays))
 	c.mu.Lock()         // Lock the mutex to ensure exclusive access to the client's state during the run.
 	defer c.mu.Unlock() // Unlock the mutex when the function returns.
 
-	// Ensure that there are relays and clients participating in the run.
+	// Ensure that there are relays and client participating in the run.
 	if len(start.Relays) == 0 {
 		return pl.NewError("%s: no participating relays", pl.GetFuncName())
 	}
 	if len(start.Clients) == 0 {
-		return pl.NewError("%s: no participating clients", pl.GetFuncName())
+		return pl.NewError("%s: no participating client", pl.GetFuncName())
 	}
 
-	// Check if the current client is included in the list of participating clients.
+	// Check if the current client is included in the list of participating client.
 	if !utils.Contains(start.Clients, func(client structs.PublicNodeApi) bool {
 		return client.ID == c.ID
 	}) {

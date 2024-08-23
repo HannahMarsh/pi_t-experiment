@@ -9,10 +9,10 @@ import (
 
 // HandleRegisterRelay processes HTTP requests for registering a relay node.
 func (bb *BulletinBoard) HandleRegisterRelay(w http.ResponseWriter, r *http.Request) {
-	var node structs.PublicNodeApi
+	var relay structs.PublicNodeApi
 
-	// Decode the JSON request body into the node struct.
-	if err := json.NewDecoder(r.Body).Decode(&node); err != nil {
+	// Decode the JSON request body into the relay struct.
+	if err := json.NewDecoder(r.Body).Decode(&relay); err != nil {
 		// If decoding fails, log the error and respond with a Bad Request status.
 		slog.Error("Error decoding relay registration request", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -20,10 +20,10 @@ func (bb *BulletinBoard) HandleRegisterRelay(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Log the relay registration event with the relay ID.
-	slog.Info("Registering relay with", "id", node.ID)
+	slog.Info("Registering relay with", "id", relay.ID)
 
-	// Update the bulletin board with the new relay node information.
-	bb.UpdateNode(node)
+	// Update the bulletin board with the new relay information.
+	bb.UpdateRelay(relay)
 
 	w.WriteHeader(http.StatusCreated)
 }
@@ -36,7 +36,6 @@ func (bb *BulletinBoard) HandleRegisterClient(w http.ResponseWriter, r *http.Req
 
 	// Decode the JSON request body into the client struct.
 	if err := json.NewDecoder(r.Body).Decode(&client); err != nil {
-		// If decoding fails, log the error and respond with a Bad Request status.
 		slog.Error("Error decoding client registration request", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -57,7 +56,6 @@ func (bb *BulletinBoard) HandleRegisterIntentToSend(w http.ResponseWriter, r *ht
 
 	// Decode the JSON request body into the intent-to-send struct.
 	if err := json.NewDecoder(r.Body).Decode(&its); err != nil {
-		// If decoding fails, log the error and respond with a Bad Request status.
 		slog.Error("Error decoding intent-to-send registration request", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -73,8 +71,8 @@ func (bb *BulletinBoard) HandleRegisterIntentToSend(w http.ResponseWriter, r *ht
 	w.WriteHeader(http.StatusOK)
 }
 
-// HandleUpdateNodeInfo processes HTTP requests for updating relay node information.
-func (bb *BulletinBoard) HandleUpdateNodeInfo(w http.ResponseWriter, r *http.Request) {
+// HandleUpdateRelayInfo processes HTTP requests for updating relay node information.
+func (bb *BulletinBoard) HandleUpdateRelayInfo(w http.ResponseWriter, r *http.Request) {
 	var nodeInfo structs.PublicNodeApi
 
 	// Decode the JSON request body into the nodeInfo struct.
@@ -85,7 +83,7 @@ func (bb *BulletinBoard) HandleUpdateNodeInfo(w http.ResponseWriter, r *http.Req
 	}
 
 	// Update the node information in the bulletin board.
-	bb.UpdateNode(nodeInfo)
+	bb.UpdateRelay(nodeInfo)
 
 	w.WriteHeader(http.StatusOK)
 }
