@@ -8,51 +8,6 @@ check_git_repository() {
     git rev-parse --is-inside-work-tree > /dev/null 2>&1
 }
 
-# Function to load ignore patterns from .ai-commit.json
-load_ignore_patterns() {
-    local config_path=".ai-commit.json"  # Define the path to the configuration file
-    local ignore_patterns=()  # Initialize an empty array to hold ignore patterns
-
-    # Check if the configuration file exists
-    if [ -f "$config_path" ]; then
-        # Use jq to parse the ignore patterns from the JSON file
-        ignore_patterns=($(jq -r '.ignore[]' "$config_path"))
-    fi
-
-    # Return the ignore patterns as a space-separated string
-    echo "${ignore_patterns[@]}"
-}
-
-# Function to filter the diff based on ignore patterns
-filter_diff() {
-    local diff="$1"
-    local ignore_patterns=("${!2}")
-
-    local filtered_lines=()
-    local skip_block=false
-    IFS=$'\n' read -r -a lines <<< "$diff"
-
-    for line in "${lines[@]}"; do
-        skip_block=false
-        for pattern in "${ignore_patterns[@]}"; do
-            if [[ "$line" =~ ${pattern//\*/.*} ]]; then
-                skip_block=true
-                break
-            fi
-        done
-
-        if ! $skip_block; then
-            filtered_lines+=("$line")
-        fi
-
-        if [[ "$line" =~ ^diff\ --git ]]; then
-            skip_block=false
-        fi
-    done
-
-    printf "%s\n" "${filtered_lines[@]}"
-}
-
 # Check if the directory is a Git repository
 if ! check_git_repository; then
     echo "This is not a git repository 🙅‍♂️"
@@ -75,18 +30,6 @@ if [ -z "$diff" ]; then
     echo "No changes to commit 🙅"
     echo "Maybe you forgot to add the files? Try 'git add .' and then run this script again."
     exit 1
-fi
-
-# Load ignore patterns from .ai-commit.json if it exists
-ignore_patterns=($(load_ignore_patterns))
-
-# Filter the diff based on ignore patterns
-filtered_diff=$(filter_diff "$diff" ignore_patterns[@])
-
-# Exit if there's no relevant diff after filtering
-if [ -z "$filtered_diff" ]; then
-    echo "No relevant changes to commit after applying ignore patterns 🙅"
-    exit 0
 fi
 
 # Prepare the prompt for generating a commit message
@@ -123,7 +66,7 @@ Important:
 
 Here is the git diff, which you are to convert into a commit message as described:
 
-$filtered_diff
+$diff
 EOF
 )
 

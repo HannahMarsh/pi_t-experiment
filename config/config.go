@@ -55,6 +55,7 @@ type Config struct {
 	Vis                     bool          `yaml:"vis"`
 	ScrapeInterval          int           `yaml:"scrapeInterval"`
 	DropAllOnionsFromClient int           `yaml:"dropAllOnionsFromClient"`
+	PrometheusPath          string        `yaml:"prometheusPath"`
 }
 
 var GlobalConfig *Config
@@ -62,27 +63,37 @@ var GlobalCtx context.Context
 var GlobalCancel context.CancelFunc
 var Names sync.Map
 
-func InitGlobal() error {
+func InitGlobal() (error, string) {
 	GlobalCtx, GlobalCancel = context.WithCancel(context.Background())
 
 	GlobalConfig = &Config{}
 
+	path := ""
+
 	if dir, err := os.Getwd(); err != nil {
-		return PrettyLogger.WrapError(err, "config.NewConfig(): global config error")
+		return PrettyLogger.WrapError(err, "config.NewConfig(): global config error"), ""
 	} else if err2 := cleanenv.ReadConfig(dir+"/config/config.yml", GlobalConfig); err2 != nil {
+
 		// Get the absolute path of the current file
 		_, currentFile, _, ok := runtime.Caller(0)
 		if !ok {
-			return PrettyLogger.NewError("Failed to get current file path")
+			return PrettyLogger.NewError("Failed to get current file path"), ""
 		}
 		currentDir := filepath.Dir(currentFile)
 		configFilePath := filepath.Join(currentDir, "/config.yml")
 		if err3 := cleanenv.ReadConfig(configFilePath, GlobalConfig); err3 != nil {
-			return PrettyLogger.WrapError(err3, "config.NewConfig(): global config error")
+			return PrettyLogger.WrapError(err3, "config.NewConfig(): global config error"), ""
+		} else {
+			path = configFilePath
 		}
-	} else if err3 := cleanenv.ReadEnv(GlobalConfig); err3 != nil {
-		return PrettyLogger.WrapError(err3, "config.NewConfig(): global config error")
+	} else {
+		path = dir + "/config/config.yml"
+		if err3 := cleanenv.ReadEnv(GlobalConfig); err3 != nil {
+			return PrettyLogger.WrapError(err3, "config.NewConfig(): global config error"), ""
+		}
 	}
+
+	path = strings.ReplaceAll(path, "config.yml", "prometheus.yml")
 	// Update relay addresses
 	for i := range GlobalConfig.Relays {
 		GlobalConfig.Relays[i].Address = fmt.Sprintf("http://%s:%d", GlobalConfig.Relays[i].Host, GlobalConfig.Relays[i].Port)
@@ -95,7 +106,7 @@ func InitGlobal() error {
 
 	GlobalConfig.BulletinBoard.Address = fmt.Sprintf("http://%s:%d", GlobalConfig.BulletinBoard.Host, GlobalConfig.BulletinBoard.Port)
 	GlobalConfig.Metrics.Address = fmt.Sprintf("http://%s:%d", GlobalConfig.Metrics.Host, GlobalConfig.Metrics.Port)
-	return nil
+	return nil, path
 }
 
 func HostPortToName(host string, port int) string {

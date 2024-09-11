@@ -357,7 +357,7 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 			go func(onion queuedOnion) {
 				defer wg.Done()
 				timeSent := time.Now()
-				if err = api_functions.SendOnion(onion.to, c.Address, onion.onion); err != nil {
+				if err = api_functions.SendOnion(onion.to, c.Address, onion.onion, 0); err != nil {
 					slog.Error("failed to send onions", err)
 				}
 				metrics.Set(metrics.MSG_SENT, float64(timeSent.Unix()), onion.msg.Hash) // Record the time when the onion was sent.

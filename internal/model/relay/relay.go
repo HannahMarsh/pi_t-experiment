@@ -199,15 +199,15 @@ func (n *Relay) Receive(oApi structs.OnionApi) error {
 
 	n.status.AddOnion(oApi.From, n.Address, nextHop, layer, isCheckpoint, !wasBruised)
 
-	go n.sendToNode(nextHop, peeled) // Forward the onion to the next hop.
+	go n.sendToNode(nextHop, peeled, layer) // Forward the onion to the next hop.
 
 	return nil
 }
 
 // sendToNode forwards the constructed onion to the specified address.
-func (n *Relay) sendToNode(addr string, constructedOnion onion_model.Onion) {
+func (n *Relay) sendToNode(addr string, constructedOnion onion_model.Onion, layer int) {
 	// Send the onion to the next hop using the API function.
-	err := api_functions.SendOnion(addr, n.Address, constructedOnion)
+	err := api_functions.SendOnion(addr, n.Address, constructedOnion, layer)
 	if err != nil {
 		slog.Error("Error sending onion", err)
 	}

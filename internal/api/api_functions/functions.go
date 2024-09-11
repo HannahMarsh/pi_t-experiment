@@ -9,6 +9,7 @@ import (
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
+	"github.com/HannahMarsh/pi_t-experiment/internal/metrics"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/onion_model"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"io"
@@ -18,26 +19,9 @@ import (
 )
 
 // sendOnion sends an onion to the specified address with compression and timeout
-func SendOnion(to, from string, o onion_model.Onion) error {
+func SendOnion(to, from string, o onion_model.Onion, layer int) error {
 	slog.Debug("Sending onion...", "from", config.AddressToName(from), "to", config.AddressToName(to))
 	url := fmt.Sprintf("%s/receive", to)
-
-	//data, err := base64.StdEncoding.DecodeString(onionStr)
-	//if err != nil {
-	//	return pl.WrapError(err, "%s: failed to decode onion string", pl.GetFuncName())
-	//}
-	//
-	////beforeSize := len(data)
-	//
-	//compressedData, err := utils.Compress(data)
-	//if err != nil {
-	//	return pl.WrapError(err, "%s: failed to compress onion", pl.GetFuncName())
-	//}
-	//
-	////afterSize := len(compressedData)
-	////slog.Info(pl.GetFuncName(), "before", beforeSize, "after", afterSize, "Saved", fmt.Sprintf("%.2f%%", 100-float64(afterSize)/float64(beforeSize)*100))
-	//
-	//encodeToString := base64.StdEncoding.EncodeToString(compressedData)
 
 	data, err := json.Marshal(o)
 	if err != nil {
@@ -64,6 +48,10 @@ func SendOnion(to, from string, o onion_model.Onion) error {
 
 	client := &http.Client{
 		Timeout: 30 * time.Second, // Set timeout
+	}
+
+	if layer >= 0 {
+		metrics.Observe(metrics.ONION_SIZE, float64(compressedBuffer.Len()))
 	}
 
 	req, err := http.NewRequestWithContext(context.Background(), "POST", url, &compressedBuffer)

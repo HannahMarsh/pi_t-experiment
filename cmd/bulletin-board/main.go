@@ -39,8 +39,11 @@ func main() {
 	}
 
 	// Initialize global configurations by loading them from config/config.yml
-	if err := config.InitGlobal(); err != nil {
+	if err, path := config.InitGlobal(); err != nil {
 		slog.Error("failed to init config", err)
+		os.Exit(1)
+	} else if err = config.InitPrometheusConfig(path); err != nil {
+		slog.Error("failed to init prometheus config", err)
 		os.Exit(1)
 	}
 
@@ -65,11 +68,24 @@ func main() {
 		}
 	}()
 
+	// Create a channel to receive OS signals (like SIGINT or SIGTERM) to handle graceful shutdowns.
+	quit := make(chan os.Signal, 1)
+	// Notify the quit channel when specific OS signals are received.
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+
 	// Set up HTTP handlers
 	http.HandleFunc("/registerRelay", bulletinBoard.HandleRegisterRelay)
 	http.HandleFunc("/registerClient", bulletinBoard.HandleRegisterClient)
 	http.HandleFunc("/registerIntentToSend", bulletinBoard.HandleRegisterIntentToSend)
 	http.HandleFunc("/updateRelay", bulletinBoard.HandleUpdateRelayInfo)
+	http.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
+		slog.Info("Shutdown signal received")
+		quit <- os.Signal(syscall.SIGTERM) // signal shutdown
+		_, err := w.Write([]byte("Shutting down..."))
+		if err != nil {
+			slog.Error("Error", err)
+		}
+	})
 
 	// Start the HTTP server
 	go func() {
@@ -83,11 +99,6 @@ func main() {
 	}()
 
 	slog.Info("🌏 starting bulletin board...", "address", url)
-
-	// Create a channel to receive OS signals (like SIGINT or SIGTERM) to handle graceful shutdowns.
-	quit := make(chan os.Signal, 1)
-	// Notify the quit channel when specific OS signals are received.
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
 	// Wait for either an OS signal to quit or the global context to be canceled
 	select {

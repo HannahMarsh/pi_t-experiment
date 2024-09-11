@@ -50,7 +50,7 @@ func main() {
 	}
 
 	// Initialize global configurations by loading them from config/config.yml
-	if err := config.InitGlobal(); err != nil {
+	if err, _ := config.InitGlobal(); err != nil {
 		slog.Error("failed to init config", err)
 		os.Exit(1)
 	}
@@ -90,13 +90,26 @@ func main() {
 		}
 	}
 
+	// Create a channel to receive OS signals (like SIGINT or SIGTERM) to handle graceful shutdowns.
+	quit := make(chan os.Signal, 1)
+	// Notify the quit channel when specific OS signals are received.
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+
 	// Set up HTTP handlers
 	http.HandleFunc("/receive", newClient.HandleReceive)
 	http.HandleFunc("/start", newClient.HandleStartRun)
 	http.HandleFunc("/status", newClient.HandleGetStatus)
+	http.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
+		slog.Info("Shutdown signal received")
+		quit <- os.Signal(syscall.SIGTERM) // signal shutdown
+		_, err := w.Write([]byte("Shutting down..."))
+		if err != nil {
+			slog.Error("Error", err)
+		}
+	})
 
 	// Serve Prometheus metrics in a separate goroutine.
-	shutdownMetrics := metrics.ServeMetrics(clientConfig.PrometheusPort, metrics.MSG_SENT, metrics.MSG_RECEIVED)
+	shutdownMetrics := metrics.ServeMetrics(clientConfig.PrometheusPort, metrics.MSG_SENT, metrics.MSG_RECEIVED, metrics.ONION_SIZE)
 
 	// Start the HTTP server
 	go func() {
@@ -113,11 +126,6 @@ func main() {
 	// Start generating messages in a separate goroutine.
 	go newClient.StartGeneratingMessages()
 
-	// Create a channel to receive OS signals (like SIGINT or SIGTERM) to handle graceful shutdowns.
-	quit := make(chan os.Signal, 1)
-	// Notify the quit channel when specific OS signals are received.
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-
 	// Wait for either an OS signal to quit or the global context to be canceled
 	select {
 	case v := <-quit: // OS signal is received
@@ -126,6 +134,7 @@ func main() {
 		slog.Info("", "signal.Notify", v)
 	case done := <-config.GlobalCtx.Done(): // global context is canceled
 		slog.Info("", "ctx.Done", done)
+		shutdownMetrics()
 	}
 
 }

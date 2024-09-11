@@ -49,7 +49,7 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 	for nnn := 0; nnn < 10; nnn++ {
 		pl.SetUpLogrusAndSlog("Error")
 
-		if err := config.InitGlobal(); err != nil {
+		if err, _ := config.InitGlobal(); err != nil {
 			slog.Error("failed to init config", err)
 			os.Exit(1)
 		}
@@ -145,7 +145,7 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 							peeled.Sepal = peeled.Sepal.RemoveBlock()
 						}
 
-						err4 := SendOnion(nextDestination, nodes[i].address, peeled)
+						err4 := SendOnion(nextDestination, nodes[i].address, peeled, -1)
 						if err4 != nil {
 							slog.Error("SendOnion() error", err4)
 							t.Errorf("SendOnion() error = %v", err4)
@@ -237,7 +237,7 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 			}
 		}()
 
-		err = SendOnion(nodes[1].address, nodes[0].address, onions[0][0])
+		err = SendOnion(nodes[1].address, nodes[0].address, onions[0][0], -1)
 		if err != nil {
 			slog.Error("SendOnion() error", err)
 			t.Fatalf("SendOnion() error = %v", err)

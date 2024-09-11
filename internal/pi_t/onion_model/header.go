@@ -43,7 +43,7 @@ type CypherTextWrapper struct {
 	NextHeader string // Encrypted next header.
 }
 
-// FormHeaders generates the headers for each layer of the onion.
+// FormHeaders generates the headers for each lay erof the onion.
 func FormHeaders(l int, l1 int, C []Content, A [][]string, publicKeys []string, recipient string, layerKeys [][]byte, path []string, hash func(string) string, metadata []Metadata) (H []Header, err error) {
 
 	sharedSecrets := make([][32]byte, l+1)     // Shared secrets for each layer.

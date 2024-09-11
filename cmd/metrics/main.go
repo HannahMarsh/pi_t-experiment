@@ -5,14 +5,12 @@ import (
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
-	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"go.uber.org/automaxprocs/maxprocs"
 	"io/ioutil"
 	"log/slog"
 	"net/http"
 	"os"
-	"sync"
-	"time"
+	"os/exec"
 )
 
 func main() {
@@ -36,48 +34,68 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := config.InitGlobal(); err != nil {
+	if err, path := config.InitGlobal(); err != nil {
 		slog.Error("failed to init config", err)
 		os.Exit(1)
-	}
+	} else if err = config.InitPrometheusConfig(path); err != nil {
+		slog.Error("failed to init prometheus config", err)
+		os.Exit(1)
+	} else {
+		// Command to start Prometheus
+		cmd := exec.Command(config.GlobalConfig.PrometheusPath, "--config.file", path)
 
-	relayPromAddresses := utils.Map(config.GlobalConfig.Relays, func(n config.Relay) string {
-		return fmt.Sprintf("http://%s:%d/metrics", n.Host, n.PrometheusPort)
-	})
+		// Set the environment variables, if needed
+		cmd.Env = os.Environ()
 
-	clientPromAddresses := utils.Map(config.GlobalConfig.Clients, func(c config.Client) string {
-		return fmt.Sprintf("http://%s:%d/metrics", c.Host, c.PrometheusPort)
-	})
+		// Set the command's standard output and error to the current process's output and error
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
 
-	slog.Info("⚡ init visualizer", "relayPromAddresses", relayPromAddresses, "clientPromAddresses", clientPromAddresses)
-
-	scrapeInterval := time.Duration(config.GlobalConfig.ScrapeInterval) * time.Millisecond
-
-	// Start the metric collector
-	for {
-		nextScrape := time.Now().Add(scrapeInterval)
-		var wg sync.WaitGroup
-		wg.Add(len(relayPromAddresses) + len(clientPromAddresses))
-
-		for _, address := range relayPromAddresses {
-			go func(address string) {
-				defer wg.Done()
-				scrapeMetrics(address)
-			}(address)
-		}
-
-		for _, address := range clientPromAddresses {
-			go func(address string) {
-				defer wg.Done()
-				scrapeMetrics(address)
-			}(address)
-		}
-
-		wg.Wait()
-		if time.Until(nextScrape) > 0 {
-			time.Sleep(time.Until(nextScrape))
+		// Start the Prometheus process
+		err := cmd.Start()
+		if err != nil {
+			slog.Error("failed to start Prometheus", err)
+			os.Exit(1)
 		}
 	}
+	//
+	//relayPromAddresses := utils.Map(config.GlobalConfig.Relays, func(n config.Relay) string {
+	//	return fmt.Sprintf("http://%s:%d/metrics", n.Host, n.PrometheusPort)
+	//})
+	//
+	//clientPromAddresses := utils.Map(config.GlobalConfig.Clients, func(c config.Client) string {
+	//	return fmt.Sprintf("http://%s:%d/metrics", c.Host, c.PrometheusPort)
+	//})
+	//
+	//slog.Info("⚡ init visualizer", "relayPromAddresses", relayPromAddresses, "clientPromAddresses", clientPromAddresses)
+	//
+	//scrapeInterval := time.Duration(config.GlobalConfig.ScrapeInterval) * time.Millisecond
+	//
+	//// Start the metric collector
+	//for {
+	//	nextScrape := time.Now().Add(scrapeInterval)
+	//	var wg sync.WaitGroup
+	//	wg.Add(len(relayPromAddresses) + len(clientPromAddresses))
+	//
+	//	for _, address := range relayPromAddresses {
+	//		go func(address string) {
+	//			defer wg.Done()
+	//			scrapeMetrics(address)
+	//		}(address)
+	//	}
+	//
+	//	for _, address := range clientPromAddresses {
+	//		go func(address string) {
+	//			defer wg.Done()
+	//			scrapeMetrics(address)
+	//		}(address)
+	//	}
+	//
+	//	wg.Wait()
+	//	if time.Until(nextScrape) > 0 {
+	//		time.Sleep(time.Until(nextScrape))
+	//	}
+	//}
 
 }
 

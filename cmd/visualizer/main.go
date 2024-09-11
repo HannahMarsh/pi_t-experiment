@@ -39,7 +39,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := config.InitGlobal(); err != nil {
+	if err, _ := config.InitGlobal(); err != nil {
 		slog.Error("failed to init config", err)
 		os.Exit(1)
 	}
