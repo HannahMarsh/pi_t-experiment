@@ -117,7 +117,7 @@ do
 
     ADDRESS="http://$HOST:$PORT"
 
-    echo "Client $id address: $ADDRESS"
+    echo "Relay $id address: $ADDRESS"
 
     shutdown_addresses+=("$ADDRESS")
     osascript -e 'tell app "Terminal"
