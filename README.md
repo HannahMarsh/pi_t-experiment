@@ -13,7 +13,7 @@ and [\[TLG17\]](#TGL-17)) under similar conditions.
 
 A communication protocol achieves anonymity if no attacker can distinguish who is communicating with whom based on 
 observable data such as network traffic. Onion routing is a well-established technique for achieving anonymity, where messages 
-are encapsulated in layers of encryption and sent through a series of intermediary nodes (relays). However, onion routing 
+are encapsulated in layers of encryption and sent through a series of intermediary relays (relays). However, onion routing 
 _alone_ does not protect against adversaries who can observe all network traffic, such as AS-level or ISP-level attackers.
 
 Mix networks (or _mixnets_) enhance onion routing by mixing messages at each relay, making it harder for adversaries to 
@@ -27,7 +27,7 @@ $`\Pi_t`$ (_"t"_ for _"tulip"_ or _"threshold"_), is the first provably anonymou
 routing protocol for the asynchronous communications setting. As described in [\[ALU24\]](#ALU24), this protocol introduces 
 several novel concepts such as [checkpoint onions]() and [bruising]().
 Theoretical analysis demonstrates that $`\Pi_t`$ can provide _differential privacy_ (see definition [below](#differential-privacy)) even under strong 
-adversarial models. This analysis assumes a peer-to-peer network where nodes must discover each other, exchange keys, and
+adversarial models. This analysis assumes a peer-to-peer network where relays must discover each other, exchange keys, and
 manage communication paths independently. Unfortunately this leads to several practical challenges such as increased complexity, lower fault tolerance,
 and inconsistent security enforcement.
 
@@ -73,24 +73,24 @@ view when Alice sends a message to Carol instead.
 ### Parameters
 (_also defined in [/config/config.yml](config/config.yml)_)
 
-- **$x$**: Server load (i.e. the expected number of onions each node processes per round).
+- **$x$**: Server load (i.e. the expected number of onions each relay processes per round).
 - **$\ell_1$**: The number of mixers in each routing path.
 - **$\ell_2$**: The number of gatekeepers in each routing path.
 - **$L$**: The number of rounds (also the length of the routing path, equal to $`\ell_1 + \ell_2 + 1`$ ).
 - **$R$**: The number of participating relays.
 - **$N$**: The number of participating clients.
 - **$d$**: The number of non-null key-blocks in $S_1$. (thus $d$ is the threshold for number of bruises before an onion is discard by a gatekeeper).
-- **$\tau$**: ( $\tau \lt \(1 − \gamma\)\(1 − \chi\)$ ) The fraction of expected checkpoint onions needed for a node to progress its local clock.
+- **$\tau$**: ( $\tau \lt \(1 − \gamma\)\(1 − \chi\)$ ) The fraction of expected checkpoint onions needed for a relay to progress its local clock.
 - **$\epsilon$**: The privacy loss in the worst case scenario.
 - **$\delta = 10^{-4}$**: The fixed probability of differential privacy violation.
 - **$\lambda$**: The security parameter. We assume every quantity of the system, including $`N`$, $`R`$, $`L`$ are polynomially bounded by $`\lambda`$.
 - **$\theta$**: The maximum fraction of bruisable layers that can be bruised before the innermost tulip bulb becomes 
   unrecoverable. Note that $d = \theta \cdot \ell_1$
-- **$\chi$**: The fraction of $N$ nodes that can be corrupted and controlled by the adversary (the subset is chosen prior to execution). Note that $\chi \lt \theta - 0.5$ and $\chi \lt \frac{d}{\ell_1} - 0.5$
+- **$\chi$**: The fraction of $N$ relays that can be corrupted and controlled by the adversary (the subset is chosen prior to execution). Note that $\chi \lt \theta - 0.5$ and $\chi \lt \frac{d}{\ell_1} - 0.5$
 
 ### No Global Clock:
 
-- Each node maintains a local clock ($c_j$) to track the progression of onion layers. A node does not progress   
+- Each relay maintains a local clock ($c_j$) to track the progression of onion layers. A relay does not progress   
   its local clock until it receives a sufficient number of checkpoint onions for the current layer (specified by $\tau$).
 
 ### Keys:
@@ -301,7 +301,7 @@ view when Alice sends a message to Carol instead.
 
 - Contains the payload or the next layer of the onion.
 - Encrypted under the [ layer key, $`k`$ ](#layer-key).
-- For intermediate nodes, it contains the encrypted content of the next onion layer.
+- For intermediate relays, it contains the encrypted content of the next onion layer.
 - For the final recipient, it contains the actual message.
 
 #### Sepal ($S$):
@@ -316,25 +316,25 @@ view when Alice sends a message to Carol instead.
   - This ensures that if the number of bruises exceeds a threshold $d$, the final gatekeeper cannot recover the master key $K$, making the onion
     undecryptable.
 
-### 1. Node / Client Registration:
+### 1. Relay / Client Registration:
 
-- Nodes publish their existence and public keys to the bulletin board.
-  - See [internal/model/node/node.go](internal/model/node/node.go)
-  - Nodes send periodic heartbeat messages so that the bulletin board can maintain a list of all active nodes in the network.
+- Relays publish their existence and public keys to the bulletin board.
+  - See [internal/model/relay/relay.go](internal/model/relay/relay.go)
+  - Relays send periodic heartbeat messages so that the bulletin board can maintain a list of all active relays in the network.
 - Clients register their intent to send messages with the bulletin board.
   - See [internal/model/client/client.go](internal/model/client/client.go)
-- When a sufficient number of nodes are active (given by $N$ ), and a sufficient number of clients have registered their 
+- When a sufficient number of relays are active (given by $N$ ), and a sufficient number of clients have registered their 
   intent-to-send messages (given by $R$ ), the bulletin board broadcasts a start signal along with the following information.
   - Each participating client receives:
     - a list of active Mixers and Gatekeepers (along with their public keys and which checkpoint onions the client needs to create).
-  - All participating nodes receive:
+  - All participating relays receive:
     - a list of expected nonces it should receive for each round _j_. 
   - See [internal/model/bulletin_board/bulletin_board.go](internal/model/bulletin_board/bulletin_board.go)
 
 ### 2. Initialization:
 
 - When a client $k$ is notified of the start of a run, it receives from the bulletin board:
-  - A list of participating Mixers and Gatekeepers where each relay node $P_i$ is associated with a public key $pk_i$ and a 
+  - A list of participating Mixers and Gatekeepers where each relay relay $P_i$ is associated with a public key $pk_i$ and a 
     list of sets P_$Y_1,...,Y_{l_1}$ , where $Y_j$ represents the subset of nonces $P_i$ expects to receive during round _j_ 
     which the client is responsible for sending.
 - For each message to be sent, the client constructs a routing path by selecting a random subset of $l_1& [Mixers](#3-mixing-and-bruising)
@@ -356,8 +356,8 @@ view when Alice sends a message to Carol instead.
     - The construction of checkpoint onions follows the same layer-by-layer encryption process as the regular onions.   
       The only difference is that checkpoint onions (a.k.a. dummy onions) don't carry a payload and instead provide cover for the "real"
       payload-carrying onions.
-    - Each layer of the onion contains the encrypted shared key which is used by the next node in the path to decrypt the layer. This shared key is
-      encrypted with the public key of the respective node and included in the header of each layer.
+    - Each layer of the onion contains the encrypted shared key which is used by the next relay in the path to decrypt the layer. This shared key is
+      encrypted with the public key of the respective relay and included in the header of each layer.
 - All onions are sent to their first hop (a Mixer).
 
 ### 3. Mixing and Bruising:
@@ -371,14 +371,14 @@ view when Alice sends a message to Carol instead.
   - To detect a delay, the mixer compares the received "time" (see [local time](#no-global-clock)) with an expected time window. If an onion arrives
     outside this window, it is considered delayed.
   - To check for tampering, the mixer verifies the nonce against its expected set $Y_k$ (calculated with session key).
-    - If the nonce is valid, the node removes the nonce from $Y_k$.
+    - If the nonce is valid, the relay removes the nonce from $Y_k$.
     - Otherwise, the onion is considered tampered with.
 - If the onion is delayed or tampered with, the Mixer invalidates one of the key slots in the onion.
-- The onion is then forwarded to the next node in the path.
+- The onion is then forwarded to the next relay in the path.
 - The number of protection layers is managed in a way that does not reveal any positional information. For instance,   
   additional dummy layers might be used to mask the actual number of active layers.
 
-### 4. Intermediate Nodes:
+### 4. Intermediate Relays:
 
 - The onion continues to travel through the network of Mixers:
   - Each Mixer decrypts its layer, possibly adds bruises (invalidates key slots), and forwards the onion.
@@ -389,7 +389,7 @@ view when Alice sends a message to Carol instead.
 - The Gatekeeper receives the onion and checks the number of valid key slots.
 - If the number of valid key slots is below a predefined threshold, the Gatekeeper discards the onion.
   - A threshold is determined based on the network's tolerance for delays and replay attacks
-- If the onion is acceptable, the Gatekeeper forwards it to the next node (which can be another Mixer or a Gatekeeper, depending on the path).
+- If the onion is acceptable, the Gatekeeper forwards it to the next relay (which can be another Mixer or a Gatekeeper, depending on the path).
 
 ### 6. Final Destination
 
@@ -404,7 +404,7 @@ view when Alice sends a message to Carol instead.
 - Observe all received onions and their metadata.
 - Bruise or delay onions that pass through their layer (but cannot modify bruise count).
 - Selectively drop onions to cause disruption, such as making onions appear delayed when they reach the next hop.
-- Inject their own onions, replicate onions (replay attack) to create noise or mislead other nodes.
+- Inject their own onions, replicate onions (replay attack) to create noise or mislead other relays.
 
 ### Verifying Differential Privacy:
 
@@ -419,13 +419,13 @@ view when Alice sends a message to Carol instead.
 
 ### No Global Clock:
 
-- In the $`\Pi_t`$ protocol, each node maintains a local clock ($c_j$) to track the progression of onion layers.
-  - **Threshold (_&tau;_)**: A system parameter representing the fraction of checkpoint onions needed for the node to progress its local clock.
+- In the $`\Pi_t`$ protocol, each relay maintains a local clock ($c_j$) to track the progression of onion layers.
+  - **Threshold (_&tau;_)**: A system parameter representing the fraction of checkpoint onions needed for the relay to progress its local clock.
   - **Checkpoints ($Y_k$)**: A set of expected nonces for the k-th layer checkpoint onions.
 
 1. **Receiving Onions**:
 
-- A node $P_i$ (acting as a mixer) receives an onion $O$ and determines whether it was received "on time"   
+- A relay $P_i$ (acting as a mixer) receives an onion $O$ and determines whether it was received "on time"   
   or not relative to $P_i$'s local clock.
 - If the onion $O$ arrived late, $P_i$ bruises the onion and forwards the bruised onion _O'_ to the next destination.
 
@@ -455,7 +455,7 @@ view when Alice sends a message to Carol instead.
 - Relays, $\[R_1...R_N\]$
 - Adversary, $`\mathcal{A}`$
   - The adversary always drops onions from $C_1$
-  - $`\mathcal{A}`$'s observables, $\text{View}(\sigma_i)$, for a scenario, $i$, include the number of onions sent and received by each client and node.
+  - $`\mathcal{A}`$'s observables, $\text{View}(\sigma_i)$, for a scenario, $i$, include the number of onions sent and received by each client and relay.
     - Let $O_{k,i}$ be the distribution (over many executions of scenario $i$) of the number of onions that client $C_k$ receives by the end of the run.
 
 ### Senarios
@@ -474,7 +474,7 @@ view when Alice sends a message to Carol instead.
 
 ### Adversary's Task
 
-The adversary observes the network volume (number of onions each client and node are sending and receiving), along with routing information (who each node are sending to/receiving from each round).
+The adversary observes the network volume (number of onions each client and relay are sending and receiving), along with routing information (who each relay are sending to/receiving from each round).
 <s> Each round, the adversary updates the
 probability distribution of where the message-bearing onion is likely located. The adversary's goal is to determine the most probable client $\[C_2...C_N\]$
 that received a message-bearing onion from $C_1$. </s>
@@ -532,13 +532,13 @@ go run cmd/bulletin-board/main.go -logLevel=<logLevel>
 - Options:
   - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
 
-### Running a Node
+### Running a Relay
 
 ```bash  
-go run cmd/node/main.go -id=<id> -logLevel=<logLevel>
+go run cmd/relay/main.go -id=<id> -logLevel=<logLevel>
 ```  
 - Options:
-  - `<id>`: The unique identifier for the node.
+  - `<id>`: The unique identifier for the relay.
   - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
 
 ### Running a Client
@@ -547,12 +547,12 @@ go run cmd/node/main.go -id=<id> -logLevel=<logLevel>
 go run cmd/client/main.go -id=<id> -logLevel=<logLevel>
 ```  
 - Options:
-  - `<id>`: The unique identifier for the node.
+  - `<id>`: The unique identifier for the client.
   - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
 
 ### Running the Metric Collector (Scrapes Prometheus endpoints for Clients and relays)
 ```bash
-go run cmd/metricCollector/metrics.go -logLevel=<slogLevel>
+go run cmd/metrics/main.go -logLevel=<slogLevel>
 ```
 - Options:
   - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
@@ -560,7 +560,7 @@ go run cmd/metricCollector/metrics.go -logLevel=<slogLevel>
 ### Running the Browser-Based Visualization Server
 
 ```bash  
-go run cmd/metrics/metrics.go -port <port>
+go run cmd/visualizer/visualizer.go -port <port>
 ```  
 - Options:
   - `<port>`: The port number for the visualization server. Access at `http://localhost:<port>`.
@@ -569,10 +569,10 @@ go run cmd/metrics/metrics.go -port <port>
 
 ### Bulletin Board
 
-- **Register Client**: `POST /register`
-- **Register Node**: `POST /register`
+- **Register Client**: `POST /registerClient`
+- **Register Relay**: `POST /registerRelay`
 
-### Node & Client
+### Relay & Client
 
 - **Receive Onion**: `POST /receive`
 - **Get Status**: `GET /status`
@@ -580,10 +580,10 @@ go run cmd/metrics/metrics.go -port <port>
 - **Prometheus Metrics**: `GET /metrics` - Note that this is served on a different port which is specified in the [config.yml](/config/config.yml) file
 
 When implementing the onion routing protocol, it helps to run the visualization server
-in real time to view the messages and onions processes by each client and node. For a small number of clients/nodes, this makes 
+in real time to view the messages and onions processes by each client and relay. For a small number of clients/relays, this makes 
 debugging the protocol easier.
 
-Obviously, it is not recommended to run the visualization program once we deploy the simulation in a distributed environment (with potentially hundreds of nodes and rounds). 
+Obviously, it is not recommended to run the visualization program once we deploy the simulation in a distributed environment (with potentially hundreds of relays and rounds). 
 
 ![](img/vis.png)
 

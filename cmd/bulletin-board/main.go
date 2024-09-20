@@ -14,11 +14,10 @@ import (
 
 	"go.uber.org/automaxprocs/maxprocs"
 	"log/slog"
-
-	_ "github.com/lib/pq"
 )
 
 func main() {
+	// Define command-line flags
 	logLevel := flag.String("log-level", "debug", "Log level")
 
 	flag.Usage = func() {
@@ -30,16 +29,21 @@ func main() {
 
 	flag.Parse()
 
+	// Set up logrus with the specified log level.
 	pl.SetUpLogrusAndSlog(*logLevel)
 
-	// set GOMAXPROCS
+	// Automatically adjust the GOMAXPROCS setting based on the number of available CPU cores.
 	if _, err := maxprocs.Set(); err != nil {
-		slog.Error("failed set max procs", err)
+		slog.Error("failed set maxprocs", err)
 		os.Exit(1)
 	}
 
-	if err := config.InitGlobal(); err != nil {
+	// Initialize global configurations by loading them from config/config.yml
+	if err, path := config.InitGlobal(); err != nil {
 		slog.Error("failed to init config", err)
+		os.Exit(1)
+	} else if err = config.InitPrometheusConfig(path); err != nil {
+		slog.Error("failed to init prometheus config", err)
 		os.Exit(1)
 	}
 
@@ -47,28 +51,46 @@ func main() {
 
 	host := cfg.BulletinBoard.Host
 	port := cfg.BulletinBoard.Port
+	// Construct the full URL for the Bulletin Board
 	url := fmt.Sprintf("https://%s:%d", host, port)
 
 	slog.Info("⚡ init Bulletin board")
 
-	bulletinBoard := bulletin_board.NewBulletinBoard(cfg)
+	// Create a new instance of the Bulletin Board with the current configuration.
+	bulletinBoard := bulletin_board.NewBulletinBoard()
 
+	// Start the Bulletin Board's main operations in a new goroutine
 	go func() {
-		err := bulletinBoard.StartRuns()
+		err := bulletinBoard.StartProtocol()
 		if err != nil {
 			slog.Error("failed to start runs", err)
 			config.GlobalCancel()
 		}
 	}()
 
-	http.HandleFunc("/registerNode", bulletinBoard.HandleRegisterNode)
+	// Create a channel to receive OS signals (like SIGINT or SIGTERM) to handle graceful shutdowns.
+	quit := make(chan os.Signal, 1)
+	// Notify the quit channel when specific OS signals are received.
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+
+	// Set up HTTP handlers
+	http.HandleFunc("/registerRelay", bulletinBoard.HandleRegisterRelay)
 	http.HandleFunc("/registerClient", bulletinBoard.HandleRegisterClient)
 	http.HandleFunc("/registerIntentToSend", bulletinBoard.HandleRegisterIntentToSend)
-	http.HandleFunc("/updateNode", bulletinBoard.HandleUpdateNodeInfo)
+	http.HandleFunc("/updateRelay", bulletinBoard.HandleUpdateRelayInfo)
+	http.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
+		slog.Info("Shutdown signal received")
+		quit <- os.Signal(syscall.SIGTERM) // signal shutdown
+		_, err := w.Write([]byte("Shutting down..."))
+		if err != nil {
+			slog.Error("Error", err)
+		}
+	})
 
+	// Start the HTTP server
 	go func() {
 		if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
-			if errors.Is(err, http.ErrServerClosed) {
+			if errors.Is(err, http.ErrServerClosed) { // Check if the server was closed intentionally (normal shutdown).
 				slog.Info("HTTP server closed")
 			} else {
 				slog.Error("failed to start HTTP server", err)
@@ -78,14 +100,12 @@ func main() {
 
 	slog.Info("🌏 starting bulletin board...", "address", url)
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-
+	// Wait for either an OS signal to quit or the global context to be canceled
 	select {
-	case v := <-quit:
+	case v := <-quit: // OS signal is received
 		config.GlobalCancel()
 		slog.Info("", "signal.Notify", v)
-	case done := <-config.GlobalCtx.Done():
+	case done := <-config.GlobalCtx.Done(): // global context is canceled
 		slog.Info("", "ctx.Done", done)
 	}
 }

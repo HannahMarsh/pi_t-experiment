@@ -19,7 +19,7 @@ type BulletinBoard struct {
 	Address string
 }
 
-type Node struct {
+type Relay struct {
 	ID             int    `yaml:"id"`
 	Host           string `yaml:"host"`
 	Port           int    `yaml:"port"`
@@ -42,18 +42,20 @@ type Metrics struct {
 }
 
 type Config struct {
-	ServerLoad     int           `yaml:"x"`
-	D              int           `yaml:"d"`
-	Delta          float64       `yaml:"delta"`
-	L1             int           `yaml:"l1"`
-	L2             int           `yaml:"l2"`
-	Chi            float64       `yaml:"chi"`
-	BulletinBoard  BulletinBoard `yaml:"bulletin_board"`
-	Nodes          []Node        `yaml:"nodes"`
-	Metrics        Metrics       `yaml:"metrics"`
-	Clients        []Client      `yaml:"clients"`
-	Vis            bool          `yaml:"vis"`
-	ScrapeInterval int           `yaml:"scrapeInterval"`
+	ServerLoad              int           `yaml:"x"`
+	D                       int           `yaml:"d"`
+	Delta                   float64       `yaml:"delta"`
+	L1                      int           `yaml:"l1"`
+	L2                      int           `yaml:"l2"`
+	Chi                     float64       `yaml:"chi"`
+	BulletinBoard           BulletinBoard `yaml:"bulletin_board"`
+	Relays                  []Relay       `yaml:"relays"`
+	Metrics                 Metrics       `yaml:"visualizer"`
+	Clients                 []Client      `yaml:"clients"`
+	Vis                     bool          `yaml:"vis"`
+	ScrapeInterval          int           `yaml:"scrapeInterval"`
+	DropAllOnionsFromClient int           `yaml:"dropAllOnionsFromClient"`
+	PrometheusPath          string        `yaml:"prometheusPath"`
 }
 
 var GlobalConfig *Config
@@ -61,30 +63,40 @@ var GlobalCtx context.Context
 var GlobalCancel context.CancelFunc
 var Names sync.Map
 
-func InitGlobal() error {
+func InitGlobal() (error, string) {
 	GlobalCtx, GlobalCancel = context.WithCancel(context.Background())
 
 	GlobalConfig = &Config{}
 
+	path := ""
+
 	if dir, err := os.Getwd(); err != nil {
-		return PrettyLogger.WrapError(err, "config.NewConfig(): global config error")
+		return PrettyLogger.WrapError(err, "config.NewConfig(): global config error"), ""
 	} else if err2 := cleanenv.ReadConfig(dir+"/config/config.yml", GlobalConfig); err2 != nil {
+
 		// Get the absolute path of the current file
 		_, currentFile, _, ok := runtime.Caller(0)
 		if !ok {
-			return PrettyLogger.NewError("Failed to get current file path")
+			return PrettyLogger.NewError("Failed to get current file path"), ""
 		}
 		currentDir := filepath.Dir(currentFile)
 		configFilePath := filepath.Join(currentDir, "/config.yml")
 		if err3 := cleanenv.ReadConfig(configFilePath, GlobalConfig); err3 != nil {
-			return PrettyLogger.WrapError(err3, "config.NewConfig(): global config error")
+			return PrettyLogger.WrapError(err3, "config.NewConfig(): global config error"), ""
+		} else {
+			path = configFilePath
 		}
-	} else if err3 := cleanenv.ReadEnv(GlobalConfig); err3 != nil {
-		return PrettyLogger.WrapError(err3, "config.NewConfig(): global config error")
+	} else {
+		path = dir + "/config/config.yml"
+		if err3 := cleanenv.ReadEnv(GlobalConfig); err3 != nil {
+			return PrettyLogger.WrapError(err3, "config.NewConfig(): global config error"), ""
+		}
 	}
-	// Update node addresses
-	for i := range GlobalConfig.Nodes {
-		GlobalConfig.Nodes[i].Address = fmt.Sprintf("http://%s:%d", GlobalConfig.Nodes[i].Host, GlobalConfig.Nodes[i].Port)
+
+	path = strings.ReplaceAll(path, "config.yml", "prometheus.yml")
+	// Update relay addresses
+	for i := range GlobalConfig.Relays {
+		GlobalConfig.Relays[i].Address = fmt.Sprintf("http://%s:%d", GlobalConfig.Relays[i].Host, GlobalConfig.Relays[i].Port)
 	}
 
 	// Update client addresses
@@ -94,7 +106,7 @@ func InitGlobal() error {
 
 	GlobalConfig.BulletinBoard.Address = fmt.Sprintf("http://%s:%d", GlobalConfig.BulletinBoard.Host, GlobalConfig.BulletinBoard.Port)
 	GlobalConfig.Metrics.Address = fmt.Sprintf("http://%s:%d", GlobalConfig.Metrics.Host, GlobalConfig.Metrics.Port)
-	return nil
+	return nil, path
 }
 
 func HostPortToName(host string, port int) string {
@@ -116,10 +128,10 @@ func AddressToName(address string) string {
 	if name, ok := Names.Load(address); ok {
 		return name.(string)
 	}
-	for _, node := range GlobalConfig.Nodes {
-		if address == node.Address {
-			name := fmt.Sprintf("%sNode %d%s", PurpleColor, node.ID, ResetColor)
-			//name := fmt.Sprintf("Node %d", node.ID)
+	for _, relay := range GlobalConfig.Relays {
+		if address == relay.Address {
+			name := fmt.Sprintf("%sRelay %d%s", PurpleColor, relay.ID, ResetColor)
+			//name := fmt.Sprintf("Relay %d", relay.ID)
 			Names.Store(address, name)
 			return name
 		}

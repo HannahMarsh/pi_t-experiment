@@ -47,9 +47,9 @@ func getAvailablePort() int {
 
 func TestReceiveOnionMultipleLayers(t *testing.T) {
 	for nnn := 0; nnn < 10; nnn++ {
-		pl.SetUpLogrusAndSlog("warn")
+		pl.SetUpLogrusAndSlog("Error")
 
-		if err := config.InitGlobal(); err != nil {
+		if err, _ := config.InitGlobal(); err != nil {
 			slog.Error("failed to init config", err)
 			os.Exit(1)
 		}
@@ -98,7 +98,7 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 			metadata[i] = onion_model.Metadata{Example: fmt.Sprintf("example%d", i)}
 		}
 
-		onions, err := pi_t.FORMONION(nodes[0].privateKeyPEM, string(payload), routingPath[:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys, metadata, d)
+		onions, err := pi_t.FORMONION(string(payload), routingPath[:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys, metadata, d)
 		if err != nil {
 			slog.Error("", err)
 			t.Fatalf("failed")
@@ -145,7 +145,7 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 							peeled.Sepal = peeled.Sepal.RemoveBlock()
 						}
 
-						err4 := SendOnion(nextDestination, nodes[i].address, peeled)
+						err4 := SendOnion(nextDestination, nodes[i].address, peeled, -1)
 						if err4 != nil {
 							slog.Error("SendOnion() error", err4)
 							t.Errorf("SendOnion() error = %v", err4)
@@ -237,7 +237,7 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 			}
 		}()
 
-		err = SendOnion(nodes[1].address, nodes[0].address, onions[0][0])
+		err = SendOnion(nodes[1].address, nodes[0].address, onions[0][0], -1)
 		if err != nil {
 			slog.Error("SendOnion() error", err)
 			t.Fatalf("SendOnion() error = %v", err)

@@ -18,12 +18,18 @@ var (
 	ONION_COUNT     = "onionCounter"
 	MSG_SENT        = "messageSentTimestamp"
 	MSG_RECEIVED    = "messageReceivedTimestamp"
+	ONION_SIZE      = "onionSize"
 )
 
 var collectors = map[string]prometheus.Collector{
 	PROCESSING_TIME: prometheus.NewHistogram(prometheus.HistogramOpts{
 		Name:    PROCESSING_TIME,
 		Help:    "Processing time of onions in seconds",
+		Buckets: prometheus.DefBuckets,
+	}),
+	ONION_SIZE: prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    ONION_SIZE,
+		Help:    "Size of onions in bytes",
 		Buckets: prometheus.DefBuckets,
 	}),
 	ONION_COUNT: prometheus.NewCounterVec(
@@ -75,6 +81,7 @@ func Inc(id string, labels ...any) {
 }
 
 func Set(id string, value float64, labels ...string) {
+	slog.Info("Setting", "id", id, "value", value, "labels", labels)
 	if labels == nil || len(labels) == 0 {
 		if collector, ok := collectors[id].(prometheus.Gauge); ok {
 			collector.Set(value)
@@ -99,13 +106,13 @@ func ServeMetrics(prometheusPort int, collectorIds ...string) (shutdown func()) 
 			pl.LogNewError("Failed to find collector with id: " + id)
 		}
 	}
-	// Create a new ServeMux and register the /metrics endpoint
+	// Create a new ServeMux and register the /visualizer endpoint
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", prometheusPort), // Bind to the specified port
-		Handler: mux,                                // Use the mux with the /metrics endpoint
+		Handler: mux,                                // Use the mux with the /visualizer endpoint
 	}
 
 	// Run the first server in a goroutine

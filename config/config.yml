@@ -1,12 +1,14 @@
 l1: 3         # Number of planned mixers in a routing path
 l2: 2         # Number of planned gatekeepers in a routing path
-x: 8          # Server load (x = Ω(polylog λ)) i.e. the expected number of onions per intermediary hop
+x: 25          # Server load (x = Ω(polylog λ)) i.e. the expected number of onions per intermediary hop
 tau: 0.8      # (τ < (1 − γ)(1 − X)) Fraction of checkpoints needed to progress local clock
 d: 2          # Threshold for number of bruises before an onion is discarded by a gatekeeper
 delta: 1e-5   # The probability of differential privacy violation due to the adversary's actions.
-chi: 0.3      # Fraction of corrupted relays (which perform no mixing)
+chi: 1.0      # Fraction of corrupted relays (which perform no mixing)
 vis: true     # Visualize the network
 scrapeInterval: 1000 # Prometheus scrape interval in milliseconds
+dropAllOnionsFromClient: 1 # Client ID to drop all onions from
+prometheusPath: '/opt/homebrew/bin/prometheus'
 
 
 metrics:
@@ -40,7 +42,7 @@ clients:
     host: 'localhost'
     port: 8106
     prometheus_port: 9106
-nodes:
+relays:
   - id: 1
     host: 'localhost'
     port: 8081

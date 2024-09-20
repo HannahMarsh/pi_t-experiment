@@ -35,7 +35,7 @@ func TestFormHeader(t *testing.T) {
 		if err != nil {
 			t.Fatalf("KeyGen() error: %v", err)
 		}
-		nodes[i] = node{privateKeyPEM, publicKeyPEM, fmt.Sprintf("node%d", i)}
+		nodes[i] = node{privateKeyPEM, publicKeyPEM, fmt.Sprintf("relay%d", i)}
 	}
 
 	secretMessage := "secret message"

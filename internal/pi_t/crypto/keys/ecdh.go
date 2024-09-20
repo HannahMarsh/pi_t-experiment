@@ -130,7 +130,7 @@ func DecodeHexKeys(hexKey1 string, hexKey2 string) ([32]byte, [32]byte, error) {
 
 // ComputeSharedKey computes the shared secret using the ECDH private key and a peer's public key.
 // Parameters:
-// - privKeyHex: The hex-encoded private key of the node.
+// - privKeyHex: The hex-encoded private key of the relay.
 // - pubKeyHex: The hex-encoded public key of the peer.
 // Returns:
 // - A byte slice representing the shared key.

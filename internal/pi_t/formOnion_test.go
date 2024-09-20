@@ -36,7 +36,7 @@ func TestFORMONION(t *testing.T) {
 		if err != nil {
 			t.Fatalf("KeyGen() error: %v", err)
 		}
-		nodes[i] = node{privateKeyPEM, publicKeyPEM, fmt.Sprintf("node%d", i)}
+		nodes[i] = node{privateKeyPEM, publicKeyPEM, fmt.Sprintf("relay%d", i)}
 	}
 
 	secretMessage := "secret message"
@@ -59,7 +59,7 @@ func TestFORMONION(t *testing.T) {
 		metadata[i] = onion_model.Metadata{Example: fmt.Sprintf("example%d", i)}
 	}
 
-	onions, err := FORMONION(nodes[0].privateKeyPEM, string(payload), routingPath[1:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys[1:], metadata, d)
+	onions, err := FORMONION(string(payload), routingPath[1:l1], routingPath[l1:len(routingPath)-1], routingPath[len(routingPath)-1], publicKeys[1:], metadata, d)
 	if err != nil {
 		slog.Error("", err)
 		t.Fatalf("failed")
