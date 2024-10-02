@@ -3,21 +3,6 @@ global:
     external_labels:
         monitor: pi_t
 scrape_configs:
-    - job_name: client-6
-      scrape_interval: 5s
-      static_configs:
-        - targets:
-            - localhost:9106
-    - job_name: client-1
-      scrape_interval: 5s
-      static_configs:
-        - targets:
-            - localhost:9101
-    - job_name: client-2
-      scrape_interval: 5s
-      static_configs:
-        - targets:
-            - localhost:9102
     - job_name: client-3
       scrape_interval: 5s
       static_configs:
@@ -33,16 +18,21 @@ scrape_configs:
       static_configs:
         - targets:
             - localhost:9105
-    - job_name: relay-2
+    - job_name: client-6
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:9202
-    - job_name: relay-3
+            - localhost:9106
+    - job_name: client-1
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:9203
+            - localhost:9101
+    - job_name: client-2
+      scrape_interval: 5s
+      static_configs:
+        - targets:
+            - localhost:9102
     - job_name: relay-4
       scrape_interval: 5s
       static_configs:
@@ -63,3 +53,13 @@ scrape_configs:
       static_configs:
         - targets:
             - localhost:9201
+    - job_name: relay-2
+      scrape_interval: 5s
+      static_configs:
+        - targets:
+            - localhost:9202
+    - job_name: relay-3
+      scrape_interval: 5s
+      static_configs:
+        - targets:
+            - localhost:9203

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
-	config2 "github.com/HannahMarsh/pi_t-experiment/config/runConfig"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/crypto/keys"
@@ -80,7 +79,7 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 			nodes[i] = node{privateKeyPEM, publicKeyPEM, fmt.Sprintf("http://localhost:%d", port), port}
 		}
 
-		slog.Info(strings.Join(utils.Map(nodes, func(n node) string { return config2.AddressToName(n.address) }), " -> "))
+		slog.Info(strings.Join(utils.Map(nodes, func(n node) string { return n.address }), " -> "))
 
 		secretMessage := "secret message"
 

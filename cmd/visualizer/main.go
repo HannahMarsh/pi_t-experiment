@@ -4,6 +4,10 @@ import (
 	_ "github.com/lib/pq"
 )
 
+func main() {
+
+}
+
 //
 //func main() {
 //	logLevel := flag.String("log-level", "debug", "Log level")
