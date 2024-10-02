@@ -9,6 +9,9 @@ type ClientView struct {
 	ID                       int
 	Address                  string
 	PublicKey                string
+	Host                     string
+	Port                     int
+	PromPort                 int
 	MessageQueue             []structs.PublicNodeApi
 	LastHeartbeat            time.Time
 	MaxTimeBetweenHeartbeats time.Duration
@@ -19,6 +22,9 @@ func NewClientView(c structs.PublicNodeApi, maxTimeBetweenHeartbeats time.Durati
 		ID:                       c.ID,
 		Address:                  c.Address,
 		PublicKey:                c.PublicKey,
+		Host:                     c.Host,
+		Port:                     c.Port,
+		PromPort:                 c.PrometheusPort,
 		MessageQueue:             make([]structs.PublicNodeApi, 0),
 		LastHeartbeat:            time.Now(),
 		MaxTimeBetweenHeartbeats: maxTimeBetweenHeartbeats,

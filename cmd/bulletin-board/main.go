@@ -39,22 +39,15 @@ func main() {
 	}
 
 	// Initialize global configurations by loading them from config/config.yml
-	if err, path := config.InitGlobal(); err != nil {
+	if err, _ := config.InitGlobal(); err != nil {
 		slog.Error("failed to init config", err)
-		os.Exit(1)
-	} else if err = config.InitPrometheusConfig(path); err != nil {
-		slog.Error("failed to init prometheus config", err)
 		os.Exit(1)
 	}
 
-	cfg := config.GlobalConfig
-
-	host := cfg.BulletinBoard.Host
-	port := cfg.BulletinBoard.Port
 	// Construct the full URL for the Bulletin Board
-	url := fmt.Sprintf("https://%s:%d", host, port)
+	url := fmt.Sprintf("https://%s:%d", config.GetBulletinBoardHost(), config.GetBulletinBoardPort())
 
-	slog.Info("⚡ init Bulletin board")
+	slog.Info("⚡ init Bulletin board", "url", url)
 
 	// Create a new instance of the Bulletin Board with the current configuration.
 	bulletinBoard := bulletin_board.NewBulletinBoard()
@@ -76,8 +69,9 @@ func main() {
 	// Set up HTTP handlers
 	http.HandleFunc("/registerRelay", bulletinBoard.HandleRegisterRelay)
 	http.HandleFunc("/registerClient", bulletinBoard.HandleRegisterClient)
-	http.HandleFunc("/registerIntentToSend", bulletinBoard.HandleRegisterIntentToSend)
+	//http.HandleFunc("/registerIntentToSend", bulletinBoard.HandleRegisterIntentToSend)
 	http.HandleFunc("/updateRelay", bulletinBoard.HandleUpdateRelayInfo)
+	http.HandleFunc("/updateConfig", bulletinBoard.HandleUpdateConfig)
 	http.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Shutdown signal received")
 		quit <- os.Signal(syscall.SIGTERM) // signal shutdown
@@ -89,7 +83,7 @@ func main() {
 
 	// Start the HTTP server
 	go func() {
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", config.GetBulletinBoardPort()), nil); err != nil {
 			if errors.Is(err, http.ErrServerClosed) { // Check if the server was closed intentionally (normal shutdown).
 				slog.Info("HTTP server closed")
 			} else {
@@ -104,8 +98,10 @@ func main() {
 	select {
 	case v := <-quit: // OS signal is received
 		config.GlobalCancel()
+		bulletinBoard.Shutdown()
 		slog.Info("", "signal.Notify", v)
 	case done := <-config.GlobalCtx.Done(): // global context is canceled
 		slog.Info("", "ctx.Done", done)
+		bulletinBoard.Shutdown()
 	}
 }

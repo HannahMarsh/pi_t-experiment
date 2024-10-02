@@ -16,7 +16,7 @@ func GetCheckpoints(relays, clients []structs.PublicNodeApi) map[int][]structs.C
 	numRelays := len(relays)
 
 	// Calculate the expected number of checkpoint onions each client should send based on the server load.
-	expectedToSend := int((float64(numRelays)*float64(config.GlobalConfig.ServerLoad))/float64(numClients)) - 1
+	expectedToSend := int((float64(numRelays)*float64(config.GetServerLoad()))/float64(numClients)) - 1
 
 	for _, client := range clients {
 		checkpoints[client.ID] = make([]structs.CheckpointOnion, 0)
@@ -25,7 +25,7 @@ func GetCheckpoints(relays, clients []structs.PublicNodeApi) map[int][]structs.C
 			path := make([]structs.Checkpoint, 0)
 
 			// Generate the relay path for the checkpoint onion, which includes L1 mixers and L2 gatekeepers.
-			for j := 0; j < config.GlobalConfig.L1+config.GlobalConfig.L2; j++ {
+			for j := 0; j < config.GetL1()+config.GetL2(); j++ {
 				path = append(path, structs.Checkpoint{
 					Receiver: utils.RandomElement(relays), // Randomly select a node as the receiver for this layer.
 					Nonce:    uuid.New().String(),         // Generate a new UUID to use as the nonce for this layer.

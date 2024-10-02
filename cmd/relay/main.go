@@ -8,6 +8,7 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/metrics"
 	"github.com/HannahMarsh/pi_t-experiment/internal/model/relay"
+	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"go.uber.org/automaxprocs/maxprocs"
 	"log/slog"
 	"net/http"
@@ -21,8 +22,11 @@ import (
 
 func main() {
 	// Define command-line flags
-	id := flag.Int("id", -1, "ID of the new relay (required)")
-	logLevel := flag.String("log-level", "debug", "Log level")
+	id_ := flag.Int("id", -1, "ID of the newClient (required)")
+	ip_ := flag.String("host", "x", "IP address of the relay")
+	port_ := flag.Int("port", 8080, "Port of the client")
+	promPort_ := flag.Int("promPort", 8200, "Port of the relay's Prometheus metrics")
+	logLevel_ := flag.String("log-level", "debug", "Log level")
 
 	flag.Usage = func() {
 		if _, err := fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0]); err != nil {
@@ -33,15 +37,30 @@ func main() {
 
 	flag.Parse()
 
+	id := *id_
+	ip := *ip_
+	port := *port_
+	promPort := *promPort_
+	logLevel := *logLevel_
+
+	pl.SetUpLogrusAndSlog(logLevel)
+
 	// Check if the required flag is provided
-	if *id == -1 {
+	if id == -1 {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: the -id flag is required\n")
 		flag.Usage()
 		os.Exit(2)
 	}
 
-	// Set up logrus with the specified log level.
-	pl.SetUpLogrusAndSlog(*logLevel)
+	if ip == "x" {
+		IP, err := utils.GetPublicIP()
+		if err != nil {
+			slog.Error("failed to get public IP", err)
+			os.Exit(1)
+		}
+		slog.Info("", "IP", IP.IP, "Hostname", IP.HostName, "City", IP.City, "Region", IP.Region, "Country", IP.Country, "Location", IP.Location, "Org", IP.Org, "Postal", IP.Postal, "Timezone", IP.Timezone, "ReadMe", IP.ReadMe)
+		ip = IP.IP
+	}
 
 	// Automatically adjust the GOMAXPROCS setting based on the number of available CPU cores.
 	if _, err := maxprocs.Set(); err != nil {
@@ -55,31 +74,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	cfg := config.GlobalConfig
-
-	// Find the relay configuration that matches the provided ID.
-	var relayConfig *config.Relay
-	for _, r := range cfg.Relays {
-		if r.ID == *id {
-			relayConfig = &r
-			break
-		}
-	}
-
-	if relayConfig == nil {
-		slog.Error("invalid id", errors.New(fmt.Sprintf("failed to get newRelay config for id=%d", *id)))
-		os.Exit(1)
-	}
-
-	slog.Info("⚡ init newRelay", "id", *id)
-
-	// Construct the full URL for the Bulletin Board
-	bulletinBoardAddress := fmt.Sprintf("http://%s:%d", cfg.BulletinBoard.Host, cfg.BulletinBoard.Port)
+	slog.Info("⚡ init newRelay", "id", id)
 
 	var newRelay *relay.Relay
 	// Attempt to create a new relay instance, retrying every 5 seconds upon failure (in case the bulletin board isn't ready yet).
 	for {
-		if n, err := relay.NewRelay(relayConfig.ID, relayConfig.Host, relayConfig.Port, bulletinBoardAddress); err != nil {
+		if n, err := relay.NewRelay(id, ip, port, promPort, config.GetBulletinBoardAddress()); err != nil {
 			slog.Error("failed to create newRelay. Trying again in 5 seconds. ", err)
 			time.Sleep(5 * time.Second)
 			continue
@@ -109,11 +109,11 @@ func main() {
 	})
 
 	// Serve Prometheus metrics in a separate goroutine.
-	shutdownMetrics := metrics.ServeMetrics(relayConfig.PrometheusPort, metrics.PROCESSING_TIME, metrics.ONION_COUNT, metrics.ONION_SIZE)
+	shutdownMetrics := metrics.ServeMetrics(promPort, metrics.PROCESSING_TIME, metrics.ONION_COUNT, metrics.ONION_SIZE)
 
 	// Start the HTTP server
 	go func() {
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", relayConfig.Port), nil); err != nil {
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
 			if errors.Is(err, http.ErrServerClosed) {
 				slog.Info("HTTP server closed")
 			} else {
@@ -122,7 +122,7 @@ func main() {
 		}
 	}()
 
-	slog.Info("🌏 start newRelay...", "address", fmt.Sprintf("http://%s:%d", relayConfig.Host, relayConfig.Port))
+	slog.Info("🌏 start newRelay...", "address", fmt.Sprintf("http://%s:%d", ip, port))
 
 	// Wait for either an OS signal to quit or the global context to be canceled
 	select {

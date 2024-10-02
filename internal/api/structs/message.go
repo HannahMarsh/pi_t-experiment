@@ -5,10 +5,10 @@ import (
 )
 
 type Message struct {
-	From string `json:"from"`
-	To   string `json:"to"`
+	From string `json:"f"`
+	To   string `json:"t"`
 	Msg  string `json:"msg"`
-	Hash string `json:"hash"`
+	Hash string `json:"h"`
 }
 
 func NewMessage(from, to, msg string) Message {

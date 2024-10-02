@@ -10,6 +10,9 @@ type RelayView struct {
 	ID                       int
 	Address                  string
 	PublicKey                string
+	Host                     string
+	Port                     int
+	PromPort                 int
 	mu                       sync.RWMutex
 	LastHeartbeat            time.Time
 	MaxTimeBetweenHeartbeats time.Duration
@@ -20,6 +23,9 @@ func NewNodeView(n structs.PublicNodeApi, maxTimeBetweenHeartbeats time.Duration
 		ID:                       n.ID,
 		Address:                  n.Address,
 		PublicKey:                n.PublicKey,
+		Host:                     n.Host,
+		Port:                     n.Port,
+		PromPort:                 n.PrometheusPort,
 		LastHeartbeat:            n.Time,
 		MaxTimeBetweenHeartbeats: maxTimeBetweenHeartbeats,
 	}

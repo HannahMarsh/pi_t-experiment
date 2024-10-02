@@ -8,6 +8,7 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/metrics"
 	"github.com/HannahMarsh/pi_t-experiment/internal/model/client"
+	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"go.uber.org/automaxprocs/maxprocs"
 	"log/slog"
 	"net/http"
@@ -21,8 +22,11 @@ import (
 
 func main() {
 	// Define command-line flags
-	id := flag.Int("id", -1, "ID of the newClient (required)")
-	logLevel := flag.String("log-level", "debug", "Log level")
+	id_ := flag.Int("id", -1, "ID of the newClient (required)")
+	ip_ := flag.String("host", "x", "IP address of the client")
+	port_ := flag.Int("port", 8080, "Port of the client")
+	promPort_ := flag.Int("promPort", 8200, "Port of the client's Prometheus metrics")
+	logLevel_ := flag.String("log-level", "debug", "Log level")
 
 	flag.Usage = func() {
 		if _, err := fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0]); err != nil {
@@ -33,15 +37,30 @@ func main() {
 
 	flag.Parse()
 
+	id := *id_
+	ip := *ip_
+	port := *port_
+	promPort := *promPort_
+	logLevel := *logLevel_
+
+	pl.SetUpLogrusAndSlog(logLevel)
+
 	// Check if the required flag is provided
-	if *id == -1 {
+	if id == -1 {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: the -id flag is required\n")
 		flag.Usage()
 		os.Exit(2)
 	}
 
-	// Set up logrus with the specified log level.
-	pl.SetUpLogrusAndSlog(*logLevel)
+	if ip == "x" {
+		IP, err := utils.GetPublicIP()
+		if err != nil {
+			slog.Error("failed to get public IP", err)
+			os.Exit(1)
+		}
+		slog.Info("", "IP", IP.IP, "Hostname", IP.HostName, "City", IP.City, "Region", IP.Region, "Country", IP.Country, "Location", IP.Location, "Org", IP.Org, "Postal", IP.Postal, "Timezone", IP.Timezone, "ReadMe", IP.ReadMe)
+		ip = IP.IP
+	}
 
 	// Automatically adjust the GOMAXPROCS setting based on the number of available CPU cores.
 	if _, err := maxprocs.Set(); err != nil {
@@ -55,31 +74,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	cfg := config.GlobalConfig
-
-	// Find the client configuration that matches the provided ID.
-	var clientConfig *config.Client
-	for _, c := range cfg.Clients {
-		if c.ID == *id {
-			clientConfig = &c
-			break
-		}
-	}
-
-	if clientConfig == nil {
-		pl.LogNewError("Invalid id. Failed to get newClient config for id=%d", *id)
-		os.Exit(1)
-	}
-
-	slog.Info("⚡ init newClient", "id", *id)
-
-	// Construct the full URL for the Bulletin Board
-	bulletinBoardAddress := fmt.Sprintf("http://%s:%d", cfg.BulletinBoard.Host, cfg.BulletinBoard.Port)
+	slog.Info("⚡ init newClient", "id", id)
 
 	var newClient *client.Client
 	// Attempt to create a new client instance, retrying every 5 seconds upon failure (in case the bulletin board isn't ready yet).
 	for {
-		if n, err := client.NewClient(clientConfig.ID, clientConfig.Host, clientConfig.Port, bulletinBoardAddress); err != nil {
+		if n, err := client.NewClient(id, ip, port, promPort, config.GetBulletinBoardAddress()); err != nil {
 			slog.Error("failed to create new c. Trying again in 5 seconds. ", err)
 			time.Sleep(5 * time.Second)
 			continue
@@ -109,22 +109,19 @@ func main() {
 	})
 
 	// Serve Prometheus metrics in a separate goroutine.
-	shutdownMetrics := metrics.ServeMetrics(clientConfig.PrometheusPort, metrics.MSG_SENT, metrics.MSG_RECEIVED, metrics.ONION_SIZE)
+	shutdownMetrics := metrics.ServeMetrics(promPort, metrics.MSG_SENT, metrics.MSG_RECEIVED, metrics.ONION_SIZE)
 
 	// Start the HTTP server
 	go func() {
 		// Construct the address for the HTTP server based on the client's port.
-		address := fmt.Sprintf(":%d", clientConfig.Port)
+		address := fmt.Sprintf(":%d", port)
 		// Attempt to start the HTTP server.
 		if err2 := http.ListenAndServe(address, nil); err2 != nil && !errors.Is(err2, http.ErrServerClosed) {
 			slog.Error("failed to start HTTP server", err2)
 		}
 	}()
 
-	slog.Info("🌏 start newClient...", "address", fmt.Sprintf("http://%s:%d", clientConfig.Host, clientConfig.Port))
-
-	// Start generating messages in a separate goroutine.
-	go newClient.StartGeneratingMessages()
+	slog.Info("🌏 start newClient...", "address", fmt.Sprintf("http://%s:%d", ip, port))
 
 	// Wait for either an OS signal to quit or the global context to be canceled
 	select {
