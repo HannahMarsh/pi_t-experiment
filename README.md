@@ -73,12 +73,12 @@ view when Alice sends a message to Carol instead.
 ### Parameters
 (_also defined in [/config/config.yml](config/config.yml)_)
 
+- **$N$**: The minimum number of clients.
+- **$n$**: The minimum number of relays.
 - **$x$**: Server load (i.e. the expected number of onions each relay processes per round).
 - **$\ell_1$**: The number of mixers in each routing path.
 - **$\ell_2$**: The number of gatekeepers in each routing path.
 - **$L$**: The number of rounds (also the length of the routing path, equal to $`\ell_1 + \ell_2 + 1`$ ).
-- **$R$**: The number of participating relays.
-- **$N$**: The number of participating clients.
 - **$d$**: The number of non-null key-blocks in $S_1$. (thus $d$ is the threshold for number of bruises before an onion is discard by a gatekeeper).
 - **$\tau$**: ( $\tau \lt \(1 − \gamma\)\(1 − \chi\)$ ) The fraction of expected checkpoint onions needed for a relay to progress its local clock.
 - **$\epsilon$**: The privacy loss in the worst case scenario.
@@ -87,6 +87,8 @@ view when Alice sends a message to Carol instead.
 - **$\theta$**: The maximum fraction of bruisable layers that can be bruised before the innermost tulip bulb becomes 
   unrecoverable. Note that $d = \theta \cdot \ell_1$
 - **$\chi$**: The fraction of $N$ relays that can be corrupted and controlled by the adversary (the subset is chosen prior to execution). Note that $\chi \lt \theta - 0.5$ and $\chi \lt \frac{d}{\ell_1} - 0.5$
+- **`BulletinBoardUrl`**: The IP address and port of the bulletin board.
+- **`MetricsPort`**: The port that all aggregated metrics are served (on the Bulletin board's IP address).
 
 ### No Global Clock:
 
@@ -522,7 +524,7 @@ go test -v ./...
 Usage
 -----  
 
-All configurations are set in the [`config/config.yaml`](config/config/yaml) file.
+All configurations are initialized in the [`config/config.yaml`](config/config/yaml) file.
 
 ### Running the Bulletin Board
 
@@ -535,35 +537,26 @@ go run cmd/bulletin-board/main.go -logLevel=<logLevel>
 ### Running a Relay
 
 ```bash  
-go run cmd/relay/main.go -id=<id> -logLevel=<logLevel>
+go run cmd/relay/main.go -id=<id> -host=<host> -port=<port> -promPort=<promPort> -logLevel=<logLevel>
 ```  
 - Options:
   - `<id>`: The unique identifier for the relay.
+  - `<host>`: (optional) The public host IP for the relay. If not given, the public IP will be retrieved automatically.
+  - `<port>`: The port number for the relay.
+  - `<promPort>`: The port number for scraping the relay's Prometheus metrics.
   - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
 
 ### Running a Client
 
 ```bash  
-go run cmd/client/main.go -id=<id> -logLevel=<logLevel>
+go run cmd/client/main.go -id=<id> -host=<host> -port=<port> -promPort=<promPort> -logLevel=<logLevel>
 ```  
 - Options:
   - `<id>`: The unique identifier for the client.
+  - `<host>`: (optional) The public host IP for the client. If not given, the public IP will be retrieved automatically.
+  - `<port>`: The port number for the client.
+  - `<promPort>`: The port number for scraping the client's Prometheus metrics.
   - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
-
-### Running the Metric Collector (Scrapes Prometheus endpoints for Clients and relays)
-```bash
-go run cmd/metrics/main.go -logLevel=<slogLevel>
-```
-- Options:
-  - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
-
-### Running the Browser-Based Visualization Server
-
-```bash  
-go run cmd/visualizer/visualizer.go -port <port>
-```  
-- Options:
-  - `<port>`: The port number for the visualization server. Access at `http://localhost:<port>`.
 
 ## Endpoints
 
@@ -571,24 +564,14 @@ go run cmd/visualizer/visualizer.go -port <port>
 
 - **Register Client**: `POST /registerClient`
 - **Register Relay**: `POST /registerRelay`
+- **Updating config with new parameters (for next run)**: `POST /updateConfig`
 
 ### Relay & Client
 
 - **Receive Onion**: `POST /receive`
 - **Get Status**: `GET /status`
 - **Start Run**: `POST /start`
-- **Prometheus Metrics**: `GET /metrics` - Note that this is served on a different port which is specified in the [config.yml](/config/config.yml) file
-
-When implementing the onion routing protocol, it helps to run the visualization server
-in real time to view the messages and onions processes by each client and relay. For a small number of clients/relays, this makes 
-debugging the protocol easier.
-
-Obviously, it is not recommended to run the visualization program once we deploy the simulation in a distributed environment (with potentially hundreds of relays and rounds). 
-
-![](img/vis.png)
-
-![](img/demo.gif)
-
+- **Prometheus Metrics**: `GET /metrics` - Note that this is served on a different port
 
 ---
 
