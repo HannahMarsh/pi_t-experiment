@@ -5,7 +5,7 @@ go 1.21
 //toolchain go1.21.2
 
 require (
-	github.com/HannahMarsh/PrettyLogger v1.0.2
+	github.com/HannahMarsh/PrettyLogger v1.0.3
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.12.0
 	github.com/ilyakaznacheev/cleanenv v1.3.0

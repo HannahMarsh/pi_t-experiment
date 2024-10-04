@@ -14,7 +14,6 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"io"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -31,6 +30,7 @@ type Relay struct {
 	Address             string                      // Full address of the relay in the form http://host:port.
 	PrivateKey          string                      // Relay's private key for decryption.
 	PublicKey           string                      // Relay's public key for encryption.
+	PrometheusPort      int                         // Port number for Prometheus metrics.
 	BulletinBoardUrl    string                      // URL of the bulletin board for relay registration and communication.
 	lastUpdate          time.Time                   // Timestamp of the last update sent to the bulletin board.
 	status              *structs.NodeStatus         // Relay status, including received onions and checkpoints.
@@ -43,34 +43,15 @@ type Relay struct {
 }
 
 // NewRelay creates a new relay instance with a unique ID, host, and port.
-func NewRelay(id int, host string, port int, bulletinBoardUrl string) (*Relay, error) {
+func NewRelay(id int, host string, port int, promPort int, bulletinBoardUrl string) (*Relay, error) {
 	// Generate a key pair (private and public) for the relay.
 	if privateKey, publicKey, err := keys.KeyGen(); err != nil {
 		return nil, pl.WrapError(err, "relay.NewClient(): failed to generate key pair")
 	} else {
 		// Initialize a list of expected nonces for each layer.
-		expectedCheckpoints := make([]map[string]bool, config.GlobalConfig.L1+config.GlobalConfig.L2+1)
+		expectedCheckpoints := make([]map[string]bool, config.GetL1()+config.GetL2()+1)
 		for i := range expectedCheckpoints {
 			expectedCheckpoints[i] = make(map[string]bool)
-		}
-
-		// Determine if the relay is corrupted based on the configuration's corruption rate (Chi).
-		numCorrupted := int(config.GlobalConfig.Chi * float64(len(config.GlobalConfig.Relays)))
-		corruptedNodes := utils.PseudoRandomSubset(config.GlobalConfig.Relays, numCorrupted, 42)
-		slog.Debug("", "corrupted nodes", strings.Join(utils.Map(corruptedNodes, func(node config.Relay) string { return fmt.Sprintf("%d", node.ID) }), ", "))
-		isCorrupted := utils.Contains(corruptedNodes, func(node config.Relay) bool {
-			return node.ID == id
-		})
-
-		addressToDropFrom := ""
-
-		// If the relay is corrupted, set the address to drop all onions from (specified in the configuration)
-		if isCorrupted {
-			if c := utils.Find(config.GlobalConfig.Clients, func(client config.Client) bool {
-				return client.ID == config.GlobalConfig.DropAllOnionsFromClient
-			}); c != nil {
-				addressToDropFrom = c.Address
-			}
 		}
 
 		n := &Relay{
@@ -80,12 +61,11 @@ func NewRelay(id int, host string, port int, bulletinBoardUrl string) (*Relay, e
 			Port:                port,
 			PublicKey:           publicKey,
 			PrivateKey:          privateKey,
+			PrometheusPort:      promPort,
 			BulletinBoardUrl:    bulletinBoardUrl,
-			status:              structs.NewNodeStatus(id, fmt.Sprintf("http://%s:%d", host, port), publicKey),
+			status:              structs.NewNodeStatus(id, port, promPort, fmt.Sprintf("http://%s:%d", host, port), host, publicKey),
 			checkpointsReceived: &cm.ConcurrentMap[int, int]{},
 			expectedNonces:      expectedCheckpoints,
-			isCorrupted:         isCorrupted,
-			addressToDropFrom:   addressToDropFrom,
 		}
 		n.wg.Add(1)
 
@@ -109,10 +89,13 @@ func (n *Relay) GetStatus() string {
 // getPublicNodeInfo returns the relay's public information in the form of a PublicNodeApi struct.
 func (n *Relay) getPublicNodeInfo() structs.PublicNodeApi {
 	return structs.PublicNodeApi{
-		ID:        n.ID,
-		Address:   n.Address,
-		PublicKey: n.PublicKey,
-		Time:      time.Now(),
+		ID:             n.ID,
+		Address:        n.Address,
+		PublicKey:      n.PublicKey,
+		PrometheusPort: n.PrometheusPort,
+		Host:           n.Host,
+		Port:           n.Port,
+		Time:           time.Now(),
 	}
 }
 
@@ -135,6 +118,30 @@ func (n *Relay) startRun(start structs.RelayStartRunApi) (didParticipate bool, e
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	defer n.wg.Done()
+
+	config.UpdateConfig(start.Config) // Update the global configuration based on the start signal.
+
+	// Determine if the relay is corrupted based on the configuration's corruption rate (Chi).
+	numRelays := utils.Max(config.GetMinimumRelays(), n.ID)
+	numCorrupted := int(config.GetChi() * float64(numRelays))
+	corruptedNodes := utils.PseudoRandomSubset(utils.NewIntArray(1, numRelays), numCorrupted, 42)
+	isCorrupted := utils.Contains(corruptedNodes, func(id int) bool {
+		return id == n.ID
+	})
+
+	addressToDropFrom := ""
+	//
+	//// If the relay is corrupted, set the address to drop all onions from (specified in the configuration)
+	//if isCorrupted {
+	//	if c := utils.Find(config.flobalConfig.Clients, func(client config2.Client) bool {
+	//		return client.ID == config.flobalConfig.DropAllOnionsFromClient
+	//	}); c != nil {
+	//		addressToDropFrom = c.Address
+	//	}
+	//}
+
+	n.isCorrupted = isCorrupted
+	n.addressToDropFrom = addressToDropFrom
 
 	// Iterate over the checkpoints in the start signal to record the expected nonces.
 	for _, c := range start.Checkpoints {
@@ -195,7 +202,7 @@ func (n *Relay) Receive(oApi structs.OnionApi) error {
 		peeled.Sepal = peeled.Sepal.RemoveBlock() // If not a checkpoint, remove the block from the onion.
 	}
 
-	slog.Info("Received onion", "ischeckpoint?", metadata.Nonce != "", "layer", layer, "nextHop", config.AddressToName(nextHop))
+	slog.Info("Received onion", "ischeckpoint?", metadata.Nonce != "", "layer", layer, "nextHop", nextHop)
 
 	n.status.AddOnion(oApi.From, n.Address, nextHop, layer, isCheckpoint, !wasBruised)
 
@@ -257,10 +264,13 @@ func (n *Relay) updateBulletinBoard(endpoint string, expectedStatusCode int) err
 
 	// Marshal the relay's public information into JSON.
 	if data, err := json.Marshal(structs.PublicNodeApi{
-		ID:        n.ID,
-		Address:   n.Address,
-		PublicKey: n.PublicKey,
-		Time:      t,
+		ID:             n.ID,
+		Address:        n.Address,
+		PublicKey:      n.PublicKey,
+		PrometheusPort: n.PrometheusPort,
+		Host:           n.Host,
+		Port:           n.Port,
+		Time:           t,
 	}); err != nil {
 		return pl.WrapError(err, "relay.UpdateBulletinBoard(): failed to marshal relay info")
 	} else {

@@ -7,6 +7,7 @@ import (
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
+	"github.com/HannahMarsh/pi_t-experiment/internal/model/bulletin_board/metrics"
 	"net/http"
 	"sync"
 	"time"
@@ -54,30 +55,41 @@ func (bb *BulletinBoard) RegisterClient(client structs.PublicNodeApi) {
 	defer bb.mu.Unlock()
 
 	// If the client is not already present in the Clients map, create a new ClientView for it.
-	if _, present := bb.Clients[client.ID]; !present {
-		bb.Clients[client.ID] = NewClientView(client, time.Second*10)
-	}
+	//if _, present := bb.Clients[client.ID]; !present {
+	bb.Clients[client.ID] = NewClientView(client, time.Second*10)
+	//}
 	return
 }
 
 // RegisterIntentToSend records a client's intent to send a message, updating the active client list accordingly.
-func (bb *BulletinBoard) RegisterIntentToSend(its structs.IntentToSend) error {
+//func (bb *BulletinBoard) RegisterIntentToSend(its structs.IntentToSend) error {
+//	bb.mu.Lock()
+//	defer bb.mu.Unlock()
+//
+//	// Ensure the sender is registered in the Clients map.
+//	if _, present := bb.Clients[its.From.ID]; !present {
+//		bb.Clients[its.From.ID] = NewClientView(its.From, time.Second*10)
+//	} else {
+//		// Register any additional client in the 'To' field of the IntentToSend.
+//		for _, client := range its.To {
+//			if _, present = bb.Clients[client.ID]; !present {
+//				bb.Clients[client.ID] = NewClientView(client, time.Second*10)
+//			}
+//		}
+//	}
+//	// Update the sender's ClientView with the intent to send data.
+//	bb.Clients[its.From.ID].UpdateClient(its)
+//	return nil
+//}
+
+func (bb *BulletinBoard) Shutdown() error {
 	bb.mu.Lock()
 	defer bb.mu.Unlock()
 
-	// Ensure the sender is registered in the Clients map.
-	if _, present := bb.Clients[its.From.ID]; !present {
-		bb.Clients[its.From.ID] = NewClientView(its.From, time.Second*10)
-	} else {
-		// Register any additional client in the 'To' field of the IntentToSend.
-		for _, client := range its.To {
-			if _, present = bb.Clients[client.ID]; !present {
-				bb.Clients[client.ID] = NewClientView(client, time.Second*10)
-			}
-		}
+	if err := metrics.StopPrometheus(); err != nil {
+		return pl.WrapError(err, "error stopping Prometheus")
 	}
-	// Update the sender's ClientView with the intent to send data.
-	bb.Clients[its.From.ID].UpdateClient(its)
+
 	return nil
 }
 
@@ -109,10 +121,13 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 		return node.IsActive() && node.Address != ""
 	}), func(_ int, nv *RelayView) structs.PublicNodeApi {
 		return structs.PublicNodeApi{
-			ID:        nv.ID,
-			Address:   nv.Address,
-			PublicKey: nv.PublicKey,
-			Time:      nv.LastHeartbeat,
+			ID:             nv.ID,
+			Address:        nv.Address,
+			PublicKey:      nv.PublicKey,
+			Host:           nv.Host,
+			Port:           nv.Port,
+			PrometheusPort: nv.PromPort,
+			Time:           nv.LastHeartbeat,
 		}
 	})
 
@@ -121,14 +136,19 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 		return cl.IsActive() && cl.Address != ""
 	}), func(_ int, cv *ClientView) structs.PublicNodeApi {
 		return structs.PublicNodeApi{
-			ID:        cv.ID,
-			Address:   cv.Address,
-			PublicKey: cv.PublicKey,
+			ID:             cv.ID,
+			Address:        cv.Address,
+			PublicKey:      cv.PublicKey,
+			Host:           cv.Host,
+			Port:           cv.Port,
+			PrometheusPort: cv.PromPort,
 		}
 	})
 
 	// Generate checkpoint onions for the run based on the desired server load from the global configuration
 	checkpoints := GetCheckpoints(activeNodes, activeClients)
+
+	cfg := config.GetConfig()
 
 	// Prepare start signals for each client, including checkpoints.
 	clientStartSignals := make(map[structs.PublicNodeApi]structs.ClientStartRunApi)
@@ -137,6 +157,7 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 			Clients:          activeClients,
 			Relays:           activeNodes,
 			CheckpointOnions: checkpoints[client.ID],
+			Config:           cfg,
 		}
 		clientStartSignals[client] = csr
 	}
@@ -155,12 +176,18 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 	for _, node := range activeNodes {
 		nodeStartSignals[node] = structs.RelayStartRunApi{
 			Checkpoints: allCheckpoints[node.ID],
+			Config:      cfg,
 		}
 	}
 
 	// Synchronize the completion of signaling all nodes.
 	var wg sync.WaitGroup
 	wg.Add(len(activeNodes) + len(activeClients))
+
+	if err := metrics.RestartPrometheus(activeNodes, activeClients); err != nil {
+		slog.Error("Error restarting Prometheus", err)
+		return pl.WrapError(err, "error restarting Prometheus")
+	}
 
 	// Signal all active client to start the run.
 	for client, csr := range clientStartSignals {
@@ -218,19 +245,19 @@ func (bb *BulletinBoard) allNodesReady() bool {
 	})
 
 	// If the number of active relays is less than required, log and return false.
-	if activeNodes < len(config.GlobalConfig.Relays) {
-		slog.Info("Not all nodes are registered")
+	if activeNodes < config.GetMinimumRelays() {
+		slog.Info("Not all nodes are registered.", "registered", activeNodes, "min required", config.GetMinimumRelays())
 		return false
 	}
 
 	// Count the number of client that have registered intent to send messages.
 	registeredClients := utils.CountAny(utils.GetValues(bb.Clients), func(client *ClientView) bool {
-		return client.MessageQueue != nil && len(client.MessageQueue) > 0
+		return true // client.MessageQueue != nil && len(client.MessageQueue) > 0
 	})
 
 	// If the number of registered client is less than required, log and return false.
-	if registeredClients < len(config.GlobalConfig.Clients) {
-		slog.Info("Not all client are registered")
+	if registeredClients < config.GetMinimumClients() {
+		slog.Info("Not all client are registered.", "registered", registeredClients, "min required", config.GetMinimumClients())
 		return false
 	}
 

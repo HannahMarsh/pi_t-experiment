@@ -28,14 +28,17 @@ type OnionStatus struct {
 	NonceVerification bool
 }
 
-func NewNodeStatus(id int, address, publicKey string) *NodeStatus {
+func NewNodeStatus(id, port, promPort int, address, host, publicKey string) *NodeStatus {
 	return &NodeStatus{
 		Received: make([]OnionStatus, 0),
 		Node: PublicNodeApi{
-			ID:        id,
-			Address:   address,
-			PublicKey: publicKey,
-			Time:      time.Now(),
+			ID:             id,
+			Address:        address,
+			PublicKey:      publicKey,
+			Host:           host,
+			Port:           port,
+			PrometheusPort: promPort,
+			Time:           time.Now(),
 		},
 		CheckpointOnionsReceived: make(map[int]int),
 		ExpectedCheckpoints:      make(map[int]int),
@@ -44,7 +47,7 @@ func NewNodeStatus(id int, address, publicKey string) *NodeStatus {
 }
 
 func (ns *NodeStatus) AddCheckpointOnion(layer int) {
-	if config.GlobalConfig.Vis {
+	if config.GetVis() {
 		ns.mu.Lock()
 		defer ns.mu.Unlock()
 		ns.CheckpointOnionsReceived[layer]++
@@ -52,7 +55,7 @@ func (ns *NodeStatus) AddCheckpointOnion(layer int) {
 }
 
 func (ns *NodeStatus) AddExpectedCheckpoint(layer int) {
-	if config.GlobalConfig.Vis {
+	if config.GetVis() {
 		ns.mu.Lock()
 		defer ns.mu.Unlock()
 		ns.ExpectedCheckpoints[layer]++
@@ -60,7 +63,7 @@ func (ns *NodeStatus) AddExpectedCheckpoint(layer int) {
 }
 
 func (ns *NodeStatus) AddOnion(lastHop, thisAddress, nextHop string, layer int, isCheckPointOnion bool, wasBruised bool) {
-	if config.GlobalConfig.Vis {
+	if config.GetVis() {
 		ns.mu.Lock()
 		defer ns.mu.Unlock()
 		ns.Received = append(ns.Received, OnionStatus{
@@ -77,7 +80,7 @@ func (ns *NodeStatus) AddOnion(lastHop, thisAddress, nextHop string, layer int, 
 }
 
 func (ns *NodeStatus) GetStatus() string {
-	if config.GlobalConfig.Vis {
+	if config.GetVis() {
 		ns.mu.RLock()
 		defer ns.mu.RUnlock()
 		if str, err := json.Marshal(ns); err != nil {

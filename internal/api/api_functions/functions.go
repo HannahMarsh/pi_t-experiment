@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
-	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"github.com/HannahMarsh/pi_t-experiment/internal/metrics"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/onion_model"
@@ -20,7 +19,7 @@ import (
 
 // sendOnion sends an onion to the specified address with compression and timeout
 func SendOnion(to, from string, o onion_model.Onion, layer int) error {
-	slog.Debug("Sending onion...", "from", config.AddressToName(from), "to", config.AddressToName(to))
+	slog.Debug("Sending onion...", "from", from, "to", to)
 	url := fmt.Sprintf("%s/receive", to)
 
 	data, err := json.Marshal(o)
@@ -63,7 +62,7 @@ func SendOnion(to, from string, o onion_model.Onion, layer int) error {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return pl.WrapError(err, "%s: failed to send POST request with onion to %s", pl.GetFuncName(), config.AddressToName(to))
+		return pl.WrapError(err, "%s: failed to send POST request with onion to %s", pl.GetFuncName(), (to))
 	}
 
 	defer func(Body io.ReadCloser) {
@@ -76,7 +75,7 @@ func SendOnion(to, from string, o onion_model.Onion, layer int) error {
 		return pl.NewError("%s: failed to send to first relay(url=%s), status code: %d, status: %s", pl.GetFuncName(), url, resp.StatusCode, resp.Status)
 	}
 
-	slog.Debug("✅ Successfully sent onion. ", "from", config.AddressToName(from), "to", config.AddressToName(to))
+	slog.Debug("✅ Successfully sent onion. ", "from", (from), "to", (to))
 	return nil
 }
 

@@ -28,6 +28,7 @@ type Client struct {
 	Address          string                  // Full address of the client in the form http://host:port.
 	PrivateKey       string                  // Client's long term private key for decryption.
 	PublicKey        string                  // Client's long term public key for encryption.
+	PrometheusPort   int                     // Port number for Prometheus metrics.
 	ActiveRelays     []structs.PublicNodeApi // List of active relays known to the client.
 	OtherClients     []structs.PublicNodeApi // List of other client known to the client.
 	Messages         []structs.Message       // Messages to be sent by the client.
@@ -38,7 +39,7 @@ type Client struct {
 }
 
 // NewClient creates a new client instance with a unique ID, host, and port.
-func NewClient(id int, host string, port int, bulletinBoardUrl string) (*Client, error) {
+func NewClient(id int, host string, port int, promPort int, bulletinBoardUrl string) (*Client, error) {
 	// Generate a key pair (private and public) for the client.
 	if privateKey, publicKey, err := keys.KeyGen(); err != nil {
 		return nil, pl.WrapError(err, "relay.NewClient(): failed to generate key pair")
@@ -50,11 +51,12 @@ func NewClient(id int, host string, port int, bulletinBoardUrl string) (*Client,
 			Address:          fmt.Sprintf("http://%s:%d", host, port),
 			PublicKey:        publicKey,
 			PrivateKey:       privateKey,
+			PrometheusPort:   promPort,
 			ActiveRelays:     make([]structs.PublicNodeApi, 0),
 			BulletinBoardUrl: bulletinBoardUrl,
 			Messages:         make([]structs.Message, 0),
 			OtherClients:     make([]structs.PublicNodeApi, 0),
-			status:           structs.NewClientStatus(id, fmt.Sprintf("http://%s:%d", host, port), publicKey),
+			status:           structs.NewClientStatus(id, port, promPort, fmt.Sprintf("http://%s:%d", host, port), host, publicKey),
 		}
 		c.wg.Add(1)
 
@@ -74,9 +76,12 @@ func (c *Client) RegisterWithBulletinBoard() error {
 
 	// Marshal the client's public information into JSON.
 	if data, err := json.Marshal(structs.PublicNodeApi{
-		ID:        c.ID,
-		Address:   c.Address,
-		PublicKey: c.PublicKey,
+		ID:             c.ID,
+		Address:        c.Address,
+		PublicKey:      c.PublicKey,
+		PrometheusPort: c.PrometheusPort,
+		Host:           c.Host,
+		Port:           c.Port,
 	}); err != nil {
 		return pl.WrapError(err, "%s: failed to marshal Client info", pl.GetFuncName())
 	} else {
@@ -103,8 +108,8 @@ func (c *Client) RegisterWithBulletinBoard() error {
 }
 
 // getRecipient determines the recipient client for sending a message based on the client's ID.
-func (c *Client) getRecipient() (string, int) {
-	numClients := len(config.GlobalConfig.Clients)
+func (c *Client) getRecipient(clients []structs.PublicNodeApi) (string, int) {
+	numClients := len(clients)
 
 	// Generate a reversed array of client IDs.
 	recipients := utils.Reverse(utils.NewIntArray(1, numClients+1))
@@ -116,19 +121,19 @@ func (c *Client) getRecipient() (string, int) {
 
 	// Determine the recipient ID based on the client's ID.
 	sendTo := recipients[c.ID-1]
-	recipient := *(utils.Find(config.GlobalConfig.Clients, func(client config.Client) bool {
+	recipient := *(utils.Find(clients, func(client structs.PublicNodeApi) bool {
 		return client.ID == sendTo
 	}))
 	return fmt.Sprintf("http://%s:%d", recipient.Host, recipient.Port), recipient.ID // Return the recipient's address and ID.
 }
 
 // StartGeneratingMessages generates a single message to be sent to another client.
-func (c *Client) StartGeneratingMessages() {
+func (c *Client) generateMessages(start structs.ClientStartRunApi) {
 	defer c.wg.Done() // Mark this operation as done in the WaitGroup when finished.
 	slog.Info("Client starting to generate messages", "id", c.ID)
 
 	// Get the recipient's address and ID.
-	recipientAddress, recipientId := c.getRecipient()
+	recipientAddress, _ := c.getRecipient(start.Clients)
 
 	// Create a new message to send to the recipient.
 	messages := []structs.Message{
@@ -136,21 +141,21 @@ func (c *Client) StartGeneratingMessages() {
 	}
 
 	// Register the intent to send the message with the bulletin board.
-	if err := c.RegisterIntentToSend(messages); err != nil {
-		slog.Error(pl.GetFuncName()+": Error registering intent to send", err)
-	} else {
-		slog.Info(fmt.Sprintf("Client %d sending to client %d", c.ID, recipientId))
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		c.Messages = messages // Store the messages to be sent.
-	}
+	//if err := c.RegisterIntentToSend(messages); err != nil {
+	//	slog.Error(pl.GetFuncName()+": Error registering intent to send", err)
+	//} else {
+	//	slog.Info(fmt.Sprintf("Client %d sending to client %d", c.ID, recipientId))
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.Messages = messages // Store the messages to be sent.
+	//}
 }
 
 // DetermineRoutingPath determines a random routing path of mixers and gatekeepers.
 func DetermineRoutingPath(participants []structs.PublicNodeApi) ([]structs.PublicNodeApi, []structs.PublicNodeApi, error) {
 	// initialize slices for mixers and gatekeepers in the path.
-	mixers := make([]structs.PublicNodeApi, config.GlobalConfig.L1)
-	gatekeepers := make([]structs.PublicNodeApi, config.GlobalConfig.L2)
+	mixers := make([]structs.PublicNodeApi, config.GetL1())
+	gatekeepers := make([]structs.PublicNodeApi, config.GetL2())
 
 	for i := range mixers {
 		mixers[i] = utils.RandomElement(participants) // Randomly select a mixer for each layer.
@@ -247,7 +252,7 @@ func (c *Client) processMessage(msg structs.Message, destination structs.PublicN
 	}
 
 	// Form the onion using the client's private key and the determined routing path.
-	o, err := pi_t.FORMONION(string(msgBytes), mixersAddr, gatekeepersAddr, destination.Address, publicKeys, metadata, config.GlobalConfig.D)
+	o, err := pi_t.FORMONION(string(msgBytes), mixersAddr, gatekeepersAddr, destination.Address, publicKeys, metadata, config.GetD())
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to create onion")
 	}
@@ -297,15 +302,15 @@ func (c *Client) processCheckpoint(checkpointOnion structs.CheckpointOnion, clie
 	metadata = append(metadata, onion_model.Metadata{})
 
 	// Extract the addresses of mixers and gatekeepers for the routing path.
-	mixersAddr := utils.Map(path[:config.GlobalConfig.L1], func(mixer structs.PublicNodeApi) string {
+	mixersAddr := utils.Map(path[:config.GetL1()], func(mixer structs.PublicNodeApi) string {
 		return mixer.Address
 	})
-	gatekeepersAddr := utils.Map(path[config.GlobalConfig.L1:], func(gatekeeper structs.PublicNodeApi) string {
+	gatekeepersAddr := utils.Map(path[config.GetL1():], func(gatekeeper structs.PublicNodeApi) string {
 		return gatekeeper.Address
 	})
 
 	// Form the checkpoint onion using the client's private key and the determined routing path.
-	o, err := pi_t.FORMONION(string(dummyPayload), mixersAddr, gatekeepersAddr, clientReceiver.Address, checkpointPublicKeys, metadata, config.GlobalConfig.D)
+	o, err := pi_t.FORMONION(string(dummyPayload), mixersAddr, gatekeepersAddr, clientReceiver.Address, checkpointPublicKeys, metadata, config.GetD())
 	if err != nil {
 		return nil, pl.WrapError(err, "failed to create checkpoint onion")
 	}
@@ -327,6 +332,10 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 	slog.Info("Client starting run", "num client", len(start.Clients), "num relays", len(start.Relays))
 	c.mu.Lock()         // Lock the mutex to ensure exclusive access to the client's state during the run.
 	defer c.mu.Unlock() // Unlock the mutex when the function returns.
+
+	config.UpdateConfig(start.Config) // Update the global configuration based on the start signal.
+
+	c.generateMessages(start)
 
 	// Ensure that there are relays and client participating in the run.
 	if len(start.Relays) == 0 {
@@ -384,7 +393,7 @@ func (c *Client) Receive(oApi structs.OnionApi) error {
 	if err2 := json.Unmarshal([]byte(peeled.Content), &msg); err2 != nil {
 		return pl.WrapError(err2, "relay.Receive(): failed to unmarshal message")
 	}
-	slog.Info("Client received onion", "layer", layer, "from", config.AddressToName(msg.From), "message", msg.Msg)
+	slog.Info("Client received onion", "layer", layer, "from", msg.From, "message", msg.Msg)
 
 	// Record the received message in the client's status.
 	c.status.AddReceived(msg)
@@ -399,48 +408,51 @@ func (c *Client) GetStatus() string {
 }
 
 // RegisterIntentToSend registers the client's intent to send messages with the bulletin board.
-func (c *Client) RegisterIntentToSend(messages []structs.Message) error {
-	// Convert the list of messages into a list of public node APIs for the recipients.
-	to := utils.Map(messages, func(m structs.Message) structs.PublicNodeApi {
-		if f := utils.Find(c.OtherClients, func(c structs.PublicNodeApi) bool {
-			return c.Address == m.To
-		}); f != nil {
-			return *f
-		} else {
-			return structs.PublicNodeApi{}
-		}
-	})
-
-	// Marshal the intent-to-send data into JSON.
-	if data, err := json.Marshal(structs.IntentToSend{
-		From: structs.PublicNodeApi{
-			ID:        c.ID,
-			Address:   c.Address,
-			PublicKey: c.PublicKey,
-			Time:      time.Now(),
-		},
-		To: to,
-	}); err != nil {
-		return pl.WrapError(err, "%s: failed to marshal Client info", pl.GetFuncName())
-	} else {
-		// Send a POST request to the bulletin board to register the intent to send messages.
-		url := c.BulletinBoardUrl + "/registerIntentToSend"
-		if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
-			return pl.WrapError(err2, "%s: failed to send POST request to bulletin board", pl.GetFuncName())
-		} else {
-			defer func(Body io.ReadCloser) {
-				// Ensure the response body is closed to avoid resource leaks.
-				if err3 := Body.Close(); err3 != nil {
-					fmt.Printf("Client.UpdateBulletinBoard(): error closing response body: %v\n", err2)
-				}
-			}(resp.Body)
-			// Check if the intent to send was registered successfully based on the HTTP status code.
-			if resp.StatusCode != http.StatusOK {
-				return pl.NewError("%s failed to register intent to send, status code: %d, %s", pl.GetFuncName(), resp.StatusCode, resp.Status)
-			} else {
-				c.Messages = messages // Store the messages to be sent.
-			}
-			return nil
-		}
-	}
-}
+//func (c *Client) RegisterIntentToSend(messages []structs.Message) error {
+//	// Convert the list of messages into a list of public node APIs for the recipients.
+//	to := utils.Map(messages, func(m structs.Message) structs.PublicNodeApi {
+//		if f := utils.Find(c.OtherClients, func(c structs.PublicNodeApi) bool {
+//			return c.Address == m.To
+//		}); f != nil {
+//			return *f
+//		} else {
+//			return structs.PublicNodeApi{}
+//		}
+//	})
+//
+//	// Marshal the intent-to-send data into JSON.
+//	if data, err := json.Marshal(structs.IntentToSend{
+//		From: structs.PublicNodeApi{
+//			ID:             c.ID,
+//			Address:        c.Address,
+//			PublicKey:      c.PublicKey,
+//			Host:           c.Host,
+//			Port:           c.Port,
+//			PrometheusPort: c.PrometheusPort,
+//			Time:           time.Now(),
+//		},
+//		To: to,
+//	}); err != nil {
+//		return pl.WrapError(err, "%s: failed to marshal Client info", pl.GetFuncName())
+//	} else {
+//		// Send a POST request to the bulletin board to register the intent to send messages.
+//		url := c.BulletinBoardUrl + "/registerIntentToSend"
+//		if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
+//			return pl.WrapError(err2, "%s: failed to send POST request to bulletin board", pl.GetFuncName())
+//		} else {
+//			defer func(Body io.ReadCloser) {
+//				// Ensure the response body is closed to avoid resource leaks.
+//				if err3 := Body.Close(); err3 != nil {
+//					fmt.Printf("Client.UpdateBulletinBoard(): error closing response body: %v\n", err2)
+//				}
+//			}(resp.Body)
+//			// Check if the intent to send was registered successfully based on the HTTP status code.
+//			if resp.StatusCode != http.StatusOK {
+//				return pl.NewError("%s failed to register intent to send, status code: %d, %s", pl.GetFuncName(), resp.StatusCode, resp.Status)
+//			} else {
+//				c.Messages = messages // Store the messages to be sent.
+//			}
+//			return nil
+//		}
+//	}
+//}

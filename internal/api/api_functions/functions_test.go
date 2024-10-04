@@ -79,7 +79,7 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 			nodes[i] = node{privateKeyPEM, publicKeyPEM, fmt.Sprintf("http://localhost:%d", port), port}
 		}
 
-		slog.Info(strings.Join(utils.Map(nodes, func(n node) string { return config.AddressToName(n.address) }), " -> "))
+		slog.Info(strings.Join(utils.Map(nodes, func(n node) string { return n.address }), " -> "))
 
 		secretMessage := "secret message"
 

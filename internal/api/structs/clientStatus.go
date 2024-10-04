@@ -27,21 +27,24 @@ type Received struct {
 	TimeReceived time.Time
 }
 
-func NewClientStatus(id int, address, publicKey string) *ClientStatus {
+func NewClientStatus(id, port, promPort int, address, host, publicKey string) *ClientStatus {
 	return &ClientStatus{
 		MessagesSent:     make([]Sent, 0),
 		MessagesReceived: make([]Received, 0),
 		Client: PublicNodeApi{
-			ID:        id,
-			Address:   address,
-			PublicKey: publicKey,
-			Time:      time.Now(),
+			ID:             id,
+			Address:        address,
+			PublicKey:      publicKey,
+			Host:           host,
+			Port:           port,
+			PrometheusPort: promPort,
+			Time:           time.Now(),
 		},
 	}
 }
 
 func (cs *ClientStatus) AddSent(clientReceiver PublicNodeApi, routingPath []PublicNodeApi, message Message) {
-	if config.GlobalConfig.Vis {
+	if config.GetVis() {
 		cs.mu.Lock()
 		defer cs.mu.Unlock()
 		cs.MessagesSent = append(cs.MessagesSent, Sent{
@@ -56,7 +59,7 @@ func (cs *ClientStatus) AddSent(clientReceiver PublicNodeApi, routingPath []Publ
 }
 
 func (cs *ClientStatus) AddReceived(message Message) {
-	if config.GlobalConfig.Vis {
+	if config.GetVis() {
 		cs.mu.Lock()
 		defer cs.mu.Unlock()
 		cs.MessagesReceived = append(cs.MessagesReceived, Received{
@@ -68,7 +71,7 @@ func (cs *ClientStatus) AddReceived(message Message) {
 }
 
 func (cs *ClientStatus) GetStatus() string {
-	if config.GlobalConfig.Vis {
+	if config.GetVis() {
 		cs.mu.RLock()
 		defer cs.mu.RUnlock()
 		if str, err := json.Marshal(cs); err != nil {
