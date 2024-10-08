@@ -1,0 +1,5 @@
+groups:
+  - name: latency_rules
+    rules:
+      - record: message_latency_seconds
+        expr: (messageReceivedTimestamp - on(hash) messageSentTimestamp)

@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 )
 
@@ -37,6 +38,7 @@ type StaticConfig struct {
 type PromConfig struct {
 	Global        Global         `yaml:"global"`
 	ScrapeConfigs []ScrapeConfig `yaml:"scrape_configs"`
+	RuleFile      []string       `yaml:"rule_files"`
 }
 
 var PID int
@@ -71,6 +73,8 @@ func RestartPrometheus(relays, clients []structs.PublicNodeApi) error {
 		}
 	}
 
+	rules := strings.Replace(path, "prometheus.yml", "rules.yml", 1)
+
 	promCfg_ := PromConfig{
 		Global: Global{
 			ScrapeInterval: fmt.Sprintf("%ds", config.GetScrapeInterval()),
@@ -79,6 +83,7 @@ func RestartPrometheus(relays, clients []structs.PublicNodeApi) error {
 			},
 		},
 		ScrapeConfigs: []ScrapeConfig{},
+		RuleFile:      []string{rules},
 	}
 
 	for _, client := range clients {
