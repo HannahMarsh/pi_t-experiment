@@ -22,19 +22,19 @@ import (
 
 // Client represents a user in the network.
 type Client struct {
-	ID               int                     // Unique identifier for the client.
-	Host             string                  // Host address of the client.
-	Port             int                     // Port number on which the client listens.
-	Address          string                  // Full address of the client in the form http://host:port.
-	PrivateKey       string                  // Client's long term private key for decryption.
-	PublicKey        string                  // Client's long term public key for encryption.
-	PrometheusPort   int                     // Port number for Prometheus metrics.
-	ActiveRelays     []structs.PublicNodeApi // List of active relays known to the client.
-	OtherClients     []structs.PublicNodeApi // List of other client known to the client.
-	Messages         []structs.Message       // Messages to be sent by the client.
-	BulletinBoardUrl string                  // URL of the bulletin board for client registration and communication.
-	status           *structs.ClientStatus   // Client status, including sent and received messages.
-	wg               sync.WaitGroup          // WaitGroup to ensure the client does not start protocol until all messages are generated
+	ID             int                     // Unique identifier for the client.
+	Host           string                  // Host address of the client.
+	Port           int                     // Port number on which the client listens.
+	Address        string                  // Full address of the client in the form http://host:port.
+	PrivateKey     string                  // Client's long term private key for decryption.
+	PublicKey      string                  // Client's long term public key for encryption.
+	PrometheusPort int                     // Port number for Prometheus metrics.
+	ActiveRelays   []structs.PublicNodeApi // List of active relays known to the client.
+	OtherClients   []structs.PublicNodeApi // List of other client known to the client.
+	//Messages         []structs.Message       // Messages to be sent by the client.
+	BulletinBoardUrl string                // URL of the bulletin board for client registration and communication.
+	status           *structs.ClientStatus // Client status, including sent and received messages.
+	wg               sync.WaitGroup        // WaitGroup to ensure the client does not start protocol until all messages are generated
 	mu               sync.RWMutex
 }
 
@@ -54,9 +54,9 @@ func NewClient(id int, host string, port int, promPort int, bulletinBoardUrl str
 			PrometheusPort:   promPort,
 			ActiveRelays:     make([]structs.PublicNodeApi, 0),
 			BulletinBoardUrl: bulletinBoardUrl,
-			Messages:         make([]structs.Message, 0),
-			OtherClients:     make([]structs.PublicNodeApi, 0),
-			status:           structs.NewClientStatus(id, port, promPort, fmt.Sprintf("http://%s:%d", host, port), host, publicKey),
+			//Messages:         make([]structs.Message, 0),
+			OtherClients: make([]structs.PublicNodeApi, 0),
+			status:       structs.NewClientStatus(id, port, promPort, fmt.Sprintf("http://%s:%d", host, port), host, publicKey),
 		}
 		c.wg.Add(1)
 
@@ -128,7 +128,7 @@ func (c *Client) getRecipient(clients []structs.PublicNodeApi) (string, int) {
 }
 
 // StartGeneratingMessages generates a single message to be sent to another client.
-func (c *Client) generateMessages(start structs.ClientStartRunApi) {
+func (c *Client) generateMessages(start structs.ClientStartRunApi) []structs.Message {
 	defer c.wg.Done() // Mark this operation as done in the WaitGroup when finished.
 	slog.Info("Client starting to generate messages", "id", c.ID)
 
@@ -140,15 +140,17 @@ func (c *Client) generateMessages(start structs.ClientStartRunApi) {
 		structs.NewMessage(c.Address, recipientAddress, fmt.Sprintf("Msg from client(id=%d)", c.ID)),
 	}
 
+	return messages
+
 	// Register the intent to send the message with the bulletin board.
 	//if err := c.RegisterIntentToSend(messages); err != nil {
 	//	slog.Error(pl.GetFuncName()+": Error registering intent to send", err)
 	//} else {
 	//	slog.Info(fmt.Sprintf("Client %d sending to client %d", c.ID, recipientId))
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.Messages = messages // Store the messages to be sent.
-	//}
+	//c.mu.Lock()
+	//defer c.mu.Unlock()
+	//c.Messages = messages // Store the messages to be sent.
+	////}
 }
 
 // DetermineRoutingPath determines a random routing path of mixers and gatekeepers.
@@ -175,14 +177,15 @@ func (c *Client) formOnions(start structs.ClientStartRunApi) ([]queuedOnion, err
 	var wg sync.WaitGroup // WaitGroup to manage concurrent onion formation.
 
 	// Iterate over the client's messages to form onions for each one.
-	for i := range c.Messages {
+	messages := c.generateMessages(start)
+	for i := range messages {
 		if destination := utils.Find(start.Clients, func(relay structs.PublicNodeApi) bool {
-			return relay.Address == c.Messages[i].To
+			return relay.Address == messages[i].To
 		}); destination != nil {
 			wg.Add(1)
 			go func(destination structs.PublicNodeApi) {
 				defer wg.Done()
-				if o, err := c.processMessage(c.Messages[i], destination, start.Relays); err != nil {
+				if o, err := c.processMessage(messages[i], destination, start.Relays); err != nil {
 					slog.Error("failed to process message", err)
 				} else {
 					mu.Lock()
@@ -335,8 +338,6 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 
 	config.UpdateConfig(start.Config) // Update the global configuration based on the start signal.
 
-	c.generateMessages(start)
-
 	// Ensure that there are relays and client participating in the run.
 	if len(start.Relays) == 0 {
 		return pl.NewError("%s: no participating relays", pl.GetFuncName())
@@ -376,7 +377,7 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 
 		wg.Wait() // Wait for all onions to be sent.
 
-		c.Messages = make([]structs.Message, 0) // Clear the client's messages after sending.
+		//c.Messages = make([]structs.Message, 0) // Clear the client's messages after sending.
 		return nil
 	}
 }

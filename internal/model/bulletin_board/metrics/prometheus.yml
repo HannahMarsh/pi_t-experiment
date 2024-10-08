@@ -3,63 +3,63 @@ global:
     external_labels:
         monitor: pi_t
 scrape_configs:
-    - job_name: client-3
-      scrape_interval: 5s
-      static_configs:
-        - targets:
-            - localhost:9103
     - job_name: client-4
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:9104
+            - localhost:57000
     - job_name: client-5
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:9105
+            - localhost:57005
     - job_name: client-6
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:9106
+            - localhost:57010
     - job_name: client-1
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:9101
+            - localhost:56985
     - job_name: client-2
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:9102
-    - job_name: relay-4
+            - localhost:56990
+    - job_name: client-3
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:9204
-    - job_name: relay-5
-      scrape_interval: 5s
-      static_configs:
-        - targets:
-            - localhost:9205
-    - job_name: relay-6
-      scrape_interval: 5s
-      static_configs:
-        - targets:
-            - localhost:9206
+            - localhost:56995
     - job_name: relay-1
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:9201
+            - localhost:57015
     - job_name: relay-2
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:9202
+            - localhost:57020
     - job_name: relay-3
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:9203
+            - localhost:57025
+    - job_name: relay-4
+      scrape_interval: 5s
+      static_configs:
+        - targets:
+            - localhost:57030
+    - job_name: relay-5
+      scrape_interval: 5s
+      static_configs:
+        - targets:
+            - localhost:57035
+    - job_name: relay-6
+      scrape_interval: 5s
+      static_configs:
+        - targets:
+            - localhost:57040
