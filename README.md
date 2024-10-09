@@ -1,5 +1,8 @@
 # Implementing $`\Pi_t`$ :tulip:
 
+Metrics Visualizer: [github.com/DrIsmailBadrez/prometheus-metrics-visualizer](https://github.com/DrIsmailBadrez/prometheus-metrics-visualizer)
+
+
 ## Introduction
 
 This project aims to implement the $`\Pi_t`$ (_"t"_ for _"tulip"_ or _"threshold"_) protocol in a service-model environment.
@@ -524,7 +527,7 @@ go test -v ./...
 Usage
 -----  
 
-All configurations are initialized in the [`config/config.yaml`](config/config/yaml) file.
+All configurations are initialized in the [`config/config.yaml`](config/config/yaml) file. The only address that is hard coded in this file is that of the bulletin board, so clients and relays can register.
 
 ### Running the Bulletin Board
 
@@ -532,7 +535,7 @@ All configurations are initialized in the [`config/config.yaml`](config/config/y
 go run cmd/bulletin-board/main.go -logLevel=<logLevel>
 ```  
 - Options:
-  - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
+  - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error"). When the level is set as "Info", color printing is disabled.
 
 ### Running a Relay
 
@@ -542,9 +545,9 @@ go run cmd/relay/main.go -id=<id> -host=<host> -port=<port> -promPort=<promPort>
 - Options:
   - `<id>`: The unique identifier for the relay.
   - `<host>`: (optional) The public host IP for the relay. If not given, the public IP will be retrieved automatically.
-  - `<port>`: The port number for the relay.
-  - `<promPort>`: The port number for scraping the relay's Prometheus metrics.
-  - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
+  - `<port>`: (optional) The port number for the relay. When not specified, any available port is used.
+  - `<promPort>`: (optional) The port number for scraping the relay's Prometheus metrics. When not specified, any available port is used.
+  - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error"). When the level is set as "Info", color printing is disabled.
 
 ### Running a Client
 
@@ -554,9 +557,9 @@ go run cmd/client/main.go -id=<id> -host=<host> -port=<port> -promPort=<promPort
 - Options:
   - `<id>`: The unique identifier for the client.
   - `<host>`: (optional) The public host IP for the client. If not given, the public IP will be retrieved automatically.
-  - `<port>`: The port number for the client.
-  - `<promPort>`: The port number for scraping the client's Prometheus metrics.
-  - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error").
+  - `<port>`: The port number for the client. When not specified, any available port is used.
+  - `<promPort>`: The port number for scraping the client's Prometheus metrics. When not specified, any available port is used.
+  - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error"). When the level is set as "Info", color printing is disabled.
 
 ## Endpoints
 
@@ -565,6 +568,7 @@ go run cmd/client/main.go -id=<id> -host=<host> -port=<port> -promPort=<promPort
 - **Register Client**: `POST /registerClient`
 - **Register Relay**: `POST /registerRelay`
 - **Updating config with new parameters (for next run)**: `POST /updateConfig`
+- Scraped metrics can be viewed on port 9090
 
 ### Relay & Client
 
