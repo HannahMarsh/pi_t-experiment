@@ -98,6 +98,11 @@ func Set(id string, value float64, labels ...string) {
 }
 
 func ServeMetrics(prometheusPort int, collectorIds ...string) (shutdown func()) {
+
+	// Register the default process and Go metrics collectors
+	//prometheus.MustRegister(cols.NewProcessCollector(cols.ProcessCollectorOpts{}))
+	//prometheus.MustRegister(cols.NewGoCollector())
+
 	// Register the histogram with Prometheus
 	for _, id := range collectorIds {
 		if collector, ok := collectors[id]; ok {

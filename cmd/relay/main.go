@@ -24,8 +24,8 @@ func main() {
 	// Define command-line flags
 	id_ := flag.Int("id", -1, "ID of the newClient (required)")
 	ip_ := flag.String("host", "x", "IP address of the relay")
-	port_ := flag.Int("port", 8080, "Port of the client")
-	promPort_ := flag.Int("promPort", 8200, "Port of the relay's Prometheus metrics")
+	port_ := flag.Int("port", 0, "Port of the client")
+	promPort_ := flag.Int("promPort", 0, "Port of the relay's Prometheus metrics")
 	logLevel_ := flag.String("log-level", "debug", "Log level")
 
 	flag.Usage = func() {
@@ -50,6 +50,24 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: the -id flag is required\n")
 		flag.Usage()
 		os.Exit(2)
+	}
+
+	if port == 0 {
+		var err error
+		port, err = utils.GetAvailablePort()
+		if err != nil {
+			slog.Error("failed to get available port", err)
+			os.Exit(1)
+		}
+	}
+
+	if promPort == 0 {
+		var err error
+		promPort, err = utils.GetAvailablePort()
+		if err != nil {
+			slog.Error("failed to get available port", err)
+			os.Exit(1)
+		}
 	}
 
 	if ip == "x" {
