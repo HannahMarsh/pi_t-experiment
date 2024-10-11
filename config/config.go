@@ -30,6 +30,7 @@ type Config struct {
 	ServerLoad              int           `yaml:"x"`
 	D                       int           `yaml:"d"`
 	Delta                   float64       `yaml:"delta"`
+	Tao                     float64       `yaml:"tao"`
 	L1                      int           `yaml:"l1"`
 	L2                      int           `yaml:"l2"`
 	Chi                     float64       `yaml:"chi"`
@@ -52,6 +53,12 @@ func GetBulletinBoardAddress() string {
 	mu.RLock()
 	defer mu.RUnlock()
 	return globalConfig.BulletinBoard.Address
+}
+
+func GetTao() float64 {
+	mu.RLock()
+	defer mu.RUnlock()
+	return globalConfig.Tao
 }
 
 func GetMinimumClients() int {

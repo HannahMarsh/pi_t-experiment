@@ -24,22 +24,31 @@ import (
 
 // Relay represents a participating relay in the network.
 type Relay struct {
-	ID                  int                         // Unique identifier for the relay.
-	Host                string                      // Host address of the relay.
-	Port                int                         // Port number on which the relay listens.
-	Address             string                      // Full address of the relay in the form http://host:port.
-	PrivateKey          string                      // Relay's private key for decryption.
-	PublicKey           string                      // Relay's public key for encryption.
-	PrometheusPort      int                         // Port number for Prometheus metrics.
-	BulletinBoardUrl    string                      // URL of the bulletin board for relay registration and communication.
-	lastUpdate          time.Time                   // Timestamp of the last update sent to the bulletin board.
-	status              *structs.NodeStatus         // Relay status, including received onions and checkpoints.
-	checkpointsReceived *cm.ConcurrentMap[int, int] // Concurrent map to track the number of received checkpoints per layer.
-	expectedNonces      []map[string]bool           // List of expected nonces for each layer, used to verify received onions.
-	isCorrupted         bool                        // Flag indicating whether the relay is corrupted (meaning it does not perform any mixing).
-	wg                  sync.WaitGroup
-	mu                  sync.RWMutex
-	addressToDropFrom   string
+	ID                     int                         // Unique identifier for the relay.
+	Host                   string                      // Host address of the relay.
+	Port                   int                         // Port number on which the relay listens.
+	Address                string                      // Full address of the relay in the form http://host:port.
+	PrivateKey             string                      // Relay's private key for decryption.
+	PublicKey              string                      // Relay's public key for encryption.
+	PrometheusPort         int                         // Port number for Prometheus metrics.
+	BulletinBoardUrl       string                      // URL of the bulletin board for relay registration and communication.
+	lastUpdate             time.Time                   // Timestamp of the last update sent to the bulletin board.
+	status                 *structs.NodeStatus         // Relay status, including received onions and checkpoints.
+	checkpointsReceived    *cm.ConcurrentMap[int, int] // Concurrent map to track the number of received checkpoints per layer.
+	onionsToSend           map[int][]queuedOnion       // List of onions to send to the next hop.
+	currentLayer           int                         // Current layer of the relay.
+	expectedNonces         []map[string]bool           // List of expected nonces for each layer, used to verify received onions.
+	expectedNumCheckpoints map[int]int                 // map to track the number of expected checkpoints per layer.
+	isCorrupted            bool                        // Flag indicating whether the relay is corrupted (meaning it does not perform any mixing).
+	wg                     sync.WaitGroup
+	mu                     sync.RWMutex
+	addressToDropFrom      string
+}
+
+type queuedOnion struct {
+	onion   onion_model.Onion
+	nextHop string
+	layer   int
 }
 
 // NewRelay creates a new relay instance with a unique ID, host, and port.
@@ -55,17 +64,19 @@ func NewRelay(id int, host string, port int, promPort int, bulletinBoardUrl stri
 		}
 
 		n := &Relay{
-			ID:                  id,
-			Host:                host,
-			Address:             fmt.Sprintf("http://%s:%d", host, port),
-			Port:                port,
-			PublicKey:           publicKey,
-			PrivateKey:          privateKey,
-			PrometheusPort:      promPort,
-			BulletinBoardUrl:    bulletinBoardUrl,
-			status:              structs.NewNodeStatus(id, port, promPort, fmt.Sprintf("http://%s:%d", host, port), host, publicKey),
-			checkpointsReceived: &cm.ConcurrentMap[int, int]{},
-			expectedNonces:      expectedCheckpoints,
+			ID:                     id,
+			Host:                   host,
+			Address:                fmt.Sprintf("http://%s:%d", host, port),
+			Port:                   port,
+			PublicKey:              publicKey,
+			PrivateKey:             privateKey,
+			PrometheusPort:         promPort,
+			BulletinBoardUrl:       bulletinBoardUrl,
+			status:                 structs.NewNodeStatus(id, port, promPort, fmt.Sprintf("http://%s:%d", host, port), host, publicKey),
+			checkpointsReceived:    &cm.ConcurrentMap[int, int]{},
+			expectedNumCheckpoints: make(map[int]int),
+			expectedNonces:         expectedCheckpoints,
+			onionsToSend:           make(map[int][]queuedOnion, 0),
 		}
 		n.wg.Add(1)
 
@@ -147,6 +158,11 @@ func (n *Relay) startRun(start structs.RelayStartRunApi) (didParticipate bool, e
 	for _, c := range start.Checkpoints {
 		n.expectedNonces[c.Layer][c.Nonce] = true
 		n.status.AddExpectedCheckpoint(c.Layer)
+		n.expectedNumCheckpoints[c.Layer]++
+	}
+
+	for i, _ := range n.onionsToSend {
+		n.onionsToSend[i] = make([]queuedOnion, 0)
 	}
 
 	return true, nil
@@ -206,7 +222,26 @@ func (n *Relay) Receive(oApi structs.OnionApi) error {
 
 	n.status.AddOnion(oApi.From, n.Address, nextHop, layer, isCheckpoint, !wasBruised)
 
-	go n.sendToNode(nextHop, peeled, layer) // Forward the onion to the next hop.
+	checkpointsReceivedThisLayer := n.checkpointsReceived.Get(layer)
+
+	n.mu.RLock()
+	if layer < n.currentLayer { // onion is late
+		n.mu.RUnlock()
+		go n.sendToNode(nextHop, peeled, layer) // Forward the onion to the next hop.
+	} else {
+		n.mu.RUnlock()
+		n.mu.Lock()
+		n.onionsToSend[layer] = append(n.onionsToSend[layer], queuedOnion{onion: peeled, nextHop: nextHop, layer: layer})
+		if checkpointsReceivedThisLayer >= int(config.GetTao()*float64(n.expectedNumCheckpoints[layer])) {
+			for _, qOnion := range n.onionsToSend[layer] {
+				go n.sendToNode(qOnion.nextHop, qOnion.onion, qOnion.layer) // Forward the onion to the next hop.
+			}
+			n.onionsToSend[layer] = make([]queuedOnion, 0)
+		}
+		n.mu.Unlock()
+	}
+
+	//go n.sendToNode(nextHop, peeled, layer) // Forward the onion to the next hop.
 
 	return nil
 }
