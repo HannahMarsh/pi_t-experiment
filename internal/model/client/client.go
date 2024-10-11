@@ -361,21 +361,21 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 
 		slog.Info("Client sending onions", "num_onions", numToSend)
 
-		var wg sync.WaitGroup // WaitGroup to manage concurrent sending of onions.
-		wg.Add(numToSend)
+		//var wg sync.WaitGroup // WaitGroup to manage concurrent sending of onions.
+		//wg.Add(numToSend)
 		for _, onion := range toSend {
 			go func(onion queuedOnion) {
-				defer wg.Done()
+				//defer wg.Done()
 				timeSent := time.Now()
 				if err = api_functions.SendOnion(onion.to, c.Address, onion.onion, 0); err != nil {
 					slog.Error("failed to send onions", err)
 				}
-				metrics.Set(metrics.MSG_SENT, float64(timeSent.Unix()), onion.msg.Hash) // Record the time when the onion was sent.
+				metrics.Set(metrics.MSG_SENT, float64(timeSent.Nanosecond()), onion.msg.Hash) // Record the time when the onion was sent.
 
 			}(onion)
 		}
 
-		wg.Wait() // Wait for all onions to be sent.
+		//wg.Wait() // Wait for all onions to be sent.
 
 		//c.Messages = make([]structs.Message, 0) // Clear the client's messages after sending.
 		return nil
@@ -398,7 +398,7 @@ func (c *Client) Receive(oApi structs.OnionApi) error {
 
 	// Record the received message in the client's status.
 	c.status.AddReceived(msg)
-	metrics.Set(metrics.MSG_RECEIVED, float64(timeReceived.Unix()), msg.Hash) // Record the time when the message was received.
+	metrics.Set(metrics.MSG_RECEIVED, float64(timeReceived.Nanosecond()), msg.Hash) // Record the time when the message was received.
 
 	return nil
 }
