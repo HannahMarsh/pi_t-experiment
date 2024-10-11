@@ -181,8 +181,8 @@ func (n *Relay) Receive(oApi structs.OnionApi) error {
 	}
 
 	defer func() {
-		metrics.Observe(metrics.PROCESSING_TIME, time.Since(timeReceived).Seconds()) // Track the processing time.
-		metrics.Inc(metrics.ONION_COUNT, layer)                                      // Increment the count of processed onions for the layer.
+		metrics.Observe(metrics.PROCESSING_TIME, float64(time.Since(timeReceived).Nanoseconds())) // Track the processing time.
+		metrics.Inc(metrics.ONION_COUNT, layer)                                                   // Increment the count of processed onions for the layer.
 	}()
 
 	// If the relay is corrupted and the onion is from the specified client, drop the onion.

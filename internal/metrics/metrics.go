@@ -24,7 +24,7 @@ var (
 var collectors = map[string]prometheus.Collector{
 	PROCESSING_TIME: prometheus.NewHistogram(prometheus.HistogramOpts{
 		Name:    PROCESSING_TIME,
-		Help:    "Processing time of onions in seconds",
+		Help:    "Processing time (nanoseconds) of onions in seconds",
 		Buckets: prometheus.DefBuckets,
 	}),
 	ONION_SIZE: prometheus.NewHistogram(prometheus.HistogramOpts{
@@ -42,14 +42,14 @@ var collectors = map[string]prometheus.Collector{
 	MSG_SENT: prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: MSG_SENT,
-			Help: "Unix timestamp of when each message was sent, labeled by message hash",
+			Help: "Unix timestamp (nanoseconds) of when each message was sent, labeled by message hash",
 		},
 		[]string{"hash"}, // Label to distinguish messages by their hash
 	),
 	MSG_RECEIVED: prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: MSG_RECEIVED,
-			Help: "Unix timestamp of when each message was sent, labeled by message hash",
+			Help: "Unix timestamp (nanoseconds) of when each message was sent, labeled by message hash",
 		},
 		[]string{"hash"}, // Label to distinguish messages by their hash
 	),
