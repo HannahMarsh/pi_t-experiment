@@ -49,3 +49,4 @@ out/*
 
 
 internal/model/bulletin_board/metrics/prometheus.yml
+internal/model/bulletin_board/metrics/rules.yml
