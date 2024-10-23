@@ -27,11 +27,12 @@ type BulletinBoard struct {
 
 // NewBulletinBoard creates a new bulletin board
 func NewBulletinBoard() *BulletinBoard {
+	lastStartRun, _ := utils.GetTimestamp()
 	return &BulletinBoard{
 		Network:         make(map[int]*RelayView),
 		Clients:         make(map[int]*ClientView),
-		lastStartRun:    utils.GetTimestamp(),
-		timeBetweenRuns: time.Second * 10,
+		lastStartRun:    lastStartRun,
+		timeBetweenRuns: time.Millisecond * 10_000, // 10 seconds
 	}
 }
 
@@ -76,9 +77,10 @@ func (bb *BulletinBoard) Shutdown() error {
 func (bb *BulletinBoard) StartProtocol() error {
 	for {
 		// Check if the time since the last start run is greater than the required interval.
-		if time.Since(bb.lastStartRun) >= bb.timeBetweenRuns {
-			bb.lastStartRun = utils.GetTimestamp() // Update the timestamp for the last start run.
-			if bb.allNodesReady() {                // Check if all nodes are ready to start.
+		timeSince := time.Since(bb.lastStartRun)
+		if timeSince >= bb.timeBetweenRuns {
+			bb.lastStartRun, _ = utils.GetTimestamp() // Update the timestamp for the last start run.
+			if bb.allNodesReady() {                   // Check if all nodes are ready to start.
 				if err := bb.signalNodesToStart(); err != nil {
 					return pl.WrapError(err, "error signaling nodes to start")
 				} else {

@@ -10,14 +10,19 @@ import (
 	"time"
 )
 
-func GetTimestamp() time.Time {
+func GetTimestamp() (time.Time, float64) {
 	// Get the current time
 	now := time.Now()
 
 	// Convert to UTC
 	utcTime := now.UTC()
 
-	return utcTime
+	return utcTime, float64(utcTime.UnixMilli())
+}
+
+func TimeSince(start time.Time) float64 {
+	t, _ := GetTimestamp()
+	return float64(t.Sub(start).Milliseconds())
 }
 
 func installNTP() (string, error) {

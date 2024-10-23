@@ -2,6 +2,7 @@ package bulletin_board
 
 import (
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
+	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"time"
 )
 
@@ -18,6 +19,7 @@ type ClientView struct {
 }
 
 func NewClientView(c structs.PublicNodeApi, maxTimeBetweenHeartbeats time.Duration) *ClientView {
+	lastHeartbeat, _ := utils.GetTimestamp()
 	return &ClientView{
 		ID:                       c.ID,
 		Address:                  c.Address,
@@ -26,7 +28,7 @@ func NewClientView(c structs.PublicNodeApi, maxTimeBetweenHeartbeats time.Durati
 		Port:                     c.Port,
 		PromPort:                 c.PrometheusPort,
 		MessageQueue:             make([]structs.PublicNodeApi, 0),
-		LastHeartbeat:            utils.GetTimestamp(),
+		LastHeartbeat:            lastHeartbeat,
 		MaxTimeBetweenHeartbeats: maxTimeBetweenHeartbeats,
 	}
 }

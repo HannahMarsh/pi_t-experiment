@@ -358,11 +358,11 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 		for _, onion := range toSend {
 			go func(onion queuedOnion) {
 				//defer wg.Done()
-				timeSent := utils.GetTimestamp()
+				_, timeSent := utils.GetTimestamp()
 				if err = api_functions.SendOnion(onion.to, c.Address, onion.onion, 0); err != nil {
 					slog.Error("failed to send onions", err)
 				}
-				metrics.Set(metrics.MSG_SENT, float64(timeSent.Nanosecond()), onion.msg.Hash) // Record the time when the onion was sent.
+				metrics.Set(metrics.MSG_SENT, timeSent, onion.msg.Hash) // Record the time when the onion was sent.
 
 			}(onion)
 		}
@@ -376,7 +376,7 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 
 // Receive processes an incoming onion, decrypts it, and extracts the encapsulated message.
 func (c *Client) Receive(oApi structs.OnionApi) error {
-	timeReceived := utils.GetTimestamp() // Record the time when the onion was received.
+	_, timeReceived := utils.GetTimestamp() // Record the time when the onion was received.
 	_, layer, _, peeled, _, err := pi_t.PeelOnion(oApi.Onion, c.PrivateKey)
 	if err != nil {
 		return pl.WrapError(err, "relay.Receive(): failed to remove layer")
@@ -388,7 +388,7 @@ func (c *Client) Receive(oApi structs.OnionApi) error {
 	}
 	slog.Info("Client received onion", "layer", layer, "from", msg.From, "message", msg.Msg)
 
-	metrics.Set(metrics.MSG_RECEIVED, float64(timeReceived.Nanosecond()), msg.Hash) // Record the time when the message was received.
+	metrics.Set(metrics.MSG_RECEIVED, timeReceived, msg.Hash) // Record the time when the message was received.
 
 	return nil
 }

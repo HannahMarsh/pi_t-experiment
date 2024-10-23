@@ -92,6 +92,7 @@ func NewRelay(id int, host string, port int, promPort int, bulletinBoardUrl stri
 
 // getPublicNodeInfo returns the relay's public information in the form of a PublicNodeApi struct.
 func (n *Relay) getPublicNodeInfo() structs.PublicNodeApi {
+	t, _ := utils.GetTimestamp() // Record the current time for the update.
 	return structs.PublicNodeApi{
 		ID:             n.ID,
 		Address:        n.Address,
@@ -99,7 +100,7 @@ func (n *Relay) getPublicNodeInfo() structs.PublicNodeApi {
 		PrometheusPort: n.PrometheusPort,
 		Host:           n.Host,
 		Port:           n.Port,
-		Time:           utils.GetTimestamp(),
+		Time:           t,
 	}
 }
 
@@ -164,7 +165,7 @@ func (n *Relay) startRun(start structs.RelayStartRunApi) (didParticipate bool, e
 func (n *Relay) Receive(oApi structs.OnionApi) error {
 	n.wg.Wait() // Wait for the expected nonces to be recorded by startRun
 
-	timeReceived := utils.GetTimestamp() // Record the time when the onion was received.
+	timeReceived, _ := utils.GetTimestamp() // Record the time when the onion was received.
 
 	// Peel the onion to extract its contents, including the role, layer, and metadata.
 	role, layer, metadata, peeled, nextHop, err := pi_t.PeelOnion(oApi.Onion, n.PrivateKey)
@@ -173,8 +174,9 @@ func (n *Relay) Receive(oApi structs.OnionApi) error {
 	}
 
 	defer func() {
-		metrics.Observe(metrics.PROCESSING_TIME, float64(time.Since(timeReceived).Nanoseconds())) // Track the processing time.
-		metrics.Inc(metrics.ONION_COUNT, layer)                                                   // Increment the count of processed onions for the layer.
+		processingTime := utils.TimeSince(timeReceived)          // Calculate the processing time.
+		metrics.Observe(metrics.PROCESSING_TIME, processingTime) // Track the processing time.
+		metrics.Inc(metrics.ONION_COUNT, layer)                  // Increment the count of processed onions for the layer.
 	}()
 
 	// If the relay is corrupted and the onion is from the specified client, drop the onion.
@@ -282,9 +284,9 @@ func (n *Relay) GetActiveNodes() ([]structs.PublicNodeApi, error) {
 
 // updateBulletinBoard updates the relay's information on the bulletin board.
 func (n *Relay) updateBulletinBoard(endpoint string, expectedStatusCode int) error {
-	n.mu.Lock()               // Lock the mutex to ensure exclusive access to the relay's state during the update.
-	defer n.mu.Unlock()       // Unlock the mutex when the function returns.
-	t := utils.GetTimestamp() // Record the current time for the update.
+	n.mu.Lock()                  // Lock the mutex to ensure exclusive access to the relay's state during the update.
+	defer n.mu.Unlock()          // Unlock the mutex when the function returns.
+	t, _ := utils.GetTimestamp() // Record the current time for the update.
 
 	// Marshal the relay's public information into JSON.
 	if data, err := json.Marshal(structs.PublicNodeApi{
