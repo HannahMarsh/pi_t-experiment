@@ -30,7 +30,7 @@ func NewBulletinBoard() *BulletinBoard {
 	return &BulletinBoard{
 		Network:         make(map[int]*RelayView),
 		Clients:         make(map[int]*ClientView),
-		lastStartRun:    time.Now(),
+		lastStartRun:    utils.GetTimestamp(),
 		timeBetweenRuns: time.Second * 10,
 	}
 }
@@ -61,27 +61,6 @@ func (bb *BulletinBoard) RegisterClient(client structs.PublicNodeApi) {
 	return
 }
 
-// RegisterIntentToSend records a client's intent to send a message, updating the active client list accordingly.
-//func (bb *BulletinBoard) RegisterIntentToSend(its structs.IntentToSend) error {
-//	bb.mu.Lock()
-//	defer bb.mu.Unlock()
-//
-//	// Ensure the sender is registered in the Clients map.
-//	if _, present := bb.Clients[its.From.ID]; !present {
-//		bb.Clients[its.From.ID] = NewClientView(its.From, time.Second*10)
-//	} else {
-//		// Register any additional client in the 'To' field of the IntentToSend.
-//		for _, client := range its.To {
-//			if _, present = bb.Clients[client.ID]; !present {
-//				bb.Clients[client.ID] = NewClientView(client, time.Second*10)
-//			}
-//		}
-//	}
-//	// Update the sender's ClientView with the intent to send data.
-//	bb.Clients[its.From.ID].UpdateClient(its)
-//	return nil
-//}
-
 func (bb *BulletinBoard) Shutdown() error {
 	bb.mu.Lock()
 	defer bb.mu.Unlock()
@@ -98,8 +77,8 @@ func (bb *BulletinBoard) StartProtocol() error {
 	for {
 		// Check if the time since the last start run is greater than the required interval.
 		if time.Since(bb.lastStartRun) >= bb.timeBetweenRuns {
-			bb.lastStartRun = time.Now() // Update the timestamp for the last start run.
-			if bb.allNodesReady() {      // Check if all nodes are ready to start.
+			bb.lastStartRun = utils.GetTimestamp() // Update the timestamp for the last start run.
+			if bb.allNodesReady() {                // Check if all nodes are ready to start.
 				if err := bb.signalNodesToStart(); err != nil {
 					return pl.WrapError(err, "error signaling nodes to start")
 				} else {

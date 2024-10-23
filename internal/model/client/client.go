@@ -17,7 +17,6 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
-	"time"
 )
 
 // Client represents a user in the network.
@@ -359,7 +358,7 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 		for _, onion := range toSend {
 			go func(onion queuedOnion) {
 				//defer wg.Done()
-				timeSent := time.Now()
+				timeSent := utils.GetTimestamp()
 				if err = api_functions.SendOnion(onion.to, c.Address, onion.onion, 0); err != nil {
 					slog.Error("failed to send onions", err)
 				}
@@ -377,7 +376,7 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 
 // Receive processes an incoming onion, decrypts it, and extracts the encapsulated message.
 func (c *Client) Receive(oApi structs.OnionApi) error {
-	timeReceived := time.Now() // Record the time when the onion was received.
+	timeReceived := utils.GetTimestamp() // Record the time when the onion was received.
 	_, layer, _, peeled, _, err := pi_t.PeelOnion(oApi.Onion, c.PrivateKey)
 	if err != nil {
 		return pl.WrapError(err, "relay.Receive(): failed to remove layer")

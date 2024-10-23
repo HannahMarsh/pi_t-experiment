@@ -26,7 +26,7 @@ func NewClientView(c structs.PublicNodeApi, maxTimeBetweenHeartbeats time.Durati
 		Port:                     c.Port,
 		PromPort:                 c.PrometheusPort,
 		MessageQueue:             make([]structs.PublicNodeApi, 0),
-		LastHeartbeat:            time.Now(),
+		LastHeartbeat:            utils.GetTimestamp(),
 		MaxTimeBetweenHeartbeats: maxTimeBetweenHeartbeats,
 	}
 }

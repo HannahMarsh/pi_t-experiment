@@ -99,7 +99,7 @@ func (n *Relay) getPublicNodeInfo() structs.PublicNodeApi {
 		PrometheusPort: n.PrometheusPort,
 		Host:           n.Host,
 		Port:           n.Port,
-		Time:           time.Now(),
+		Time:           utils.GetTimestamp(),
 	}
 }
 
@@ -164,7 +164,7 @@ func (n *Relay) startRun(start structs.RelayStartRunApi) (didParticipate bool, e
 func (n *Relay) Receive(oApi structs.OnionApi) error {
 	n.wg.Wait() // Wait for the expected nonces to be recorded by startRun
 
-	timeReceived := time.Now() // Record the time when the onion was received.
+	timeReceived := utils.GetTimestamp() // Record the time when the onion was received.
 
 	// Peel the onion to extract its contents, including the role, layer, and metadata.
 	role, layer, metadata, peeled, nextHop, err := pi_t.PeelOnion(oApi.Onion, n.PrivateKey)
@@ -282,9 +282,9 @@ func (n *Relay) GetActiveNodes() ([]structs.PublicNodeApi, error) {
 
 // updateBulletinBoard updates the relay's information on the bulletin board.
 func (n *Relay) updateBulletinBoard(endpoint string, expectedStatusCode int) error {
-	n.mu.Lock()         // Lock the mutex to ensure exclusive access to the relay's state during the update.
-	defer n.mu.Unlock() // Unlock the mutex when the function returns.
-	t := time.Now()     // Record the current time for the update.
+	n.mu.Lock()               // Lock the mutex to ensure exclusive access to the relay's state during the update.
+	defer n.mu.Unlock()       // Unlock the mutex when the function returns.
+	t := utils.GetTimestamp() // Record the current time for the update.
 
 	// Marshal the relay's public information into JSON.
 	if data, err := json.Marshal(structs.PublicNodeApi{
