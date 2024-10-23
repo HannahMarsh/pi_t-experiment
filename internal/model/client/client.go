@@ -32,9 +32,8 @@ type Client struct {
 	ActiveRelays   []structs.PublicNodeApi // List of active relays known to the client.
 	OtherClients   []structs.PublicNodeApi // List of other client known to the client.
 	//Messages         []structs.Message       // Messages to be sent by the client.
-	BulletinBoardUrl string                // URL of the bulletin board for client registration and communication.
-	status           *structs.ClientStatus // Client status, including sent and received messages.
-	wg               sync.WaitGroup        // WaitGroup to ensure the client does not start protocol until all messages are generated
+	BulletinBoardUrl string         // URL of the bulletin board for client registration and communication.
+	wg               sync.WaitGroup // WaitGroup to ensure the client does not start protocol until all messages are generated
 	mu               sync.RWMutex
 }
 
@@ -56,7 +55,6 @@ func NewClient(id int, host string, port int, promPort int, bulletinBoardUrl str
 			BulletinBoardUrl: bulletinBoardUrl,
 			//Messages:         make([]structs.Message, 0),
 			OtherClients: make([]structs.PublicNodeApi, 0),
-			status:       structs.NewClientStatus(id, port, promPort, fmt.Sprintf("http://%s:%d", host, port), host, publicKey),
 		}
 		c.wg.Add(1)
 
@@ -267,9 +265,6 @@ func (c *Client) processMessage(msg structs.Message, destination structs.PublicN
 		msg:   msg,
 	})
 
-	// Record the sent message in the client's status.
-	c.status.AddSent(destination, routingPath, msg)
-
 	return onions, nil // Return the formed onions.
 }
 
@@ -325,8 +320,6 @@ func (c *Client) processCheckpoint(checkpointOnion structs.CheckpointOnion, clie
 		msg:   dummyMsg,
 	})
 
-	// Record the sent dummy message in the client's status.
-	c.status.AddSent(utils.GetLast(path), path, dummyMsg)
 	return onions, nil // Return the formed checkpoint onions.
 }
 
@@ -396,64 +389,7 @@ func (c *Client) Receive(oApi structs.OnionApi) error {
 	}
 	slog.Info("Client received onion", "layer", layer, "from", msg.From, "message", msg.Msg)
 
-	// Record the received message in the client's status.
-	c.status.AddReceived(msg)
 	metrics.Set(metrics.MSG_RECEIVED, float64(timeReceived.Nanosecond()), msg.Hash) // Record the time when the message was received.
 
 	return nil
 }
-
-// GetStatus returns the current status of the client, including sent and received messages.
-func (c *Client) GetStatus() string {
-	return c.status.GetStatus()
-}
-
-// RegisterIntentToSend registers the client's intent to send messages with the bulletin board.
-//func (c *Client) RegisterIntentToSend(messages []structs.Message) error {
-//	// Convert the list of messages into a list of public node APIs for the recipients.
-//	to := utils.Map(messages, func(m structs.Message) structs.PublicNodeApi {
-//		if f := utils.Find(c.OtherClients, func(c structs.PublicNodeApi) bool {
-//			return c.Address == m.To
-//		}); f != nil {
-//			return *f
-//		} else {
-//			return structs.PublicNodeApi{}
-//		}
-//	})
-//
-//	// Marshal the intent-to-send data into JSON.
-//	if data, err := json.Marshal(structs.IntentToSend{
-//		From: structs.PublicNodeApi{
-//			ID:             c.ID,
-//			Address:        c.Address,
-//			PublicKey:      c.PublicKey,
-//			Host:           c.Host,
-//			Port:           c.Port,
-//			PrometheusPort: c.PrometheusPort,
-//			Time:           time.Now(),
-//		},
-//		To: to,
-//	}); err != nil {
-//		return pl.WrapError(err, "%s: failed to marshal Client info", pl.GetFuncName())
-//	} else {
-//		// Send a POST request to the bulletin board to register the intent to send messages.
-//		url := c.BulletinBoardUrl + "/registerIntentToSend"
-//		if resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(data)); err2 != nil {
-//			return pl.WrapError(err2, "%s: failed to send POST request to bulletin board", pl.GetFuncName())
-//		} else {
-//			defer func(Body io.ReadCloser) {
-//				// Ensure the response body is closed to avoid resource leaks.
-//				if err3 := Body.Close(); err3 != nil {
-//					fmt.Printf("Client.UpdateBulletinBoard(): error closing response body: %v\n", err2)
-//				}
-//			}(resp.Body)
-//			// Check if the intent to send was registered successfully based on the HTTP status code.
-//			if resp.StatusCode != http.StatusOK {
-//				return pl.NewError("%s failed to register intent to send, status code: %d, %s", pl.GetFuncName(), resp.StatusCode, resp.Status)
-//			} else {
-//				c.Messages = messages // Store the messages to be sent.
-//			}
-//			return nil
-//		}
-//	}
-//}

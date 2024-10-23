@@ -33,7 +33,6 @@ type Relay struct {
 	PrometheusPort         int                         // Port number for Prometheus metrics.
 	BulletinBoardUrl       string                      // URL of the bulletin board for relay registration and communication.
 	lastUpdate             time.Time                   // Timestamp of the last update sent to the bulletin board.
-	status                 *structs.NodeStatus         // Relay status, including received onions and checkpoints.
 	checkpointsReceived    *cm.ConcurrentMap[int, int] // Concurrent map to track the number of received checkpoints per layer.
 	onionsToSend           map[int][]queuedOnion       // List of onions to send to the next hop.
 	currentLayer           int                         // Current layer of the relay.
@@ -72,7 +71,6 @@ func NewRelay(id int, host string, port int, promPort int, bulletinBoardUrl stri
 			PrivateKey:             privateKey,
 			PrometheusPort:         promPort,
 			BulletinBoardUrl:       bulletinBoardUrl,
-			status:                 structs.NewNodeStatus(id, port, promPort, fmt.Sprintf("http://%s:%d", host, port), host, publicKey),
 			checkpointsReceived:    &cm.ConcurrentMap[int, int]{},
 			expectedNumCheckpoints: make(map[int]int),
 			expectedNonces:         expectedCheckpoints,
@@ -90,11 +88,6 @@ func NewRelay(id int, host string, port int, promPort int, bulletinBoardUrl stri
 
 		return n, nil
 	}
-}
-
-// GetStatus returns the current status of the relay, including received onions and checkpoints.
-func (n *Relay) GetStatus() string {
-	return n.status.GetStatus()
 }
 
 // getPublicNodeInfo returns the relay's public information in the form of a PublicNodeApi struct.
@@ -157,7 +150,6 @@ func (n *Relay) startRun(start structs.RelayStartRunApi) (didParticipate bool, e
 	// Iterate over the checkpoints in the start signal to record the expected nonces.
 	for _, c := range start.Checkpoints {
 		n.expectedNonces[c.Layer][c.Nonce] = true
-		n.status.AddExpectedCheckpoint(c.Layer)
 		n.expectedNumCheckpoints[c.Layer]++
 	}
 
@@ -192,10 +184,10 @@ func (n *Relay) Receive(oApi structs.OnionApi) error {
 	}
 
 	wasBruised := false
-	isCheckpoint := false
+	isCheckpoint := metadata.Nonce != ""
 
 	// If the onion contains a nonce, it is a checkpoint.
-	if metadata.Nonce != "" {
+	if isCheckpoint {
 		isCheckpoint = true
 		if _, present := n.expectedNonces[layer][metadata.Nonce]; present { // Verify the nonce.
 			n.checkpointsReceived.GetAndSet(layer, func(i int) int {
@@ -213,14 +205,11 @@ func (n *Relay) Receive(oApi structs.OnionApi) error {
 			}
 		}
 
-		n.status.AddCheckpointOnion(layer)
 	} else if role == onion_model.MIXER {
 		peeled.Sepal = peeled.Sepal.RemoveBlock() // If not a checkpoint, remove the block from the onion.
 	}
 
-	slog.Info("Received onion", "ischeckpoint?", metadata.Nonce != "", "layer", layer, "nextHop", nextHop)
-
-	n.status.AddOnion(oApi.From, n.Address, nextHop, layer, isCheckpoint, !wasBruised)
+	slog.Info("Received onion", "ischeckpoint?", isCheckpoint, "layer", layer, "nextHop", nextHop, "role", role, "wasBruised", wasBruised, "isCorrupted", n.isCorrupted, "from", oApi.From)
 
 	checkpointsReceivedThisLayer := n.checkpointsReceived.Get(layer)
 
