@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 var usedPorts sync.Map
@@ -119,7 +120,7 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 				defer wg.Done()
 				mux := http.NewServeMux()
 				mux.HandleFunc("/receive", func(w http.ResponseWriter, r *http.Request) {
-					HandleReceiveOnion(w, r, func(oApi structs.OnionApi) error {
+					HandleReceiveOnion(w, r, func(oApi structs.OnionApi, timeS time.Time) error {
 						onionStr := oApi.Onion
 						_, layer, _, peeled, nextDestination, err2 := pi_t.PeelOnion(onionStr, nodes[i].privateKeyPEM)
 						if err2 != nil {
@@ -172,7 +173,7 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 		go func() {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/receive", func(w http.ResponseWriter, r *http.Request) {
-				HandleReceiveOnion(w, r, func(oApi structs.OnionApi) error {
+				HandleReceiveOnion(w, r, func(oApi structs.OnionApi, timeS time.Time) error {
 					onionStr := oApi.Onion
 					defer wg.Done()
 					_, layer, _, peeled, _, err2 := pi_t.PeelOnion(onionStr, nodes[l].privateKeyPEM)

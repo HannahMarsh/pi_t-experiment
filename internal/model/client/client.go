@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 )
 
 // Client represents a user in the network.
@@ -359,7 +360,7 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 			go func(onion queuedOnion) {
 				//defer wg.Done()
 				_, timeSent := utils.GetTimestamp()
-				if err = api_functions.SendOnion(onion.to, c.Address, onion.onion, 0); err != nil {
+				if err = api_functions.SendOnion(onion.to, c.Address, []int64{int64(timeSent)}, onion.onion, 0); err != nil {
 					slog.Error("failed to send onions", err)
 				}
 				metrics.Set(metrics.MSG_SENT, timeSent, onion.msg.Hash) // Record the time when the onion was sent.
@@ -375,8 +376,23 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 }
 
 // Receive processes an incoming onion, decrypts it, and extracts the encapsulated message.
-func (c *Client) Receive(oApi structs.OnionApi) error {
-	_, timeReceived := utils.GetTimestamp() // Record the time when the onion was received.
+func (c *Client) Receive(oApi structs.OnionApi, timeReceived time.Time) error {
+	timestamps := oApi.ReceiveTimestampsPerLayer
+	utils.SortOrdered(timestamps)
+
+	numHops := len(timestamps)
+	latencyBetweenHops := make([]int64, 0)
+	timeSent := timestamps[0]
+	for layer, tr := range timestamps {
+		if layer > 0 {
+			latencyBetweenHops = append(latencyBetweenHops, tr-timeSent)
+			timeSent = tr
+		}
+	}
+	averageLatencyBetweenHops := int64(utils.Average(latencyBetweenHops))
+	totalLatency := timestamps[numHops-1] - timestamps[0]
+	slog.Info("Client received onion", "from", oApi.From, "num_hops", numHops, "total_latency", totalLatency, "average_latency_between_hops", averageLatencyBetweenHops)
+
 	_, layer, _, peeled, _, err := pi_t.PeelOnion(oApi.Onion, c.PrivateKey)
 	if err != nil {
 		return pl.WrapError(err, "relay.Receive(): failed to remove layer")
@@ -388,7 +404,7 @@ func (c *Client) Receive(oApi structs.OnionApi) error {
 	}
 	slog.Info("Client received onion", "layer", layer, "from", msg.From, "message", msg.Msg)
 
-	metrics.Set(metrics.MSG_RECEIVED, timeReceived, msg.Hash) // Record the time when the message was received.
+	metrics.Set(metrics.MSG_RECEIVED, utils.ConvertToFloat64(timeReceived), msg.Hash) // Record the time when the message was received.
 
 	return nil
 }

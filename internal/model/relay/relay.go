@@ -45,9 +45,10 @@ type Relay struct {
 }
 
 type queuedOnion struct {
-	onion   onion_model.Onion
-	nextHop string
-	layer   int
+	onion      onion_model.Onion
+	nextHop    string
+	layer      int
+	timestamps []int64
 }
 
 // NewRelay creates a new relay instance with a unique ID, host, and port.
@@ -162,10 +163,8 @@ func (n *Relay) startRun(start structs.RelayStartRunApi) (didParticipate bool, e
 }
 
 // Receive processes an incoming onion, decrypts it, and forwards it to the next hop.
-func (n *Relay) Receive(oApi structs.OnionApi) error {
+func (n *Relay) Receive(oApi structs.OnionApi, timeReceived time.Time) error {
 	n.wg.Wait() // Wait for the expected nonces to be recorded by startRun
-
-	timeReceived, _ := utils.GetTimestamp() // Record the time when the onion was received.
 
 	// Peel the onion to extract its contents, including the role, layer, and metadata.
 	role, layer, metadata, peeled, nextHop, err := pi_t.PeelOnion(oApi.Onion, n.PrivateKey)
@@ -215,33 +214,29 @@ func (n *Relay) Receive(oApi structs.OnionApi) error {
 
 	checkpointsReceivedThisLayer := n.checkpointsReceived.Get(layer)
 
+	newQOnion := queuedOnion{onion: peeled, nextHop: nextHop, layer: layer, timestamps: oApi.ReceiveTimestampsPerLayer}
 	n.mu.RLock()
 	if layer < n.currentLayer { // onion is late
 		n.mu.RUnlock()
-		go n.sendToNode(nextHop, peeled, layer) // Forward the onion to the next hop.
+		go n.sendOnion(newQOnion) // Forward the onion to the next hop.
 	} else {
 		n.mu.RUnlock()
 		n.mu.Lock()
-		n.onionsToSend[layer] = append(n.onionsToSend[layer], queuedOnion{onion: peeled, nextHop: nextHop, layer: layer})
+		n.onionsToSend[layer] = append(n.onionsToSend[layer], newQOnion)
 		if checkpointsReceivedThisLayer >= int(config.GetTao()*float64(n.expectedNumCheckpoints[layer])) {
 			for _, qOnion := range n.onionsToSend[layer] {
-				go n.sendToNode(qOnion.nextHop, qOnion.onion, qOnion.layer) // Forward the onion to the next hop.
+				go n.sendOnion(qOnion)
 			}
 			n.onionsToSend[layer] = make([]queuedOnion, 0)
 		}
 		n.mu.Unlock()
 	}
 
-	//go n.sendToNode(nextHop, peeled, layer) // Forward the onion to the next hop.
-
 	return nil
 }
 
-// sendToNode forwards the constructed onion to the specified address.
-func (n *Relay) sendToNode(addr string, constructedOnion onion_model.Onion, layer int) {
-	// Send the onion to the next hop using the API function.
-	err := api_functions.SendOnion(addr, n.Address, constructedOnion, layer)
-	if err != nil {
+func (n *Relay) sendOnion(qOnion queuedOnion) {
+	if err := api_functions.SendOnion(qOnion.nextHop, n.Address, qOnion.timestamps, qOnion.onion, qOnion.layer); err != nil {
 		slog.Error("Error sending onion", err)
 	}
 }

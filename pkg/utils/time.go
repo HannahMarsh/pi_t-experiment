@@ -17,7 +17,11 @@ func GetTimestamp() (time.Time, float64) {
 	// Convert to UTC
 	utcTime := now.UTC()
 
-	return utcTime, float64(utcTime.UnixMilli())
+	return utcTime, ConvertToFloat64(utcTime)
+}
+
+func ConvertToFloat64(timeStamp time.Time) float64 {
+	return float64(timeStamp.UnixMilli())
 }
 
 func TimeSince(start time.Time) float64 {

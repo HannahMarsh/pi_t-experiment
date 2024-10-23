@@ -596,6 +596,12 @@ func FindLast[T any](items []T, f func(T) bool) *T {
 	return nil
 }
 
+func Average[T Number](items []T) float64 {
+	sum := Sum(items)
+	return toFloat64(sum) / float64(len(items))
+
+}
+
 func Count[T comparable](items []T, value T) int {
 	count := 0
 	for _, item := range items {
