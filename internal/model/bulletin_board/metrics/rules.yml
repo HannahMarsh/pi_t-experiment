@@ -27,5 +27,5 @@ groups:
         expr: avg(onionProcessingTime) by (node, round)
   - name: dropped_onions_group
     rules:
-      - record: onions_dropped_by_gatekeeper
+      - record: onions_dropped
         expr: label_replace(count(onionsSent) by (intendedReceiver), "receiver", "$1", "intendedReceiver", "(.*)") - count(onionsReceived) by (receiver)
