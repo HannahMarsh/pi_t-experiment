@@ -46,3 +46,6 @@ data/
 data/*
 out/
 out/*
+
+
+internal/model/bulletin_board/metrics/prometheus.yml
