@@ -213,7 +213,7 @@ func (n *Relay) Receive(oApi structs.OnionApi, timeReceived time.Time) error {
 		peeled.Sepal = peeled.Sepal.RemoveBlock() // If not a checkpoint, remove the block from the onion.
 	}
 
-	slog.Info("Received onion", "ischeckpoint?", isCheckpoint, "layer", layer, "nextHop", nextHop, "role", role, "wasBruised", wasBruised, "isCorrupted", n.isCorrupted, "from", oApi.From)
+	slog.Debug("Received onion", "ischeckpoint?", isCheckpoint, "layer", layer, "nextHop", nextHop, "role", role, "wasBruised", wasBruised, "isCorrupted", n.isCorrupted, "from", oApi.From)
 
 	checkpointsReceivedThisLayer := n.checkpointsReceived.Get(layer)
 

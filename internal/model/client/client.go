@@ -397,7 +397,7 @@ func (c *Client) Receive(oApi structs.OnionApi, timeReceived time.Time) error {
 		return pl.WrapError(err2, "relay.Receive(): failed to unmarshal message")
 	}
 	isCheckpoint := msg.Msg == ""
-	slog.Info("Client received onion", "layer", layer, "from", msg.From, "message", msg.Msg)
+	slog.Debug("Client received onion", "layer", layer, "from", msg.From, "message", msg.Msg)
 
 	metrics.SetOnionsReceived(tReceived, msg.From, c.Address, isCheckpoint, msg.Hash)
 

@@ -166,7 +166,7 @@ func SetOnionsReceived(timestamp int64, sender, intendedReceiver string, isCheck
 }
 
 func set(id string, value float64, labels ...string) {
-	slog.Info("Setting", "id", id, "value", value)
+	slog.Debug("Setting", "id", id, "value", value)
 	if labels == nil || len(labels) == 0 {
 		if collector, ok := collectors[id].(prometheus.Gauge); ok {
 			collector.Set(value)

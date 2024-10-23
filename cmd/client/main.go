@@ -30,7 +30,7 @@ func main() {
 	ip_ := flag.String("host", "x", "IP address of the client")
 	port_ := flag.Int("port", 0, "Port of the client")
 	promPort_ := flag.Int("promPort", 0, "Port of the client's Prometheus metrics")
-	logLevel_ := flag.String("log-level", "debug", "Log level")
+	logLevel_ := flag.String("log-level", "info", "Log level")
 
 	flag.Usage = func() {
 		if _, err := fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0]); err != nil {

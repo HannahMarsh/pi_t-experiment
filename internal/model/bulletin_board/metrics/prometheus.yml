@@ -3,65 +3,65 @@ global:
     external_labels:
         monitor: pi_t
 scrape_configs:
-    - job_name: client-5
-      scrape_interval: 5s
-      static_configs:
-        - targets:
-            - localhost:65433
     - job_name: client-6
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:65438
+            - localhost:52517
     - job_name: client-1
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:65413
+            - localhost:52469
     - job_name: client-2
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:65418
+            - localhost:52478
     - job_name: client-3
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:65423
+            - localhost:52490
     - job_name: client-4
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:65428
-    - job_name: relay-6
+            - localhost:52499
+    - job_name: client-5
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:65471
+            - localhost:52508
     - job_name: relay-1
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:65446
+            - localhost:52526
     - job_name: relay-2
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:65451
+            - localhost:52538
     - job_name: relay-3
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:65456
+            - localhost:52547
     - job_name: relay-4
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:65461
+            - localhost:52556
     - job_name: relay-5
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:65466
+            - localhost:52565
+    - job_name: relay-6
+      scrape_interval: 5s
+      static_configs:
+        - targets:
+            - localhost:52574
 rule_files:
     - /Users/hanma/Documents/GitHub/pi_t-experiment/internal/model/bulletin_board/metrics/rules.yml
