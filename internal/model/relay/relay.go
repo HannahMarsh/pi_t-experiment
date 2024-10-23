@@ -33,7 +33,6 @@ type Relay struct {
 	PrometheusPort         int                         // Port number for Prometheus metrics.
 	BulletinBoardUrl       string                      // URL of the bulletin board for relay registration and communication.
 	lastUpdate             time.Time                   // Timestamp of the last update sent to the bulletin board.
-	status                 *structs.NodeStatus         // Relay status, including received onions and checkpoints.
 	checkpointsReceived    *cm.ConcurrentMap[int, int] // Concurrent map to track the number of received checkpoints per layer.
 	onionsToSend           map[int][]queuedOnion       // List of onions to send to the next hop.
 	currentLayer           int                         // Current layer of the relay.
@@ -43,12 +42,15 @@ type Relay struct {
 	wg                     sync.WaitGroup
 	mu                     sync.RWMutex
 	addressToDropFrom      string
+	ShutdownMetrics        func()
 }
 
 type queuedOnion struct {
-	onion   onion_model.Onion
-	nextHop string
-	layer   int
+	onion          onion_model.Onion
+	nextHop        string
+	layer          int
+	originallySent int64
+	timeReceived   time.Time
 }
 
 // NewRelay creates a new relay instance with a unique ID, host, and port.
@@ -72,11 +74,11 @@ func NewRelay(id int, host string, port int, promPort int, bulletinBoardUrl stri
 			PrivateKey:             privateKey,
 			PrometheusPort:         promPort,
 			BulletinBoardUrl:       bulletinBoardUrl,
-			status:                 structs.NewNodeStatus(id, port, promPort, fmt.Sprintf("http://%s:%d", host, port), host, publicKey),
 			checkpointsReceived:    &cm.ConcurrentMap[int, int]{},
 			expectedNumCheckpoints: make(map[int]int),
 			expectedNonces:         expectedCheckpoints,
 			onionsToSend:           make(map[int][]queuedOnion, 0),
+			ShutdownMetrics:        func() {},
 		}
 		n.wg.Add(1)
 
@@ -92,13 +94,9 @@ func NewRelay(id int, host string, port int, promPort int, bulletinBoardUrl stri
 	}
 }
 
-// GetStatus returns the current status of the relay, including received onions and checkpoints.
-func (n *Relay) GetStatus() string {
-	return n.status.GetStatus()
-}
-
 // getPublicNodeInfo returns the relay's public information in the form of a PublicNodeApi struct.
 func (n *Relay) getPublicNodeInfo() structs.PublicNodeApi {
+	t, _ := utils.GetTimestamp() // Record the current time for the update.
 	return structs.PublicNodeApi{
 		ID:             n.ID,
 		Address:        n.Address,
@@ -106,7 +104,7 @@ func (n *Relay) getPublicNodeInfo() structs.PublicNodeApi {
 		PrometheusPort: n.PrometheusPort,
 		Host:           n.Host,
 		Port:           n.Port,
-		Time:           time.Now(),
+		Time:           t,
 	}
 }
 
@@ -129,6 +127,9 @@ func (n *Relay) startRun(start structs.RelayStartRunApi) (didParticipate bool, e
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	defer n.wg.Done()
+
+	n.ShutdownMetrics()
+	n.ShutdownMetrics = metrics.ServeMetrics(start.StartOfRun, n.PrometheusPort, metrics.ONION_SIZE, metrics.LATENCY_BETWEEN_HOPS, metrics.PROCESSING_TIME)
 
 	config.UpdateConfig(start.Config) // Update the global configuration based on the start signal.
 
@@ -157,7 +158,6 @@ func (n *Relay) startRun(start structs.RelayStartRunApi) (didParticipate bool, e
 	// Iterate over the checkpoints in the start signal to record the expected nonces.
 	for _, c := range start.Checkpoints {
 		n.expectedNonces[c.Layer][c.Nonce] = true
-		n.status.AddExpectedCheckpoint(c.Layer)
 		n.expectedNumCheckpoints[c.Layer]++
 	}
 
@@ -169,10 +169,8 @@ func (n *Relay) startRun(start structs.RelayStartRunApi) (didParticipate bool, e
 }
 
 // Receive processes an incoming onion, decrypts it, and forwards it to the next hop.
-func (n *Relay) Receive(oApi structs.OnionApi) error {
+func (n *Relay) Receive(oApi structs.OnionApi, timeReceived time.Time) error {
 	n.wg.Wait() // Wait for the expected nonces to be recorded by startRun
-
-	timeReceived := time.Now() // Record the time when the onion was received.
 
 	// Peel the onion to extract its contents, including the role, layer, and metadata.
 	role, layer, metadata, peeled, nextHop, err := pi_t.PeelOnion(oApi.Onion, n.PrivateKey)
@@ -180,10 +178,8 @@ func (n *Relay) Receive(oApi structs.OnionApi) error {
 		return pl.WrapError(err, "relay.Receive(): failed to remove layer")
 	}
 
-	defer func() {
-		metrics.Observe(metrics.PROCESSING_TIME, float64(time.Since(timeReceived).Nanoseconds())) // Track the processing time.
-		metrics.Inc(metrics.ONION_COUNT, layer)                                                   // Increment the count of processed onions for the layer.
-	}()
+	networkLatency := int64(utils.ConvertToFloat64(timeReceived)) - oApi.LastSentTimestamp
+	metrics.SetLatencyBetweenHops(networkLatency, oApi.From, n.Address, layer)
 
 	// If the relay is corrupted and the onion is from the specified client, drop the onion.
 	if n.isCorrupted && oApi.From == n.addressToDropFrom {
@@ -192,10 +188,10 @@ func (n *Relay) Receive(oApi structs.OnionApi) error {
 	}
 
 	wasBruised := false
-	isCheckpoint := false
+	isCheckpoint := metadata.Nonce != ""
 
 	// If the onion contains a nonce, it is a checkpoint.
-	if metadata.Nonce != "" {
+	if isCheckpoint {
 		isCheckpoint = true
 		if _, present := n.expectedNonces[layer][metadata.Nonce]; present { // Verify the nonce.
 			n.checkpointsReceived.GetAndSet(layer, func(i int) int {
@@ -213,44 +209,40 @@ func (n *Relay) Receive(oApi structs.OnionApi) error {
 			}
 		}
 
-		n.status.AddCheckpointOnion(layer)
 	} else if role == onion_model.MIXER {
 		peeled.Sepal = peeled.Sepal.RemoveBlock() // If not a checkpoint, remove the block from the onion.
 	}
 
-	slog.Info("Received onion", "ischeckpoint?", metadata.Nonce != "", "layer", layer, "nextHop", nextHop)
-
-	n.status.AddOnion(oApi.From, n.Address, nextHop, layer, isCheckpoint, !wasBruised)
+	slog.Info("Received onion", "ischeckpoint?", isCheckpoint, "layer", layer, "nextHop", nextHop, "role", role, "wasBruised", wasBruised, "isCorrupted", n.isCorrupted, "from", oApi.From)
 
 	checkpointsReceivedThisLayer := n.checkpointsReceived.Get(layer)
 
+	newQOnion := queuedOnion{onion: peeled, nextHop: nextHop, layer: layer, originallySent: oApi.OriginallySentTimestamp, timeReceived: timeReceived}
 	n.mu.RLock()
 	if layer < n.currentLayer { // onion is late
 		n.mu.RUnlock()
-		go n.sendToNode(nextHop, peeled, layer) // Forward the onion to the next hop.
+		go n.sendOnion(newQOnion) // Forward the onion to the next hop.
 	} else {
 		n.mu.RUnlock()
 		n.mu.Lock()
-		n.onionsToSend[layer] = append(n.onionsToSend[layer], queuedOnion{onion: peeled, nextHop: nextHop, layer: layer})
+		n.onionsToSend[layer] = append(n.onionsToSend[layer], newQOnion)
 		if checkpointsReceivedThisLayer >= int(config.GetTao()*float64(n.expectedNumCheckpoints[layer])) {
 			for _, qOnion := range n.onionsToSend[layer] {
-				go n.sendToNode(qOnion.nextHop, qOnion.onion, qOnion.layer) // Forward the onion to the next hop.
+				go n.sendOnion(qOnion)
 			}
 			n.onionsToSend[layer] = make([]queuedOnion, 0)
 		}
 		n.mu.Unlock()
 	}
 
-	//go n.sendToNode(nextHop, peeled, layer) // Forward the onion to the next hop.
-
 	return nil
 }
 
-// sendToNode forwards the constructed onion to the specified address.
-func (n *Relay) sendToNode(addr string, constructedOnion onion_model.Onion, layer int) {
-	// Send the onion to the next hop using the API function.
-	err := api_functions.SendOnion(addr, n.Address, constructedOnion, layer)
-	if err != nil {
+func (n *Relay) sendOnion(qOnion queuedOnion) {
+	processingTime := utils.TimeSince(qOnion.timeReceived)
+	metrics.SetProcessingTime(int64(processingTime), n.Address, qOnion.layer)
+
+	if err := api_functions.SendOnion(qOnion.nextHop, n.Address, qOnion.originallySent, qOnion.onion, qOnion.layer); err != nil {
 		slog.Error("Error sending onion", err)
 	}
 }
@@ -293,9 +285,9 @@ func (n *Relay) GetActiveNodes() ([]structs.PublicNodeApi, error) {
 
 // updateBulletinBoard updates the relay's information on the bulletin board.
 func (n *Relay) updateBulletinBoard(endpoint string, expectedStatusCode int) error {
-	n.mu.Lock()         // Lock the mutex to ensure exclusive access to the relay's state during the update.
-	defer n.mu.Unlock() // Unlock the mutex when the function returns.
-	t := time.Now()     // Record the current time for the update.
+	n.mu.Lock()                  // Lock the mutex to ensure exclusive access to the relay's state during the update.
+	defer n.mu.Unlock()          // Unlock the mutex when the function returns.
+	t, _ := utils.GetTimestamp() // Record the current time for the update.
 
 	// Marshal the relay's public information into JSON.
 	if data, err := json.Marshal(structs.PublicNodeApi{

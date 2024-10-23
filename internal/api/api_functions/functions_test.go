@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 var usedPorts sync.Map
@@ -119,7 +120,7 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 				defer wg.Done()
 				mux := http.NewServeMux()
 				mux.HandleFunc("/receive", func(w http.ResponseWriter, r *http.Request) {
-					HandleReceiveOnion(w, r, func(oApi structs.OnionApi) error {
+					HandleReceiveOnion(w, r, func(oApi structs.OnionApi, timeS time.Time) error {
 						onionStr := oApi.Onion
 						_, layer, _, peeled, nextDestination, err2 := pi_t.PeelOnion(onionStr, nodes[i].privateKeyPEM)
 						if err2 != nil {
@@ -145,7 +146,7 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 							peeled.Sepal = peeled.Sepal.RemoveBlock()
 						}
 
-						err4 := SendOnion(nextDestination, nodes[i].address, peeled, -1)
+						err4 := SendOnion(nextDestination, nodes[i].address, 0, peeled, -1)
 						if err4 != nil {
 							slog.Error("SendOnion() error", err4)
 							t.Errorf("SendOnion() error = %v", err4)
@@ -172,7 +173,7 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 		go func() {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/receive", func(w http.ResponseWriter, r *http.Request) {
-				HandleReceiveOnion(w, r, func(oApi structs.OnionApi) error {
+				HandleReceiveOnion(w, r, func(oApi structs.OnionApi, timeS time.Time) error {
 					onionStr := oApi.Onion
 					defer wg.Done()
 					_, layer, _, peeled, _, err2 := pi_t.PeelOnion(onionStr, nodes[l].privateKeyPEM)
@@ -237,7 +238,7 @@ func TestReceiveOnionMultipleLayers(t *testing.T) {
 			}
 		}()
 
-		err = SendOnion(nodes[1].address, nodes[0].address, onions[0][0], -1)
+		err = SendOnion(nodes[1].address, nodes[0].address, 0, onions[0][0], -1)
 		if err != nil {
 			slog.Error("SendOnion() error", err)
 			t.Fatalf("SendOnion() error = %v", err)

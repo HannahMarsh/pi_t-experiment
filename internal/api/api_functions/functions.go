@@ -18,7 +18,7 @@ import (
 )
 
 // sendOnion sends an onion to the specified address with compression and timeout
-func SendOnion(to, from string, o onion_model.Onion, layer int) error {
+func SendOnion(to, from string, firstSent int64, o onion_model.Onion, layer int) error {
 	slog.Debug("Sending onion...", "from", from, "to", to)
 	url := fmt.Sprintf("%s/receive", to)
 
@@ -29,10 +29,13 @@ func SendOnion(to, from string, o onion_model.Onion, layer int) error {
 
 	oStr := base64.StdEncoding.EncodeToString(data)
 
+	_, lastSent := utils.GetTimestamp()
 	onion := structs.OnionApi{
-		To:    to,
-		From:  from,
-		Onion: oStr,
+		To:                      to,
+		From:                    from,
+		Onion:                   oStr,
+		OriginallySentTimestamp: firstSent,
+		LastSentTimestamp:       int64(lastSent),
 	}
 
 	payload, err := json.Marshal(onion)
@@ -49,9 +52,8 @@ func SendOnion(to, from string, o onion_model.Onion, layer int) error {
 		Timeout: 30 * time.Second, // Set timeout
 	}
 
-	if layer >= 0 {
-		metrics.Observe(metrics.ONION_SIZE, float64(compressedBuffer.Len()))
-	}
+	onionSize := int64(compressedBuffer.Len())
+	metrics.SetOnionSize(onionSize, layer)
 
 	req, err := http.NewRequestWithContext(context.Background(), "POST", url, &compressedBuffer)
 	if err != nil {
@@ -79,8 +81,9 @@ func SendOnion(to, from string, o onion_model.Onion, layer int) error {
 	return nil
 }
 
-func HandleReceiveOnion(w http.ResponseWriter, r *http.Request, receiveFunction func(api structs.OnionApi) error) {
+func HandleReceiveOnion(w http.ResponseWriter, r *http.Request, receiveFunction func(api structs.OnionApi, receivedTime time.Time) error) {
 
+	receivedTimestamp, _ := utils.GetTimestamp()
 	var body []byte
 	var err error
 
@@ -119,7 +122,7 @@ func HandleReceiveOnion(w http.ResponseWriter, r *http.Request, receiveFunction 
 		return
 	}
 
-	if err = receiveFunction(o); err != nil {
+	if err = receiveFunction(o, receivedTimestamp); err != nil {
 		slog.Error("Error receiving onion", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

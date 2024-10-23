@@ -16,14 +16,6 @@ func (c *Client) HandleReceive(w http.ResponseWriter, r *http.Request) {
 	api_functions.HandleReceiveOnion(w, r, c.Receive)
 }
 
-// HandleGetStatus returns the current status of the client in response to an HTTP request.
-func (c *Client) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write([]byte(c.GetStatus())); err != nil {
-		slog.Error("Error writing response", err)
-	}
-}
-
 // HandleStartRun handles the initiation of a run based on a start signal received via an HTTP request.
 func (c *Client) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Starting run")

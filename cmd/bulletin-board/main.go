@@ -7,6 +7,7 @@ import (
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
 	"github.com/HannahMarsh/pi_t-experiment/internal/model/bulletin_board"
+	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,6 +16,9 @@ import (
 	"go.uber.org/automaxprocs/maxprocs"
 	"log/slog"
 )
+
+var stopNTC func()
+var bulletinBoard *bulletin_board.BulletinBoard
 
 func main() {
 	// Define command-line flags
@@ -38,6 +42,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	stopNTC = utils.StartNTP()
+
 	// Initialize global configurations by loading them from config/config.yml
 	if err, _ := config.InitGlobal(); err != nil {
 		slog.Error("failed to init config", err)
@@ -50,7 +56,7 @@ func main() {
 	slog.Info("⚡ init Bulletin board", "url", url)
 
 	// Create a new instance of the Bulletin Board with the current configuration.
-	bulletinBoard := bulletin_board.NewBulletinBoard()
+	bulletinBoard = bulletin_board.NewBulletinBoard()
 
 	// Start the Bulletin Board's main operations in a new goroutine
 	go func() {
@@ -98,10 +104,17 @@ func main() {
 	select {
 	case v := <-quit: // OS signal is received
 		config.GlobalCancel()
-		bulletinBoard.Shutdown()
 		slog.Info("", "signal.Notify", v)
+		cleanup()
 	case done := <-config.GlobalCtx.Done(): // global context is canceled
 		slog.Info("", "ctx.Done", done)
-		bulletinBoard.Shutdown()
+		cleanup()
 	}
+}
+
+func cleanup() {
+	if err := bulletinBoard.Shutdown(); err != nil {
+		slog.Error("failed to shutdown bulletin board", err)
+	}
+	stopNTC()
 }

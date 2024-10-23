@@ -6,7 +6,6 @@ import (
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
-	"github.com/HannahMarsh/pi_t-experiment/internal/metrics"
 	"github.com/HannahMarsh/pi_t-experiment/internal/model/client"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"go.uber.org/automaxprocs/maxprocs"
@@ -19,6 +18,11 @@ import (
 
 	_ "github.com/lib/pq"
 )
+
+var stopNTC func()
+var newClient *client.Client
+
+//var shutdownMetrics func()
 
 func main() {
 	// Define command-line flags
@@ -44,6 +48,8 @@ func main() {
 	logLevel := *logLevel_
 
 	pl.SetUpLogrusAndSlog(logLevel)
+
+	stopNTC = utils.StartNTP()
 
 	if port == 0 {
 		var err error
@@ -94,7 +100,6 @@ func main() {
 
 	slog.Info("⚡ init newClient", "id", id)
 
-	var newClient *client.Client
 	// Attempt to create a new client instance, retrying every 5 seconds upon failure (in case the bulletin board isn't ready yet).
 	for {
 		if n, err := client.NewClient(id, ip, port, promPort, config.GetBulletinBoardAddress()); err != nil {
@@ -116,7 +121,6 @@ func main() {
 	// Set up HTTP handlers
 	http.HandleFunc("/receive", newClient.HandleReceive)
 	http.HandleFunc("/start", newClient.HandleStartRun)
-	http.HandleFunc("/status", newClient.HandleGetStatus)
 	http.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Shutdown signal received")
 		quit <- os.Signal(syscall.SIGTERM) // signal shutdown
@@ -128,7 +132,7 @@ func main() {
 
 	slog.Info("🌏 serving prometheus metrics..", "address", fmt.Sprintf("http://%s:%d", ip, port))
 	// Serve Prometheus metrics in a separate goroutine.
-	shutdownMetrics := metrics.ServeMetrics(promPort, metrics.MSG_SENT, metrics.MSG_RECEIVED, metrics.ONION_SIZE)
+	//shutdownMetrics = metrics.ServeMetrics(promPort, metrics.END_TO_END_LATENCY, metrics.ONION_SIZE, metrics.LATENCY_BETWEEN_HOPS, metrics.PROCESSING_TIME, metrics.ONIONS_RECEIVED, metrics.ONIONS_SENT)
 
 	// Start the HTTP server
 	go func() {
@@ -145,12 +149,18 @@ func main() {
 	// Wait for either an OS signal to quit or the global context to be canceled
 	select {
 	case v := <-quit: // OS signal is received
-		config.GlobalCancel()
-		shutdownMetrics()
 		slog.Info("", "signal.Notify", v)
+		config.GlobalCancel()
+		cleanup()
 	case done := <-config.GlobalCtx.Done(): // global context is canceled
 		slog.Info("", "ctx.Done", done)
-		shutdownMetrics()
+		cleanup()
 	}
 
+}
+
+func cleanup() {
+	//shutdownMetrics()
+	newClient.ShutdownMetrics()
+	stopNTC()
 }

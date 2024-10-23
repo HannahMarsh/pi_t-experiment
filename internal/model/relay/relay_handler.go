@@ -13,14 +13,6 @@ func (n *Relay) HandleReceiveOnion(w http.ResponseWriter, r *http.Request) {
 	api_functions.HandleReceiveOnion(w, r, n.Receive)
 }
 
-// HandleGetStatus returns the current status of the relay in response to an HTTP request.
-func (n *Relay) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write([]byte(n.GetStatus())); err != nil {
-		slog.Error("Error writing response", err)
-	}
-}
-
 // HandleStartRun handles the initiation of a relay run based on a start signal received via an HTTP request.
 func (n *Relay) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Starting run")

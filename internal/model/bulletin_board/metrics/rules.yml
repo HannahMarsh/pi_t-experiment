@@ -1,5 +1,31 @@
 groups:
-  - name: latency_rules
+  - name: onions_sent_group
     rules:
-      - record: message_latency_seconds
-        expr: (messageReceivedTimestamp - on(hash) messageSentTimestamp)
+      - record: arrival_rate_per_second
+        expr: (1000 * (count(onionsSent) by (checkpoint))) / ((max(onionsSent) by (checkpoint)) - (min(onionsSent) by (checkpoint)))
+      - record: total_onions_sent
+        expr: count(onionsSent) by (sender, checkpoint)
+  - name: onions_received_group
+    rules:
+      - record: receive_rate_per_second
+        expr: (1000 * (count(onionsReceived) by (receiver))) / ((max(onionsReceived) by (receiver)) - (min(onionsReceived) by (receiver)))
+      - record: total_onions_received
+        expr: count(onionsReceived) by (receiver, checkpoint)
+      - record: onion_throughput
+        expr: (1000 * (count(onionsReceived)) / (max(onionsReceived) - min(onionsReceived)))
+      - record: onion_goodput
+        expr: (1000 * (count(onionsReceived{checkpoint="true"})) / (max(onionsReceived{checkpoint="true"}) - min(onionsReceived{checkpoint="true"})))
+  - name: latency_group
+    rules:
+      - record: network_latency_per_round
+        expr: avg(latencyBetweenHops) by (round)
+      - record: network_latency_per_node
+        expr: avg(label_replace(latencyBetweenHops, "node", "$1", "to", "(.*)") or label_replace(latencyBetweenHops, "node", "$1", "from", "(.*)")) by (node)
+      - record: endToEndLatency_checkpoints
+        expr: avg(endToEndLatency) by (checkpoint)
+      - record: average_processing_time
+        expr: avg(onionProcessingTime) by (node, round)
+  - name: dropped_onions_group
+    rules:
+      - record: onions_dropped_by_gatekeeper
+        expr: label_replace(count(onionsSent) by (intendedReceiver), "receiver", "$1", "intendedReceiver", "(.*)") - count(onionsReceived) by (receiver)
