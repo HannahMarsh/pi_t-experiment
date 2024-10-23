@@ -42,13 +42,15 @@ type Relay struct {
 	wg                     sync.WaitGroup
 	mu                     sync.RWMutex
 	addressToDropFrom      string
+	ShutdownMetrics        func()
 }
 
 type queuedOnion struct {
-	onion      onion_model.Onion
-	nextHop    string
-	layer      int
-	timestamps []int64
+	onion          onion_model.Onion
+	nextHop        string
+	layer          int
+	originallySent int64
+	timeReceived   time.Time
 }
 
 // NewRelay creates a new relay instance with a unique ID, host, and port.
@@ -76,6 +78,7 @@ func NewRelay(id int, host string, port int, promPort int, bulletinBoardUrl stri
 			expectedNumCheckpoints: make(map[int]int),
 			expectedNonces:         expectedCheckpoints,
 			onionsToSend:           make(map[int][]queuedOnion, 0),
+			ShutdownMetrics:        func() {},
 		}
 		n.wg.Add(1)
 
@@ -125,6 +128,9 @@ func (n *Relay) startRun(start structs.RelayStartRunApi) (didParticipate bool, e
 	defer n.mu.Unlock()
 	defer n.wg.Done()
 
+	n.ShutdownMetrics()
+	n.ShutdownMetrics = metrics.ServeMetrics(start.StartOfRun, n.PrometheusPort, metrics.ONION_SIZE, metrics.LATENCY_BETWEEN_HOPS, metrics.PROCESSING_TIME)
+
 	config.UpdateConfig(start.Config) // Update the global configuration based on the start signal.
 
 	// Determine if the relay is corrupted based on the configuration's corruption rate (Chi).
@@ -172,11 +178,8 @@ func (n *Relay) Receive(oApi structs.OnionApi, timeReceived time.Time) error {
 		return pl.WrapError(err, "relay.Receive(): failed to remove layer")
 	}
 
-	defer func() {
-		processingTime := utils.TimeSince(timeReceived)          // Calculate the processing time.
-		metrics.Observe(metrics.PROCESSING_TIME, processingTime) // Track the processing time.
-		metrics.Inc(metrics.ONION_COUNT, layer)                  // Increment the count of processed onions for the layer.
-	}()
+	networkLatency := int64(utils.ConvertToFloat64(timeReceived)) - oApi.LastSentTimestamp
+	metrics.SetLatencyBetweenHops(networkLatency, oApi.From, n.Address, layer)
 
 	// If the relay is corrupted and the onion is from the specified client, drop the onion.
 	if n.isCorrupted && oApi.From == n.addressToDropFrom {
@@ -214,7 +217,7 @@ func (n *Relay) Receive(oApi structs.OnionApi, timeReceived time.Time) error {
 
 	checkpointsReceivedThisLayer := n.checkpointsReceived.Get(layer)
 
-	newQOnion := queuedOnion{onion: peeled, nextHop: nextHop, layer: layer, timestamps: oApi.ReceiveTimestampsPerLayer}
+	newQOnion := queuedOnion{onion: peeled, nextHop: nextHop, layer: layer, originallySent: oApi.OriginallySentTimestamp, timeReceived: timeReceived}
 	n.mu.RLock()
 	if layer < n.currentLayer { // onion is late
 		n.mu.RUnlock()
@@ -236,7 +239,10 @@ func (n *Relay) Receive(oApi structs.OnionApi, timeReceived time.Time) error {
 }
 
 func (n *Relay) sendOnion(qOnion queuedOnion) {
-	if err := api_functions.SendOnion(qOnion.nextHop, n.Address, qOnion.timestamps, qOnion.onion, qOnion.layer); err != nil {
+	processingTime := utils.TimeSince(qOnion.timeReceived)
+	metrics.SetProcessingTime(int64(processingTime), n.Address, qOnion.layer)
+
+	if err := api_functions.SendOnion(qOnion.nextHop, n.Address, qOnion.originallySent, qOnion.onion, qOnion.layer); err != nil {
 		slog.Error("Error sending onion", err)
 	}
 }

@@ -95,6 +95,8 @@ func (bb *BulletinBoard) StartProtocol() error {
 
 // signalNodesToStart sends the start signal to all active nodes (client and relays) in the network.
 func (bb *BulletinBoard) signalNodesToStart() error {
+	_, startTime := utils.GetTimestamp()
+	startOfRun := int64(startTime)
 	slog.Info("Signaling nodes to start...")
 
 	// Filter and map active relays to their PublicNodeApi representations.
@@ -139,6 +141,7 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 			Relays:           activeNodes,
 			CheckpointOnions: checkpoints[client.ID],
 			Config:           cfg,
+			StartOfRun:       startOfRun,
 		}
 		clientStartSignals[client] = csr
 	}
@@ -158,6 +161,7 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 		nodeStartSignals[node] = structs.RelayStartRunApi{
 			Checkpoints: allCheckpoints[node.ID],
 			Config:      cfg,
+			StartOfRun:  startOfRun,
 		}
 	}
 

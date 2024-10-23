@@ -35,6 +35,7 @@ type Client struct {
 	BulletinBoardUrl string         // URL of the bulletin board for client registration and communication.
 	wg               sync.WaitGroup // WaitGroup to ensure the client does not start protocol until all messages are generated
 	mu               sync.RWMutex
+	ShutdownMetrics  func()
 }
 
 // NewClient creates a new client instance with a unique ID, host, and port.
@@ -54,7 +55,8 @@ func NewClient(id int, host string, port int, promPort int, bulletinBoardUrl str
 			ActiveRelays:     make([]structs.PublicNodeApi, 0),
 			BulletinBoardUrl: bulletinBoardUrl,
 			//Messages:         make([]structs.Message, 0),
-			OtherClients: make([]structs.PublicNodeApi, 0),
+			OtherClients:    make([]structs.PublicNodeApi, 0),
+			ShutdownMetrics: func() {},
 		}
 		c.wg.Add(1)
 
@@ -325,6 +327,9 @@ func (c *Client) processCheckpoint(checkpointOnion structs.CheckpointOnion, clie
 
 // startRun initiates a communication run based on the start signal received from the bulletin board.
 func (c *Client) startRun(start structs.ClientStartRunApi) error {
+	c.ShutdownMetrics()
+
+	c.ShutdownMetrics = metrics.ServeMetrics(start.StartOfRun, c.PrometheusPort, metrics.END_TO_END_LATENCY, metrics.ONION_SIZE, metrics.LATENCY_BETWEEN_HOPS, metrics.PROCESSING_TIME, metrics.ONIONS_RECEIVED, metrics.ONIONS_SENT)
 	slog.Info("Client starting run", "num client", len(start.Clients), "num relays", len(start.Relays))
 	c.mu.Lock()         // Lock the mutex to ensure exclusive access to the client's state during the run.
 	defer c.mu.Unlock() // Unlock the mutex when the function returns.
@@ -360,10 +365,11 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 			go func(onion queuedOnion) {
 				//defer wg.Done()
 				_, timeSent := utils.GetTimestamp()
-				if err = api_functions.SendOnion(onion.to, c.Address, []int64{int64(timeSent)}, onion.onion, 0); err != nil {
+				metrics.SetOnionsSent(int64(timeSent), c.Address, onion.msg.To, onion.msg.Msg == "", onion.msg.Hash) // Record the time when the onion was sent.
+				if err = api_functions.SendOnion(onion.to, c.Address, int64(timeSent), onion.onion, 0); err != nil {
 					slog.Error("failed to send onions", err)
 				}
-				metrics.Set(metrics.MSG_SENT, timeSent, onion.msg.Hash) // Record the time when the onion was sent.
+				//metrics.Set(metrics.MSG_SENT, timeSent, onion.msg.Hash) // Record the time when the onion was sent.
 
 			}(onion)
 		}
@@ -377,21 +383,9 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 
 // Receive processes an incoming onion, decrypts it, and extracts the encapsulated message.
 func (c *Client) Receive(oApi structs.OnionApi, timeReceived time.Time) error {
-	timestamps := oApi.ReceiveTimestampsPerLayer
-	utils.SortOrdered(timestamps)
-
-	numHops := len(timestamps)
-	latencyBetweenHops := make([]int64, 0)
-	timeSent := timestamps[0]
-	for layer, tr := range timestamps {
-		if layer > 0 {
-			latencyBetweenHops = append(latencyBetweenHops, tr-timeSent)
-			timeSent = tr
-		}
-	}
-	averageLatencyBetweenHops := int64(utils.Average(latencyBetweenHops))
-	totalLatency := timestamps[numHops-1] - timestamps[0]
-	slog.Info("Client received onion", "from", oApi.From, "num_hops", numHops, "total_latency", totalLatency, "average_latency_between_hops", averageLatencyBetweenHops)
+	tReceived := int64(utils.ConvertToFloat64(timeReceived))
+	endToEndLatency := tReceived - oApi.OriginallySentTimestamp
+	hopNetworkLatency := tReceived - oApi.LastSentTimestamp
 
 	_, layer, _, peeled, _, err := pi_t.PeelOnion(oApi.Onion, c.PrivateKey)
 	if err != nil {
@@ -402,9 +396,14 @@ func (c *Client) Receive(oApi structs.OnionApi, timeReceived time.Time) error {
 	if err2 := json.Unmarshal([]byte(peeled.Content), &msg); err2 != nil {
 		return pl.WrapError(err2, "relay.Receive(): failed to unmarshal message")
 	}
+	isCheckpoint := msg.Msg == ""
 	slog.Info("Client received onion", "layer", layer, "from", msg.From, "message", msg.Msg)
 
-	metrics.Set(metrics.MSG_RECEIVED, utils.ConvertToFloat64(timeReceived), msg.Hash) // Record the time when the message was received.
+	metrics.SetOnionsReceived(tReceived, msg.From, c.Address, isCheckpoint, msg.Hash)
 
+	processingTime := int64(utils.TimeSince(timeReceived))
+	metrics.SetProcessingTime(processingTime, c.Address, layer)
+	metrics.SetEndToEndLatency(endToEndLatency, msg.From, c.Address, isCheckpoint, msg.Hash)
+	metrics.SetLatencyBetweenHops(hopNetworkLatency, oApi.From, c.Address, layer)
 	return nil
 }

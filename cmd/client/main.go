@@ -6,7 +6,6 @@ import (
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
-	"github.com/HannahMarsh/pi_t-experiment/internal/metrics"
 	"github.com/HannahMarsh/pi_t-experiment/internal/model/client"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"go.uber.org/automaxprocs/maxprocs"
@@ -22,7 +21,8 @@ import (
 
 var stopNTC func()
 var newClient *client.Client
-var shutdownMetrics func()
+
+//var shutdownMetrics func()
 
 func main() {
 	// Define command-line flags
@@ -132,7 +132,7 @@ func main() {
 
 	slog.Info("🌏 serving prometheus metrics..", "address", fmt.Sprintf("http://%s:%d", ip, port))
 	// Serve Prometheus metrics in a separate goroutine.
-	shutdownMetrics = metrics.ServeMetrics(promPort, metrics.MSG_SENT, metrics.MSG_RECEIVED, metrics.ONION_SIZE)
+	//shutdownMetrics = metrics.ServeMetrics(promPort, metrics.END_TO_END_LATENCY, metrics.ONION_SIZE, metrics.LATENCY_BETWEEN_HOPS, metrics.PROCESSING_TIME, metrics.ONIONS_RECEIVED, metrics.ONIONS_SENT)
 
 	// Start the HTTP server
 	go func() {
@@ -160,6 +160,7 @@ func main() {
 }
 
 func cleanup() {
-	shutdownMetrics()
+	//shutdownMetrics()
+	newClient.ShutdownMetrics()
 	stopNTC()
 }

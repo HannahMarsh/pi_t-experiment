@@ -6,7 +6,6 @@ import (
 	"fmt"
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/config"
-	"github.com/HannahMarsh/pi_t-experiment/internal/metrics"
 	"github.com/HannahMarsh/pi_t-experiment/internal/model/relay"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
 	"go.uber.org/automaxprocs/maxprocs"
@@ -131,7 +130,6 @@ func main() {
 	})
 
 	// Serve Prometheus metrics in a separate goroutine.
-	shutdownMetrics = metrics.ServeMetrics(promPort, metrics.PROCESSING_TIME, metrics.ONION_COUNT, metrics.ONION_SIZE)
 
 	// Start the HTTP server
 	go func() {
@@ -160,6 +158,7 @@ func main() {
 }
 
 func cleanup() {
-	shutdownMetrics()
+	//shutdownMetrics()
+	newRelay.ShutdownMetrics()
 	stopNTC()
 }

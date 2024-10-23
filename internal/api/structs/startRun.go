@@ -7,11 +7,13 @@ type ClientStartRunApi struct {
 	Clients          []PublicNodeApi   `json:"c"`
 	CheckpointOnions []CheckpointOnion `json:"co"`
 	Config           config.Config     `json:"cfg"`
+	StartOfRun       int64
 }
 
 type RelayStartRunApi struct {
 	Checkpoints []Checkpoint  `json:"cp"`
 	Config      config.Config `json:"cfg"`
+	StartOfRun  int64
 }
 
 type CheckpointOnion struct {

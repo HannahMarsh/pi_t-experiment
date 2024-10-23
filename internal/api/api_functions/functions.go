@@ -18,7 +18,7 @@ import (
 )
 
 // sendOnion sends an onion to the specified address with compression and timeout
-func SendOnion(to, from string, receivedTimestamps []int64, o onion_model.Onion, layer int) error {
+func SendOnion(to, from string, firstSent int64, o onion_model.Onion, layer int) error {
 	slog.Debug("Sending onion...", "from", from, "to", to)
 	url := fmt.Sprintf("%s/receive", to)
 
@@ -29,11 +29,13 @@ func SendOnion(to, from string, receivedTimestamps []int64, o onion_model.Onion,
 
 	oStr := base64.StdEncoding.EncodeToString(data)
 
+	_, lastSent := utils.GetTimestamp()
 	onion := structs.OnionApi{
-		To:                        to,
-		From:                      from,
-		Onion:                     oStr,
-		ReceiveTimestampsPerLayer: receivedTimestamps,
+		To:                      to,
+		From:                    from,
+		Onion:                   oStr,
+		OriginallySentTimestamp: firstSent,
+		LastSentTimestamp:       int64(lastSent),
 	}
 
 	payload, err := json.Marshal(onion)
@@ -50,9 +52,8 @@ func SendOnion(to, from string, receivedTimestamps []int64, o onion_model.Onion,
 		Timeout: 30 * time.Second, // Set timeout
 	}
 
-	if layer >= 0 {
-		metrics.Observe(metrics.ONION_SIZE, float64(compressedBuffer.Len()))
-	}
+	onionSize := int64(compressedBuffer.Len())
+	metrics.SetOnionSize(onionSize, layer)
 
 	req, err := http.NewRequestWithContext(context.Background(), "POST", url, &compressedBuffer)
 	if err != nil {
@@ -82,7 +83,7 @@ func SendOnion(to, from string, receivedTimestamps []int64, o onion_model.Onion,
 
 func HandleReceiveOnion(w http.ResponseWriter, r *http.Request, receiveFunction func(api structs.OnionApi, receivedTime time.Time) error) {
 
-	receivedTimestamp, receivedTimestampFloat64 := utils.GetTimestamp()
+	receivedTimestamp, _ := utils.GetTimestamp()
 	var body []byte
 	var err error
 
@@ -120,7 +121,6 @@ func HandleReceiveOnion(w http.ResponseWriter, r *http.Request, receiveFunction 
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	o = o.AddReceiveTimestamp(int64(receivedTimestampFloat64))
 
 	if err = receiveFunction(o, receivedTimestamp); err != nil {
 		slog.Error("Error receiving onion", err)
