@@ -22,7 +22,7 @@ var bulletinBoard *bulletin_board.BulletinBoard
 
 func main() {
 	// Define command-line flags
-	logLevel := flag.String("log-level", "debug", "Log level")
+	logLevel := flag.String("log-level", "info", "Log level")
 
 	flag.Usage = func() {
 		if _, err := fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0]); err != nil {
