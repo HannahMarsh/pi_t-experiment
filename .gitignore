@@ -48,4 +48,4 @@ out/
 out/*
 
 
-internal/model/bulletin_board/metrics/prometheus.yml
+**/prometheus.yml

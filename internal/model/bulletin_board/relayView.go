@@ -32,17 +32,18 @@ func NewNodeView(n structs.PublicNodeApi, maxTimeBetweenHeartbeats time.Duration
 }
 
 func (nv *RelayView) UpdateNode(c structs.PublicNodeApi) {
-	nv.mu.Lock()
-	defer nv.mu.Unlock()
-	if nv.LastHeartbeat.After(c.Time) {
-		return
-	} else {
-		nv.LastHeartbeat = c.Time
-	}
+	//nv.mu.Lock()
+	//defer nv.mu.Unlock()
+	//if nv.LastHeartbeat.After(c.Time) {
+	//	return
+	//} else {
+	//	nv.LastHeartbeat = c.Time
+	//}
 }
 
 func (nv *RelayView) IsActive() bool {
-	nv.mu.RLock()
-	defer nv.mu.RUnlock()
-	return time.Since(nv.LastHeartbeat) < nv.MaxTimeBetweenHeartbeats
+	//nv.mu.RLock()
+	//defer nv.mu.RUnlock()
+	//return time.Since(nv.LastHeartbeat) < nv.MaxTimeBetweenHeartbeats
+	return true
 }
