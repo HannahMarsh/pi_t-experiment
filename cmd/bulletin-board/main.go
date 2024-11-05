@@ -60,7 +60,7 @@ func main() {
 
 	// Start the Bulletin Board's main operations in a new goroutine
 	go func() {
-		err := bulletinBoard.StartProtocol()
+		err := bulletinBoard.StartProtocol(false)
 		if err != nil {
 			slog.Error("failed to start runs", err)
 			config.GlobalCancel()
@@ -73,6 +73,7 @@ func main() {
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
 	// Set up HTTP handlers
+	http.HandleFunc("/startRegister", bulletinBoard.HandleStartWithRegisterProtocol)
 	http.HandleFunc("/start", bulletinBoard.HandleStartProtocol)
 	http.HandleFunc("/registerRelay", bulletinBoard.HandleRegisterRelay)
 	http.HandleFunc("/registerClient", bulletinBoard.HandleRegisterClient)

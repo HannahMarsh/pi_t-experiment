@@ -16,6 +16,7 @@ func (n *Relay) HandleReceiveOnion(w http.ResponseWriter, r *http.Request) {
 
 // HandleStartRun handles the initiation of a relay run based on a start signal received via an HTTP request.
 func (n *Relay) HandleStartRun(w http.ResponseWriter, r *http.Request) {
+
 	slog.Info("Starting run")
 	var start structs.RelayStartRunApi
 	// Decode the JSON request body into the start signal struct.
@@ -26,6 +27,15 @@ func (n *Relay) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go func() {
+		n.rCounterMu.Lock()
+		if n.runCounter > 0 {
+			n.rCounterMu.Unlock()
+			n.wg.Wait()
+			n.wg.Add(1)
+		} else {
+			n.rCounterMu.Unlock()
+		}
+
 		if didParticipate, err := n.startRun(start); err != nil {
 			slog.Error("Error starting run", err)
 		} else {

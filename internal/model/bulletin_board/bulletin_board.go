@@ -73,10 +73,31 @@ func (bb *BulletinBoard) Shutdown() error {
 	return nil
 }
 
+var useLast bool
+var useLastMu sync.Mutex
+
 // StartProtocol periodically checks if all nodes are ready and, if so, signals them to start a new run.
-func (bb *BulletinBoard) StartProtocol() error {
+func (bb *BulletinBoard) StartProtocol(useLastRegistered bool) error {
+	slog.Info("Starting protocol...", "useLastRegistered", useLastRegistered)
+	if useLastRegistered {
+		useLastMu.Lock()
+		useLast = true
+		useLastMu.Unlock()
+		bb.signalNodesToRegister()
+	}
 	for {
+		useLastMu.Lock()
+		if useLast && !useLastRegistered {
+			useLastMu.Unlock()
+			slog.Info("Returning...")
+			return nil
+		} else {
+			useLastMu.Unlock()
+		}
 		if bb.allNodesReady() { // Check if all nodes are ready to start.
+			useLastMu.Lock()
+			useLast = false
+			useLastMu.Unlock()
 			if err := bb.signalNodesToStart(); err != nil {
 				return pl.WrapError(err, "error signaling nodes to start")
 			} else {
@@ -102,6 +123,36 @@ func (bb *BulletinBoard) StartProtocol() error {
 	//
 	//	time.Sleep(time.Second * 5) // Wait 5 seconds before the next check.
 	//}
+}
+
+func (bb *BulletinBoard) signalNodesToRegister() {
+	last, err := config.GetLastRegistered()
+	if err != nil {
+		slog.Error("Error getting last registered nodes", err)
+	}
+
+	nodes := append(last.Clients, last.Relays...)
+	client := &http.Client{}
+
+	successful := 0
+
+	for _, node := range nodes {
+		// Send the start signal to the client's /start endpoint.
+		url := fmt.Sprintf("http://%s:%d/register", node.Host, node.Port)
+		if req, err := http.NewRequest("POST", url, nil); err != nil {
+			slog.Error("Error signaling node to register\n", err)
+		} else {
+			_, err := client.Do(req)
+			if err != nil {
+				slog.Error("Error signaling node to register\n", err)
+			} else {
+				successful++
+			}
+		}
+	}
+
+	slog.Info(fmt.Sprintf("Signaled %d nodes to register", successful))
+
 }
 
 // signalNodesToStart sends the start signal to all active nodes (client and relays) in the network.
@@ -138,6 +189,20 @@ func (bb *BulletinBoard) signalNodesToStart() error {
 			PrometheusPort: cv.PromPort,
 		}
 	})
+
+	config.UpdateRegistered(utils.Map(activeNodes, func(node structs.PublicNodeApi) config.Node {
+		return config.Node{
+			Host:     node.Host,
+			Port:     node.Port,
+			PromPort: node.PrometheusPort,
+		}
+	}), utils.Map(activeClients, func(client structs.PublicNodeApi) config.Node {
+		return config.Node{
+			Host:     client.Host,
+			Port:     client.Port,
+			PromPort: client.PrometheusPort,
+		}
+	}))
 
 	// Generate checkpoint onions for the run based on the desired server load from the global configuration
 	checkpoints := GetCheckpoints(activeNodes, activeClients)

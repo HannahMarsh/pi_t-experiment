@@ -3,6 +3,8 @@ package config
 import (
 	"context"
 	"fmt"
+	"gopkg.in/yaml.v3"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -18,6 +20,17 @@ type BulletinBoard struct {
 	Port     int    `yaml:"port"`
 	Address  string
 	PromPort int `yaml:"promPort"`
+}
+
+type LastRegistered struct {
+	Clients []Node `yaml:"clients"`
+	Relays  []Node `yaml:"relays"`
+}
+
+type Node struct {
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	PromPort int    `yaml:"promPort"`
 }
 
 type Config struct {
@@ -170,6 +183,7 @@ var globalConfig *Config
 var GlobalCtx context.Context
 var GlobalCancel context.CancelFunc
 var mu sync.RWMutex
+var Path string
 
 func InitGlobal() (error, string) {
 	mu.Lock()
@@ -203,11 +217,83 @@ func InitGlobal() (error, string) {
 		}
 	}
 
+	Path = strings.ReplaceAll(path, "config.yml", "lastRegisteredClientsRelays.yml")
+
 	path = strings.ReplaceAll(path, "config.yml", "prometheus.yml")
 
 	globalConfig.BulletinBoard.Address = fmt.Sprintf("http://%s:%d", globalConfig.BulletinBoard.Host, globalConfig.BulletinBoard.Port)
 
 	return nil, path
+}
+
+func UpdateRegistered(clients []Node, relays []Node) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	registered := LastRegistered{
+		Clients: clients,
+		Relays:  relays,
+	}
+
+	// Marshal the struct into YAML format
+	data, err := yaml.Marshal(&registered)
+	if err != nil {
+		slog.Error("failed to marshal prometheus config", err)
+		return
+	}
+
+	// Open the file for writing (creates the file if it doesn't exist)
+	file, err := os.OpenFile(Path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		slog.Error("failed to open file", err)
+		return
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			slog.Error("failed to close file", err)
+		}
+	}(file)
+
+	// Write the YAML data to the file
+	_, err = file.Write(data)
+	if err != nil {
+		slog.Error("failed to write prometheus config to file", err)
+		return
+	}
+
+	// Ensure the data is flushed to disk immediately
+	err = file.Sync()
+	if err != nil {
+		slog.Error("failed to flush prometheus config to disk", err)
+	}
+
+	slog.Info("registered clients and relays file updated", "path", Path)
+}
+
+func GetLastRegistered() (LastRegistered, error) {
+	mu.RLock()
+	defer mu.RUnlock()
+
+	var registered LastRegistered
+
+	file, err := os.Open(Path)
+	if err != nil {
+		return registered, PrettyLogger.WrapError(err, "failed to open file")
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			slog.Error("failed to close file", err)
+		}
+	}(file)
+
+	// Decode the YAML file into a struct
+	if err = yaml.NewDecoder(file).Decode(&registered); err != nil {
+		return registered, PrettyLogger.WrapError(err, "failed to decode yaml")
+	}
+
+	return registered, nil
 }
 
 func UpdateConfig(cfg Config) {

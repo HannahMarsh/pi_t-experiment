@@ -43,6 +43,9 @@ type Relay struct {
 	mu                     sync.RWMutex
 	addressToDropFrom      string
 	ShutdownMetrics        func()
+	runCounter             int
+	rCounterMu             sync.Mutex
+	started                bool
 }
 
 type queuedOnion struct {
@@ -124,12 +127,20 @@ func (n *Relay) StartPeriodicUpdates(interval time.Duration) {
 
 // startRun initializes a run based on the start signal received from the bulletin board.
 func (n *Relay) startRun(start structs.RelayStartRunApi) (didParticipate bool, e error) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	defer n.wg.Done()
+	n.started = true
+	n.rCounterMu.Lock()
+	n.runCounter++
+	if n.runCounter == 1 {
+		n.ShutdownMetrics()
+		n.ShutdownMetrics = metrics.ServeMetrics(start.StartOfRun, n.PrometheusPort, metrics.ONION_SIZE, metrics.LATENCY_BETWEEN_HOPS, metrics.PROCESSING_TIME)
+	}
+	n.rCounterMu.Unlock()
 
-	n.ShutdownMetrics()
-	n.ShutdownMetrics = metrics.ServeMetrics(start.StartOfRun, n.PrometheusPort, metrics.ONION_SIZE, metrics.LATENCY_BETWEEN_HOPS, metrics.PROCESSING_TIME)
+	n.mu.Lock()
+	defer func() {
+		n.mu.Unlock()
+		n.wg.Done()
+	}()
 
 	config.UpdateConfig(start.Config) // Update the global configuration based on the start signal.
 
@@ -164,7 +175,6 @@ func (n *Relay) startRun(start structs.RelayStartRunApi) (didParticipate bool, e
 	for i, _ := range n.onionsToSend {
 		n.onionsToSend[i] = make([]queuedOnion, 0)
 	}
-
 	return true, nil
 }
 

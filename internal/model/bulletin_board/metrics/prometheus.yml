@@ -3,65 +3,65 @@ global:
     external_labels:
         monitor: pi_t
 scrape_configs:
-    - job_name: client-1
-      scrape_interval: 5s
-      static_configs:
-        - targets:
-            - localhost:53080
-    - job_name: client-2
-      scrape_interval: 5s
-      static_configs:
-        - targets:
-            - localhost:53085
     - job_name: client-3
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:53090
+            - localhost:50207
     - job_name: client-4
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:53095
+            - localhost:50212
     - job_name: client-5
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:53100
+            - localhost:50219
     - job_name: client-6
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:53105
-    - job_name: relay-4
+            - localhost:50224
+    - job_name: client-1
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:53127
-    - job_name: relay-5
+            - localhost:50194
+    - job_name: client-2
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:53133
+            - localhost:50199
     - job_name: relay-6
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:53138
+            - localhost:50257
     - job_name: relay-1
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:53110
+            - localhost:50229
     - job_name: relay-2
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:53116
+            - localhost:50234
     - job_name: relay-3
       scrape_interval: 5s
       static_configs:
         - targets:
-            - localhost:53122
+            - localhost:50242
+    - job_name: relay-4
+      scrape_interval: 5s
+      static_configs:
+        - targets:
+            - localhost:50247
+    - job_name: relay-5
+      scrape_interval: 5s
+      static_configs:
+        - targets:
+            - localhost:50252
 rule_files:
     - /Users/hanma/Documents/GitHub/pi_t-experiment/internal/model/bulletin_board/metrics/rules.yml

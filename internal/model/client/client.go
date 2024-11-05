@@ -32,12 +32,14 @@ type Client struct {
 	ActiveRelays   []structs.PublicNodeApi // List of active relays known to the client.
 	OtherClients   []structs.PublicNodeApi // List of other client known to the client.
 	//Messages         []structs.Message       // Messages to be sent by the client.
-	BulletinBoardUrl string         // URL of the bulletin board for client registration and communication.
-	wg               sync.WaitGroup // WaitGroup to ensure the client does not start protocol until all messages are generated
-	mu               sync.RWMutex
-	ShutdownMetrics  func()
-	OnionsReceived   []structs.Message
-	oReceived        sync.RWMutex
+	BulletinBoardUrl string // URL of the bulletin board for client registration and communication.
+	//wg               sync.WaitGroup // WaitGroup to ensure the client does not start protocol until all messages are generated
+	mu              sync.RWMutex
+	ShutdownMetrics func()
+	OnionsReceived  []structs.Message
+	oReceived       sync.RWMutex
+	runCounter      int
+	rCounterMu      sync.Mutex
 }
 
 // NewClient creates a new client instance with a unique ID, host, and port.
@@ -61,7 +63,7 @@ func NewClient(id int, host string, port int, promPort int, bulletinBoardUrl str
 			ShutdownMetrics: func() {},
 			OnionsReceived:  make([]structs.Message, 0),
 		}
-		c.wg.Add(1)
+		//c.wg.Add(1)
 
 		// Register the client with the bulletin board.
 		if err := c.RegisterWithBulletinBoard(); err != nil {
@@ -132,7 +134,7 @@ func (c *Client) getRecipient(clients []structs.PublicNodeApi) (string, int) {
 
 // StartGeneratingMessages generates a single message to be sent to another client.
 func (c *Client) generateMessages(start structs.ClientStartRunApi) []structs.Message {
-	defer c.wg.Done() // Mark this operation as done in the WaitGroup when finished.
+	//defer c.wg.Done() // Mark this operation as done in the WaitGroup when finished.
 	slog.Info("Client starting to generate messages", "id", c.ID)
 
 	// Get the recipient's address and ID.
@@ -330,9 +332,14 @@ func (c *Client) processCheckpoint(checkpointOnion structs.CheckpointOnion, clie
 
 // startRun initiates a communication run based on the start signal received from the bulletin board.
 func (c *Client) startRun(start structs.ClientStartRunApi) error {
-	c.ShutdownMetrics()
+	c.rCounterMu.Lock()
+	c.runCounter++
+	if c.runCounter == 1 {
+		c.ShutdownMetrics()
+		c.ShutdownMetrics = metrics.ServeMetrics(start.StartOfRun, c.PrometheusPort, metrics.END_TO_END_LATENCY, metrics.ONION_SIZE, metrics.LATENCY_BETWEEN_HOPS, metrics.PROCESSING_TIME, metrics.ONIONS_RECEIVED, metrics.ONIONS_SENT)
+	}
+	c.rCounterMu.Unlock()
 
-	c.ShutdownMetrics = metrics.ServeMetrics(start.StartOfRun, c.PrometheusPort, metrics.END_TO_END_LATENCY, metrics.ONION_SIZE, metrics.LATENCY_BETWEEN_HOPS, metrics.PROCESSING_TIME, metrics.ONIONS_RECEIVED, metrics.ONIONS_SENT)
 	slog.Info("Client starting run", "num client", len(start.Clients), "num relays", len(start.Relays))
 	c.mu.Lock()         // Lock the mutex to ensure exclusive access to the client's state during the run.
 	defer c.mu.Unlock() // Unlock the mutex when the function returns.

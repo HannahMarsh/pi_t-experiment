@@ -30,13 +30,30 @@ func (bb *BulletinBoard) HandleRegisterRelay(w http.ResponseWriter, r *http.Requ
 }
 
 // HandleRegisterRelay processes HTTP requests for registering a relay node.
+func (bb *BulletinBoard) HandleStartWithRegisterProtocol(w http.ResponseWriter, r *http.Request) {
+	// Log the relay registration event with the relay ID.
+	slog.Info("Starting protocol...")
+
+	// Start the Bulletin Board's main operations in a new goroutine
+	go func() {
+		err := bb.StartProtocol(true)
+		if err != nil {
+			slog.Error("failed to start runs", err)
+			config.GlobalCancel()
+		}
+	}()
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+// HandleRegisterRelay processes HTTP requests for registering a relay node.
 func (bb *BulletinBoard) HandleStartProtocol(w http.ResponseWriter, r *http.Request) {
 	// Log the relay registration event with the relay ID.
 	slog.Info("Starting protocol...")
 
 	// Start the Bulletin Board's main operations in a new goroutine
 	go func() {
-		err := bb.StartProtocol()
+		err := bb.StartProtocol(false)
 		if err != nil {
 			slog.Error("failed to start runs", err)
 			config.GlobalCancel()
