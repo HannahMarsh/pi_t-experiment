@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 )
 
 // HandleReceive handles incoming onions sent to the client by other nodes.
@@ -33,6 +34,23 @@ func (c *Client) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 			slog.Info("Done sending onions")
 		}
 	}()
+	w.WriteHeader(http.StatusOK)
+}
+
+func (c *Client) HandleRegisterWithBulletinBoard(w http.ResponseWriter, r *http.Request) {
+	slog.Info("Registering with bulletin board")
+
+	go func(c *Client) {
+		for {
+			if err := c.RegisterWithBulletinBoard(); err != nil {
+				slog.Error("failed to register with bulletin board: " + err.Error())
+			} else {
+				slog.Info("Registered with bulletin board")
+				break
+			}
+			time.Sleep(5 * time.Second)
+		}
+	}(c)
 	w.WriteHeader(http.StatusOK)
 }
 

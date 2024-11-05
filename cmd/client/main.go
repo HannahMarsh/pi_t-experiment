@@ -121,6 +121,7 @@ func main() {
 	// Set up HTTP handlers
 	http.HandleFunc("/receive", newClient.HandleReceive)
 	http.HandleFunc("/start", newClient.HandleStartRun)
+	http.HandleFunc("/register", newClient.HandleRegisterWithBulletinBoard)
 	http.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Shutdown signal received")
 		quit <- os.Signal(syscall.SIGTERM) // signal shutdown
