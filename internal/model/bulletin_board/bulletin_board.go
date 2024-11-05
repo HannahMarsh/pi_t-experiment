@@ -18,21 +18,23 @@ import (
 
 // BulletinBoard keeps track of active relays and coordinates the start signal
 type BulletinBoard struct {
-	Network         map[int]*RelayView  // Maps relay IDs to their respective RelayView structs.
-	Clients         map[int]*ClientView // Maps client IDs to their respective ClientView structs.
-	mu              sync.RWMutex        // Mutex for read/write locking
-	lastStartRun    time.Time           // Timestamp of the last start signal sent.
-	timeBetweenRuns time.Duration       // Minimum duration between consecutive start signals.
+	Network             map[int]*RelayView  // Maps relay IDs to their respective RelayView structs.
+	Clients             map[int]*ClientView // Maps client IDs to their respective ClientView structs.
+	mu                  sync.RWMutex        // Mutex for read/write locking
+	lastStartRun        time.Time           // Timestamp of the last start signal sent.
+	timeBetweenRuns     time.Duration       // Minimum duration between consecutive start signals.
+	tellNodesToRegister bool
 }
 
 // NewBulletinBoard creates a new bulletin board
-func NewBulletinBoard() *BulletinBoard {
+func NewBulletinBoard(tellNodesToRegister bool) *BulletinBoard {
 	lastStartRun, _ := utils.GetTimestamp()
 	return &BulletinBoard{
-		Network:         make(map[int]*RelayView),
-		Clients:         make(map[int]*ClientView),
-		lastStartRun:    lastStartRun,
-		timeBetweenRuns: time.Millisecond * 10_000, // 10 seconds
+		Network:             make(map[int]*RelayView),
+		Clients:             make(map[int]*ClientView),
+		lastStartRun:        lastStartRun,
+		timeBetweenRuns:     time.Millisecond * 10_000, // 10 seconds
+		tellNodesToRegister: tellNodesToRegister,
 	}
 }
 
@@ -78,6 +80,7 @@ var useLastMu sync.Mutex
 
 // StartProtocol periodically checks if all nodes are ready and, if so, signals them to start a new run.
 func (bb *BulletinBoard) StartProtocol(useLastRegistered bool) error {
+	useLastRegistered = useLastRegistered || bb.tellNodesToRegister
 	slog.Info("Starting protocol...", "useLastRegistered", useLastRegistered)
 	if useLastRegistered {
 		useLastMu.Lock()

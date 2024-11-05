@@ -24,6 +24,8 @@ func main() {
 	// Define command-line flags
 	logLevel := flag.String("log-level", "info", "Log level")
 
+	tellNodesToRegister := flag.Bool("usePrev", false, "False by default. If true, the bulletin board will tell all the clients and relays to register again, using the addresses saved from the previous run (lastRegisteredClientsRelays.yml)")
+
 	flag.Usage = func() {
 		if _, err := fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0]); err != nil {
 			slog.Error("Usage of %s:\n", err, os.Args[0])
@@ -56,7 +58,7 @@ func main() {
 	slog.Info("⚡ init Bulletin board", "url", url)
 
 	// Create a new instance of the Bulletin Board with the current configuration.
-	bulletinBoard = bulletin_board.NewBulletinBoard()
+	bulletinBoard = bulletin_board.NewBulletinBoard(*tellNodesToRegister)
 
 	// Start the Bulletin Board's main operations in a new goroutine
 	go func() {
