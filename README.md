@@ -532,10 +532,11 @@ All configurations are initialized in the [`config/config.yaml`](config/config/y
 ### Running the Bulletin Board
 
 ```bash  
-go run cmd/bulletin-board/main.go -logLevel=<logLevel>
+go run cmd/bulletin-board/main.go -logLevel=<logLevel> <-usePrev>
 ```  
 - Options:
   - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error"). When the level is set as "Info", color printing is disabled.
+  - `<-usePrev>`: (optional) A boolean flag which enables the bulletin board to tell all the clients and relays to register again, using the addresses saved from the previous run (lastRegisteredClientsRelays.yml)
 
 ### Running a Relay
 
@@ -557,8 +558,8 @@ go run cmd/client/main.go -id=<id> -host=<host> -port=<port> -promPort=<promPort
 - Options:
   - `<id>`: The unique identifier for the client.
   - `<host>`: (optional) The public host IP for the client. If not given, the public IP will be retrieved automatically.
-  - `<port>`: The port number for the client. When not specified, any available port is used.
-  - `<promPort>`: The port number for scraping the client's Prometheus metrics. When not specified, any available port is used.
+  - `<port>`: (optional) The port number for the client. When not specified, any available port is used.
+  - `<promPort>`: (optional) The port number for scraping the client's Prometheus metrics. When not specified, any available port is used.
   - `<logLevel>`: (optional) The logging level (e.g., "info", "debug", "warn", "error"). When the level is set as "Info", color printing is disabled.
 
 ## Endpoints
@@ -567,6 +568,9 @@ go run cmd/client/main.go -id=<id> -host=<host> -port=<port> -promPort=<promPort
 
 - **Register Client**: `POST /registerClient`
 - **Register Relay**: `POST /registerRelay`
+- **Restart Protocol**: `POST /start`
+- **Shutdown Server**: `POST /shutdown`
+- **Restart Protocol and Use Client/Relay addresses from previous run**: `POST /startRegister`
 - **Updating config with new parameters (for next run)**: `POST /updateConfig`
 - Scraped metrics can be viewed on port 9090
 
@@ -575,6 +579,7 @@ go run cmd/client/main.go -id=<id> -host=<host> -port=<port> -promPort=<promPort
 - **Receive Onion**: `POST /receive`
 - **Get Status**: `GET /status`
 - **Start Run**: `POST /start`
+- **Re-register with bulletin board**: `POST /register`
 - **Prometheus Metrics**: `GET /metrics` - Note that this is served on a different port
 
 ---
