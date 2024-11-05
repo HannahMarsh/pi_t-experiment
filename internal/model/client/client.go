@@ -36,6 +36,8 @@ type Client struct {
 	wg               sync.WaitGroup // WaitGroup to ensure the client does not start protocol until all messages are generated
 	mu               sync.RWMutex
 	ShutdownMetrics  func()
+	OnionsReceived   []structs.Message
+	oReceived        sync.RWMutex
 }
 
 // NewClient creates a new client instance with a unique ID, host, and port.
@@ -57,6 +59,7 @@ func NewClient(id int, host string, port int, promPort int, bulletinBoardUrl str
 			//Messages:         make([]structs.Message, 0),
 			OtherClients:    make([]structs.PublicNodeApi, 0),
 			ShutdownMetrics: func() {},
+			OnionsReceived:  make([]structs.Message, 0),
 		}
 		c.wg.Add(1)
 
@@ -336,6 +339,10 @@ func (c *Client) startRun(start structs.ClientStartRunApi) error {
 
 	config.UpdateConfig(start.Config) // Update the global configuration based on the start signal.
 
+	c.oReceived.Lock()
+	c.OnionsReceived = make([]structs.Message, 0)
+	c.oReceived.Unlock()
+
 	// Ensure that there are relays and client participating in the run.
 	if len(start.Relays) == 0 {
 		return pl.NewError("%s: no participating relays", pl.GetFuncName())
@@ -398,6 +405,13 @@ func (c *Client) Receive(oApi structs.OnionApi, timeReceived time.Time) error {
 	}
 	isCheckpoint := msg.Msg == ""
 	slog.Debug("Client received onion", "layer", layer, "from", msg.From, "message", msg.Msg)
+
+	c.oReceived.Lock()
+	c.OnionsReceived = append(c.OnionsReceived, msg)
+	onionsReceived := len(c.OnionsReceived)
+	c.oReceived.Unlock()
+
+	slog.Info(fmt.Sprintf("Client has received %d onions", onionsReceived))
 
 	metrics.SetOnionsReceived(tReceived, msg.From, c.Address, isCheckpoint, msg.Hash)
 

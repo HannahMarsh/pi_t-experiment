@@ -76,21 +76,32 @@ func (bb *BulletinBoard) Shutdown() error {
 // StartProtocol periodically checks if all nodes are ready and, if so, signals them to start a new run.
 func (bb *BulletinBoard) StartProtocol() error {
 	for {
-		// Check if the time since the last start run is greater than the required interval.
-		timeSince := time.Since(bb.lastStartRun)
-		if timeSince >= bb.timeBetweenRuns {
-			bb.lastStartRun, _ = utils.GetTimestamp() // Update the timestamp for the last start run.
-			if bb.allNodesReady() {                   // Check if all nodes are ready to start.
-				if err := bb.signalNodesToStart(); err != nil {
-					return pl.WrapError(err, "error signaling nodes to start")
-				} else {
-					return nil // If successful, exit the loop.
-				}
+		if bb.allNodesReady() { // Check if all nodes are ready to start.
+			if err := bb.signalNodesToStart(); err != nil {
+				return pl.WrapError(err, "error signaling nodes to start")
+			} else {
+				return nil // If successful, exit the loop.
 			}
 		}
-
-		time.Sleep(time.Second * 5) // Wait 5 seconds before the next check.
+		time.Sleep(3 * time.Second) // Wait 3 seconds before the next check.
 	}
+	//
+	//for {
+	//	// Check if the time since the last start run is greater than the required interval.
+	//	timeSince := time.Since(bb.lastStartRun)
+	//	if timeSince >= bb.timeBetweenRuns {
+	//		bb.lastStartRun, _ = utils.GetTimestamp() // Update the timestamp for the last start run.
+	//		if bb.allNodesReady() {                   // Check if all nodes are ready to start.
+	//			if err := bb.signalNodesToStart(); err != nil {
+	//				return pl.WrapError(err, "error signaling nodes to start")
+	//			} else {
+	//				return nil // If successful, exit the loop.
+	//			}
+	//		}
+	//	}
+	//
+	//	time.Sleep(time.Second * 5) // Wait 5 seconds before the next check.
+	//}
 }
 
 // signalNodesToStart sends the start signal to all active nodes (client and relays) in the network.
@@ -225,28 +236,27 @@ func (bb *BulletinBoard) allNodesReady() bool {
 	defer bb.mu.RUnlock()
 
 	// Count the number of active relay nodes.
-	activeNodes := utils.CountAny(utils.GetValues(bb.Network), func(node *RelayView) bool {
-		return node.IsActive()
-	})
+	activeNodes := utils.CountNonNull(utils.GetValues(bb.Network))
+	//	utils.CountAny(utils.GetValues(bb.Network), func(node *RelayView) bool {
+	//	return node.IsActive()
+	//})
 
 	// If the number of active relays is less than required, log and return false.
 	if activeNodes < config.GetMinimumRelays() {
-		slog.Info("Not all nodes are registered.", "registered", activeNodes, "min required", config.GetMinimumRelays())
+		slog.Info(fmt.Sprintf("Not all nodes are registered. %d are registered, but need minimum of %d to start protocol.", activeNodes, config.GetMinimumRelays()))
 		return false
 	}
 
 	// Count the number of client that have registered intent to send messages.
-	registeredClients := utils.CountAny(utils.GetValues(bb.Clients), func(client *ClientView) bool {
-		return true // client.MessageQueue != nil && len(client.MessageQueue) > 0
-	})
+	registeredClients := utils.CountNonNull(utils.GetValues(bb.Clients))
 
 	// If the number of registered client is less than required, log and return false.
 	if registeredClients < config.GetMinimumClients() {
-		slog.Info("Not all client are registered.", "registered", registeredClients, "min required", config.GetMinimumClients())
+		slog.Info(fmt.Sprintf("Not all clients are registered. %d are registered, but need minimum of %d to start protocol.", registeredClients, config.GetMinimumClients()))
 		return false
 	}
 
 	// If all nodes and client are ready, log and return true.
-	slog.Info("All nodes ready")
+	slog.Info(fmt.Sprintf("All %d relays and %d clients ready", activeNodes, registeredClients))
 	return true
 }

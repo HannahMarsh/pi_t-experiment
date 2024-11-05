@@ -227,6 +227,19 @@ func GetValues[K comparable, V any](m map[K]V) []V {
 	return values
 }
 
+func CountNonNull[T any](items []*T) int {
+	i := 0
+	if items == nil {
+		return i
+	}
+	for _, item := range items {
+		if item != nil {
+			i++
+		}
+	}
+	return i
+}
+
 func MapToMap[K comparable, V any, K2 comparable, V2 any](m map[K]V, f func(K, V) (K2, V2)) map[K2]V2 {
 	result := make(map[K2]V2)
 	for k, v := range m {

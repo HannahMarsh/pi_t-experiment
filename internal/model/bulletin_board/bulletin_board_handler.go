@@ -21,7 +21,7 @@ func (bb *BulletinBoard) HandleRegisterRelay(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Log the relay registration event with the relay ID.
-	slog.Info("Registering relay with", "id", relay.ID)
+	slog.Debug("Registering relay with", "id", relay.ID)
 
 	// Update the bulletin board with the new relay information.
 	bb.UpdateRelay(relay)
@@ -29,9 +29,26 @@ func (bb *BulletinBoard) HandleRegisterRelay(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusCreated)
 }
 
+// HandleRegisterRelay processes HTTP requests for registering a relay node.
+func (bb *BulletinBoard) HandleStartProtocol(w http.ResponseWriter, r *http.Request) {
+	// Log the relay registration event with the relay ID.
+	slog.Info("Starting protocol...")
+
+	// Start the Bulletin Board's main operations in a new goroutine
+	go func() {
+		err := bb.StartProtocol()
+		if err != nil {
+			slog.Error("failed to start runs", err)
+			config.GlobalCancel()
+		}
+	}()
+
+	w.WriteHeader(http.StatusCreated)
+}
+
 // HandleRegisterClient processes HTTP requests for registering a client node.
 func (bb *BulletinBoard) HandleRegisterClient(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Received client registration request") // Log that a client registration request has been received.
+	slog.Debug("Received client registration request") // Log that a client registration request has been received.
 
 	var client structs.PublicNodeApi
 
@@ -43,7 +60,7 @@ func (bb *BulletinBoard) HandleRegisterClient(w http.ResponseWriter, r *http.Req
 	}
 
 	// Log the client registration event with the client ID.
-	slog.Info("Registering client with", "id", client.ID)
+	slog.Debug("Registering client with", "id", client.ID)
 
 	// Register the client with the bulletin board.
 	go bb.RegisterClient(client)

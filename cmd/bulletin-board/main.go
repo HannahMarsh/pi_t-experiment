@@ -73,6 +73,7 @@ func main() {
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
 	// Set up HTTP handlers
+	http.HandleFunc("/start", bulletinBoard.HandleStartProtocol)
 	http.HandleFunc("/registerRelay", bulletinBoard.HandleRegisterRelay)
 	http.HandleFunc("/registerClient", bulletinBoard.HandleRegisterClient)
 	//http.HandleFunc("/registerIntentToSend", bulletinBoard.HandleRegisterIntentToSend)
