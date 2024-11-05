@@ -6,6 +6,7 @@ import (
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"log/slog"
 	"net/http"
+	"time"
 )
 
 // HandleReceiveOnion handles incoming onion requests sent to the relay.
@@ -31,5 +32,22 @@ func (n *Relay) HandleStartRun(w http.ResponseWriter, r *http.Request) {
 			slog.Info("Run complete", "did_participate", didParticipate)
 		}
 	}()
+	w.WriteHeader(http.StatusOK)
+}
+
+func (n *Relay) HandleRegisterWithBulletinBoard(w http.ResponseWriter, r *http.Request) {
+	slog.Info("Registering with bulletin board")
+
+	go func(n *Relay) {
+		for {
+			if err := n.RegisterWithBulletinBoard(); err != nil {
+				slog.Error("failed to register with bulletin board: " + err.Error())
+			} else {
+				slog.Info("Registered with bulletin board")
+				break
+			}
+			time.Sleep(5 * time.Second)
+		}
+	}(n)
 	w.WriteHeader(http.StatusOK)
 }

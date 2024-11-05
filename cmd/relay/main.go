@@ -120,6 +120,7 @@ func main() {
 	// Set up HTTP handlers
 	http.HandleFunc("/receive", newRelay.HandleReceiveOnion)
 	http.HandleFunc("/start", newRelay.HandleStartRun)
+	http.HandleFunc("/register", newRelay.HandleRegisterWithBulletinBoard)
 	http.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Shutdown signal received")
 		quit <- os.Signal(syscall.SIGTERM) // signal shutdown
