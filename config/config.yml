@@ -8,7 +8,7 @@ d: 2          # Threshold for number of bruises before an onion is discarded by 
 delta: 1e-5   # The probability of differential privacy violation due to the adversary's actions.
 chi: 1.0      # Fraction of corrupted relays (which perform no mixing)
 dropAllOnionsFromClient: 1 # Client ID to drop all onions from
-vis: true     # Visualize the network
+vis: false     # Visualize the network
 scrapeInterval: 15 # Prometheus scrape interval in seconds
 prometheusPath: '/opt/homebrew/bin/prometheus'
 bulletin_board:

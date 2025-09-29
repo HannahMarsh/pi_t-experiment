@@ -3,14 +3,15 @@ package pi_t
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"strings"
+	"testing"
+
 	pl "github.com/HannahMarsh/PrettyLogger"
 	"github.com/HannahMarsh/pi_t-experiment/internal/api/structs"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/crypto/keys"
 	"github.com/HannahMarsh/pi_t-experiment/internal/pi_t/onion_model"
 	"github.com/HannahMarsh/pi_t-experiment/pkg/utils"
-	"log/slog"
-	"strings"
-	"testing"
 )
 
 func TestFORMONION(t *testing.T) {
