@@ -14,6 +14,12 @@ const (
 	RECIPIENT       = "recipient"
 )
 
+// Each hop’s header `E_i` is encrypted using X25519 (ephemeral–static ECDH) combined with HKDF–SHA256 to derive a
+// per-layer 256-bit symmetric key, and each hop’s `B_i`, `Content`, and all sepal blocks are encrypted under that key
+// using AES-256-GCM. For the final recipient, the message payload is first encrypted directly under their X25519 public
+// key; earlier layers repeatedly wrap the content and sepal blocks in nested AES-GCM layers keyed by fresh random per-hop
+// keys.
+
 // TulipOnion represents a single onion at some stage.
 type TulipOnion struct {
 	Header  []byte   // H_i
