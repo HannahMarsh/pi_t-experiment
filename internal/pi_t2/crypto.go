@@ -1,0 +1,165 @@
+package pi_t2
+
+import (
+	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/ecdh"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/binary"
+	"errors"
+	"io"
+
+	"golang.org/x/crypto/hkdf"
+)
+
+// ============================
+// Key Helpers
+// ============================
+
+func randomKey() []byte {
+	key := make([]byte, 32) // 256-bit AES key
+	if _, err := io.ReadFull(rand.Reader, key); err != nil {
+		panic(err)
+	}
+	return key
+}
+
+// ============================
+// Hybrid Encryption (X25519 + AES-GCM)
+// ============================
+
+// hybridEncrypt: X25519 ephemeral-static -> HKDF -> AES-GCM
+func hybridEncrypt(pubKey interface{}, plaintext []byte) ([]byte, error) {
+	ecdhPub, ok := pubKey.(*ecdh.PublicKey)
+	if !ok {
+		return nil, errors.New("invalid public key type")
+	}
+
+	curve := ecdh.X25519()
+	ephemeralPriv, err := curve.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	ephemeralPub := ephemeralPriv.PublicKey()
+
+	shared, err := ephemeralPriv.ECDH(ecdhPub)
+	if err != nil {
+		return nil, err
+	}
+
+	// derive AES key from shared secret
+	aesKey := deriveKey(shared)
+	ct, err := encryptSymmetricWithKey(plaintext, aesKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// encode ephemeral pubkey + ciphertext
+	ephemeralBytes := ephemeralPub.Bytes()
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, uint16(len(ephemeralBytes)))
+	buf.Write(ephemeralBytes)
+	buf.Write(ct)
+	return buf.Bytes(), nil
+}
+
+func hybridDecrypt(privKey interface{}, ciphertext []byte) ([]byte, error) {
+	ecdhPriv, ok := privKey.(*ecdh.PrivateKey)
+	if !ok {
+		return nil, errors.New("invalid private key type")
+	}
+
+	buf := bytes.NewReader(ciphertext)
+	var ephLen uint16
+	if err := binary.Read(buf, binary.LittleEndian, &ephLen); err != nil {
+		return nil, err
+	}
+
+	ephPubBytes := make([]byte, ephLen)
+	if _, err := io.ReadFull(buf, ephPubBytes); err != nil {
+		return nil, err
+	}
+
+	curve := ecdh.X25519()
+	ephPub, err := curve.NewPublicKey(ephPubBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	shared, err := ecdhPriv.ECDH(ephPub)
+	if err != nil {
+		return nil, err
+	}
+
+	aesKey := deriveKey(shared)
+	ct := make([]byte, buf.Len())
+	if _, err := io.ReadFull(buf, ct); err != nil {
+		return nil, err
+	}
+
+	return decryptSymmetricWithKey(ct, aesKey)
+}
+
+func deriveKey(sharedSecret []byte) []byte {
+	h := hkdf.New(sha256.New, sharedSecret, nil, []byte("tulip-hybrid"))
+	key := make([]byte, 32)
+	if _, err := io.ReadFull(h, key); err != nil {
+		panic(err)
+	}
+	return key
+}
+
+// ============================
+// Symmetric Encryption (AES-GCM)
+// ============================
+
+func encryptSymmetric(plaintext, key []byte) ([]byte, error) {
+	ct, err := encryptSymmetricWithKey(plaintext, key)
+	if err != nil {
+		return nil, err
+	}
+	return ct, nil
+}
+
+func encryptSymmetricWithKey(plaintext, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonce := make([]byte, aead.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+
+	return append(nonce, aead.Seal(nil, nonce, plaintext, nil)...), nil
+}
+
+func decryptSymmetric(ciphertext, key []byte) ([]byte, error) {
+	return decryptSymmetricWithKey(ciphertext, key)
+}
+
+func decryptSymmetricWithKey(ciphertext, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ciphertext) < aead.NonceSize() {
+		return nil, errors.New("ciphertext too short")
+	}
+
+	nonce := ciphertext[:aead.NonceSize()]
+	body := ciphertext[aead.NonceSize():]
+	return aead.Open(nil, nonce, body, nil)
+}

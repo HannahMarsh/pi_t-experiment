@@ -40,8 +40,8 @@ func main() {
 		os.Exit(-1)
 	}
 
-	pathLengths := []int{3, 5, 7}
-	messageSizes := []int{64, 256, 1024}
+	pathLengths := []int{3, 4, 5, 6, 7, 8}
+	messageSizes := []int{64, 256, 1024} // Bytes
 
 	for _, l := range pathLengths {
 		for _, m := range messageSizes {
